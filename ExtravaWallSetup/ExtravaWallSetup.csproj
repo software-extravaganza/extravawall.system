@@ -1,0 +1,71 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net7.0</TargetFramework>
+		<RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers>
+		
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<!--<PublishAot>true</PublishAot>-->
+		<!--<StaticICULinking>true</StaticICULinking>
+		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
+		<IlcDisableReflection>true</IlcDisableReflection>
+		<IlcOptimizationPreference>Size</IlcOptimizationPreference>-->
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<PublishSingleFile>false</PublishSingleFile>
+		<PublishTrimmed>true</PublishTrimmed>
+		<SelfContained>true</SelfContained>
+		<IsTrimmable>true</IsTrimmable>
+		<TrimMode>full</TrimMode>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+		<IlcOptimizationPreference>Size</IlcOptimizationPreference>
+		<IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+		<IlcDisableReflection>true</IlcDisableReflection>
+		<IlcTrimMetadata>true</IlcTrimMetadata>
+		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+		<TrimmerRemoveSymbols>true</TrimmerRemoveSymbols>
+		<DebuggerSupport>false</DebuggerSupport>
+		<EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+		<EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+		<EventSourceSupport>false</EventSourceSupport>
+		<HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+		<UseSystemResourceKeys>true</UseSystemResourceKeys>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<PublishAot>true</PublishAot>
+		<StripSymbols>true</StripSymbols>
+		<NoStdLib>true</NoStdLib>
+		<NoConfig>true</NoConfig>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Content Include="TrimRoots.xml" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CliWrap" Version="3.6.0" />
+		<PackageReference Include="Figgle.Generator" Version="0.5.1" />
+		<PackageReference Include="Hardware.Info" Version="10.1.1" />
+		<PackageReference Include="Microsoft.DotNet.ILCompiler; runtime.win-x64.Microsoft.DotNet.ILCompiler; runtime.linux-x64.Microsoft.DotNet.ILCompiler" Version="8.0.0-*" />
+		<PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
+		<PackageReference Include="ReactiveMarbles.ObservableEvents.SourceGenerator" Version="1.2.3">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="ReactiveUI" Version="18.4.1" />
+		<PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
+		<PackageReference Include="Spectre.Console" Version="0.46.0" />
+		<PackageReference Include="Terminal.Gui" Version="1.9.0" />
+		<PackageReference Include="Tomlyn" Version="0.16.2" />
+	</ItemGroup>
+</Project>

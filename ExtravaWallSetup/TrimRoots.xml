@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<linker>
+	<assembly fullname="ExtravaWallSetup">
+		<type fullname="ExtravaWallSetup.Program">
+		</type>
+	</assembly>
+
+	<assembly fullname="Mono.Posix.NETStandard"></assembly>
+	<assembly fullname="libCursesWrapper"></assembly>
+</linker>
