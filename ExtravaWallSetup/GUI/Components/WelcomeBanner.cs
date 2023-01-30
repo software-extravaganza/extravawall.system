@@ -5,9 +5,11 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components
+{
 
-    
-    public partial class WelcomeBanner {
+
+    public partial class WelcomeBanner
+    {
     }
 }

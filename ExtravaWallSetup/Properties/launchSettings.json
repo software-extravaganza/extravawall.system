@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "ExtravaWallSetup": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false,
+      "remoteDebugMachine": "ExtravaWallLin",
+      "authenticationMode": "Windows",
+      "hotReloadEnabled": false,
+      "nativeDebugging": true
+    },
+    "WSL:Debian": {
+      "commandName": "WSL",
+      //"workingDirectory": "{OutDir}",
+      "distributionName": "Debian",
+      "nativeDebugging": true//,
+      //"executablePath": "dotnet",
+      //"commandLineArgs": "run {OutDir}/ExtravaWallSetup.dll"
+    }
+  }
+}

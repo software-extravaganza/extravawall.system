@@ -9,11 +9,15 @@
 // -----------------------------------------------------------------------------
 namespace ExtravaWallSetup.GUI {
     using DynamicData;
+    using ExtravaWallSetup.Commands;
+    using ExtravaWallSetup.Commands.Framework;
+    using ExtravaWallSetup.GUI.Framework;
     using Hardware.Info;
     using System;
     using System.Data;
     using System.Reflection;
     using System.Runtime.InteropServices;
+    using System.Threading.Tasks;
     using Terminal.Gui;
     using Terminal.Gui.Graphs;
     using static Terminal.Gui.Graphs.BarSeries;
@@ -37,20 +41,19 @@ namespace ExtravaWallSetup.GUI {
         private float _memGraphOffset;
         private ColorScheme _defaultInfoTableColorScheme;
         private ColorScheme _defaultInfoTableColumnColorScheme;
-
-        public DefaultScreen() {
+        public ScrollView VirtualConsoleView => consoleScrollView;
+        private TaskCompletionSource _layoutInitializedCompletionSource;
+        public Task LayoutInitialized => _layoutInitializedCompletionSource.Task;
+        public TableView InfoTable => infoTable;
+        public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource) {
+            _layoutInitializedCompletionSource = layoutInitializedCompletionSource;
             InitializeComponent();
             _memPoints = new ScatterSeries();
             _cpuPoints = new ScatterSeries();
             _hardwareInfo = new HardwareInfo();
-            updateSystemInfo();
+            
             _startTime = DateTime.Now;
-            _systemTimer = new Timer((o) => {
-                // Note the check for Mainloop being valid. System.Timers can run after they are Disposed.
-                // This code must be defensive for that. 
-                updateGraphs();
-                Application.MainLoop?.Invoke(drawGraphs);
-            }, null, 0, _systemTimerTick);
+       
 
             _memSeries = new DiscoBarSeries();
             _memBars = new List<BarSeries.Bar>();
@@ -64,20 +67,6 @@ namespace ExtravaWallSetup.GUI {
             _memGraphOffset = 0f;
             memGraph.AutoSize = true;
             cpuGraph.AutoSize = true;
-            ////Console.WriteLine($"Used Memory: {}%");
-            ////Console.WriteLine($"Cpu: {}%");
-            //memGraph.Series.Add(_memPoints);
-            //cpuGraph.Series.Add(_cpuPoints);
-
-            //memGraph.AxisX.Increment = 500f;
-            //memGraph.AxisX.ShowLabelsEvery = 1;
-            //memGraph.AxisY.Increment = 0.1f;
-            //memGraph.AxisY.ShowLabelsEvery = 5;
-
-            //cpuGraph.AxisX.Increment = 500f;
-            //cpuGraph.AxisX.ShowLabelsEvery = 1;
-            //cpuGraph.AxisY.Increment = 0.1f;
-            //cpuGraph.AxisY.ShowLabelsEvery = 5;
             _defaultInfoTableColorScheme = new ColorScheme() {
                 Normal = new Terminal.Gui.Attribute(Color.Gray, Color.Blue)
             };
@@ -86,9 +75,8 @@ namespace ExtravaWallSetup.GUI {
             };
 
             infoTable.Style.RowColorGetter = (a) => _defaultInfoTableColorScheme;
-            
+            consoleScrollView.LayoutComplete += consoleScrollView_LayoutCompleteAsync;
             consoleScrollView.KeepContentAlwaysInViewport = true;
-            consoleScrollView.LayoutComplete += ConsoleScrollView_LayoutComplete;
             consoleScrollView.Enabled = true;
             consoleScrollView.Visible = true;
             consoleScrollView.ShowHorizontalScrollIndicator = true;
@@ -96,76 +84,25 @@ namespace ExtravaWallSetup.GUI {
             consoleScrollView.ColorScheme = Colors.TopLevel;
             consoleScrollView.WantMousePositionReports = true;
             consoleScrollView.SetFocus();
-            // consoleScrollView.Focus
-            //consoleScrollView.Add(new BannerView());
-            //AddConsoleContent(new BannerView());
-            this.KeyPress += DefaultScreen_KeyDown;
-            Terminal.Gui.Application.Resized = DefaultScreen_Resized;
+            consoleScrollView.AutoSize = true;
+
+            _systemTimer = new Timer((o) => {
+                // Note the check for Mainloop being valid. System.Timers can run after they are Disposed.
+                // This code must be defensive for that. 
+                updateGraphs();
+                Application.MainLoop?.Invoke(drawGraphs);
+
+            }, null, 0, _systemTimerTick);
         }
 
-        private void DefaultScreen_Resized(Application.ResizedEventArgs obj) {
-            ResetConsoleScroll();
-        }
-
-        private void DefaultScreen_KeyDown(KeyEventEventArgs obj) {
-            if(obj.KeyEvent.Key == Key.F5) {
-                ResetConsoleScroll();
-                Redraw(Bounds);
+        private void consoleScrollView_LayoutCompleteAsync(LayoutEventArgs obj) {
+            if (!_layoutInitializedCompletionSource.Task.IsCompleted) {
+                _layoutInitializedCompletionSource.SetResult();
             }
-        }
-
-        bool _initalLayout = false;
-        private void ConsoleScrollView_LayoutComplete(LayoutEventArgs obj) {
-            if (!_initalLayout) {
-                _initalLayout = true;
-                AddConsoleContent(new BannerView());
-                AddConsoleContent(new StartMenuView());
-            }
-        }
-
-        private void AddConsoleContent(View obj) {
-            var lowestPosition = consoleScrollView.Subviews.First().Subviews.LastOrDefault();
-            consoleScrollView.Add(obj);
-            obj.GetCurrentWidth(out int currentWidth);
-            obj.GetCurrentHeight(out int currentHeight);
-            obj.Y = lowestPosition == null ? Pos.At(0) : Pos.Bottom(lowestPosition) + 1;
-            obj.X = Pos.At(0);
-            _totalScrollWidth += currentWidth;
-            _totalScrollHeight += currentHeight;
-            ResetConsoleScroll();
-            consoleScrollView.SetFocus();
-        }
-
-        private void ResetConsoleScroll() {
-            consoleScrollView.GetCurrentWidth(out int scrollViewWidth);
-            consoleScrollView.GetCurrentHeight(out int scrollViewHeight);
-            consoleScrollView.ContentSize = new Size(_totalScrollWidth <= scrollViewWidth ? scrollViewWidth : _totalScrollWidth, _totalScrollHeight <= scrollViewHeight ? scrollViewHeight : _totalScrollHeight);
-            consoleScrollView.ContentOffset = new Point(0, consoleScrollView.ContentSize.Height - scrollViewHeight);
-            consoleScrollView.SetNeedsDisplay();
-        }
-
-        private void updateSystemInfo() {
-            addInfoRow(nameof(RuntimeInformation.ProcessArchitecture), RuntimeInformation.ProcessArchitecture.ToString());
-            addInfoRow(nameof(RuntimeInformation.OSArchitecture), RuntimeInformation.OSArchitecture.ToString());
-            addInfoRow(nameof(RuntimeInformation.FrameworkDescription), RuntimeInformation.FrameworkDescription.ToString());
-            addInfoRow(nameof(RuntimeInformation.OSDescription), RuntimeInformation.OSDescription.ToString());
-            addInfoRow(nameof(RuntimeInformation.RuntimeIdentifier), RuntimeInformation.RuntimeIdentifier.ToString());
-            addInfoRow(nameof(RuntimeInformation.ProcessArchitecture), RuntimeInformation.ProcessArchitecture.ToString());
-            addInfoRow("Current Location", AppContext.BaseDirectory.ToString());
-        }
-        private System.Data.DataRow addInfoRow(string property, string value) {
-            List<object> row = new List<object>() {
-                property,
-                value
-            };
-
-            var datarow = infoTable.Table.Rows.Add(row.ToArray());
-            return datarow;
         }
 
         bool good = false;
-        private int _totalScrollWidth;
-        private int _totalScrollHeight = 1;
+        
 
         private void updateGraphs() {
 
@@ -186,12 +123,12 @@ namespace ExtravaWallSetup.GUI {
             cpuGraph.GetCurrentWidth(out int cpuGraphWidth);
             memGraph.GetCurrentHeight(out int memGraphHeight);
             cpuGraph.GetCurrentHeight(out int cpuGraphHeight);
-            
-            while (_memBars.Count > memGraphWidth) {
+
+            while (_memBars.Count > memGraphWidth && _memBars.Count > 0) {
                 _memBars.RemoveAt(0);
             }
 
-            while (_cpuBars.Count > cpuGraphWidth) {
+            while (_cpuBars.Count > cpuGraphWidth && _cpuBars.Count > 0) {
                 _cpuBars.RemoveAt(0);
             }
             //memGraph.ScrollOffset = new PointF(_memGraphOffset, 0);
@@ -222,4 +159,8 @@ namespace ExtravaWallSetup.GUI {
         }
 
     }
+
+
+
+
 }

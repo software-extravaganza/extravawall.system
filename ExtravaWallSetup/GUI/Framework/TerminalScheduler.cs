@@ -7,19 +7,24 @@ using System.Text;
 using System.Threading.Tasks;
 using Terminal.Gui;
 
-namespace ExtravaWallSetup.GUI {
-    public class TerminalScheduler : LocalScheduler {
+namespace ExtravaWallSetup.GUI.Framework
+{
+    public class TerminalScheduler : LocalScheduler
+    {
         public static readonly TerminalScheduler Default = new TerminalScheduler();
         TerminalScheduler() { }
 
         public override IDisposable Schedule<TState>(
             TState state, TimeSpan dueTime,
-            Func<IScheduler, TState, IDisposable> action) {
+            Func<IScheduler, TState, IDisposable> action)
+        {
 
-            IDisposable PostOnMainLoop() {
+            IDisposable PostOnMainLoop()
+            {
                 var composite = new CompositeDisposable(2);
                 var cancellation = new CancellationDisposable();
-                Application.MainLoop.Invoke(() => {
+                Application.MainLoop.Invoke(() =>
+                {
                     if (!cancellation.Token.IsCancellationRequested)
                         composite.Add(action(this, state));
                 });
@@ -27,9 +32,11 @@ namespace ExtravaWallSetup.GUI {
                 return composite;
             }
 
-            IDisposable PostOnMainLoopAsTimeout() {
+            IDisposable PostOnMainLoopAsTimeout()
+            {
                 var composite = new CompositeDisposable(2);
-                var timeout = Application.MainLoop.AddTimeout(dueTime, args => {
+                var timeout = Application.MainLoop.AddTimeout(dueTime, args =>
+                {
                     composite.Add(action(this, state));
                     return false;
                 });

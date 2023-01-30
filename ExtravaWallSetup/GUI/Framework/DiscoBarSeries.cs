@@ -7,15 +7,18 @@ using static Terminal.Gui.Graphs.BarSeries;
 using Terminal.Gui.Graphs;
 using Terminal.Gui;
 
-namespace ExtravaWallSetup.GUI {
-    class DiscoBarSeries : BarSeries {
+namespace ExtravaWallSetup.GUI.Framework
+{
+    class DiscoBarSeries : BarSeries
+    {
         private Terminal.Gui.Attribute green;
         private Terminal.Gui.Attribute brightgreen;
         private Terminal.Gui.Attribute brightyellow;
         private Terminal.Gui.Attribute red;
         private Terminal.Gui.Attribute brightred;
 
-        public DiscoBarSeries() {
+        public DiscoBarSeries()
+        {
 
             green = Application.Driver.MakeAttribute(Color.BrightGreen, Color.Black);
             brightgreen = Application.Driver.MakeAttribute(Color.Green, Color.Black);
@@ -23,27 +26,34 @@ namespace ExtravaWallSetup.GUI {
             red = Application.Driver.MakeAttribute(Color.Red, Color.Black);
             brightred = Application.Driver.MakeAttribute(Color.BrightRed, Color.Black);
         }
-        protected override void DrawBarLine(GraphView graph, Terminal.Gui.Point start, Terminal.Gui.Point end, Bar beingDrawn) {
+        protected override void DrawBarLine(GraphView graph, Point start, Point end, Bar beingDrawn)
+        {
             var driver = Application.Driver;
 
             int x = start.X;
-            for (int y = end.Y; y <= start.Y; y++) {
+            for (int y = end.Y; y <= start.Y; y++)
+            {
 
                 var height = graph.ScreenToGraphSpace(x, y).Y;
 
-                if (height >= .85) {
+                if (height >= .85)
+                {
                     driver.SetAttribute(red);
                 }
-                else if (height >= .66) {
+                else if (height >= .66)
+                {
                     driver.SetAttribute(brightred);
                 }
-                else if (height >= .45) {
+                else if (height >= .45)
+                {
                     driver.SetAttribute(brightyellow);
                 }
-                else if (height >= .25) {
+                else if (height >= .25)
+                {
                     driver.SetAttribute(brightgreen);
                 }
-                else {
+                else
+                {
                     driver.SetAttribute(green);
                 }
 

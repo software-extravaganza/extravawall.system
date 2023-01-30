@@ -15,8 +15,8 @@ using System.Text.RegularExpressions;
 using Tomlyn;
 using static System.Net.Mime.MediaTypeNames;
 using ReactiveUI;
-using ExtravaWallSetup.GUI;
 using System.Reactive.Concurrency;
+using ExtravaWallSetup.GUI.Framework;
 
 try {
     //var rule = new Rule($"[red]ExtravaWall Installer ({RuntimeInformation.OSArchitecture})[/]");
@@ -37,8 +37,13 @@ try {
     Terminal.Gui.Application.Driver.LRCorner = '\u256F';
     RxApp.MainThreadScheduler = TerminalScheduler.Default;
     RxApp.TaskpoolScheduler = TaskPoolScheduler.Default;
-    Terminal.Gui.Application.Top.Add(new ExtravaWallSetup.GUI.DefaultScreen());
-    Terminal.Gui.Application.Run();
+    var installManager = new InstallManager();
+    Terminal.Gui.Application.Top.Add(installManager.DefaultScreen);
+    try {
+        Terminal.Gui.Application.Run();
+    }
+    catch (Exception ex) {
+    }
     Terminal.Gui.Application.Shutdown();
 
     //Environment.ProcessorCount
@@ -94,23 +99,13 @@ try {
     // Echo the fruit back to the terminal
     // AnsiConsole.WriteLine($"I agree. {fruit} is tasty!");
 
-    const string COMMAND_UNAME = "uname";
-    const string UNAME_ARG_NAME = "-n";
-    const string UNAME_ARG_OS = "-s";
+
     const string SHELL_COMMAND_CAT = "cat";
     const string COMMAND_SHELL = "/bin/sh";
     const string SHELL_ARG_INTERPRET = "-c";
     const string SHELL_COMMAND_LS_ARG_SYS_INFO = "ls /etc/*-release";
-    
-    var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-    var isWindowsAdmin = () => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-    var isUnixAdmin = () => Mono.Unix.Native.Syscall.geteuid() == 0;
-    var IsAdministrator = () => isWindows ? isWindowsAdmin() : isUnixAdmin();
 
-    if (!IsAdministrator()) {
-        Console.WriteLine($"Please run with elivated permissions to properly install");
-        return;
-    }
+   
     ////var files = new DirectoryInfo(AppContext.BaseDirectory).GetFiles();
     ////foreach (var file in files) {
     ////    Console.WriteLine(file);
@@ -170,27 +165,27 @@ try {
     //}
 
 
-    async Task StartInstall() {
-        var hostname = string.Empty;
-        var hostnameFound = (string result) => {
-            hostname = result;
-            Console.WriteLine($"Hostname found: {hostname}");
-        };
-        var hostnameNotFound = (string result) => {
-            Console.Error.WriteLine($"No hostname found: {result}");
+    //async Task StartInstall() {
+    //    var hostname = string.Empty;
+    //    var hostnameFound = (string result) => {
+    //        hostname = result;
+    //        Console.WriteLine($"Hostname found: {hostname}");
+    //    };
+    //    var hostnameNotFound = (string result) => {
+    //        Console.Error.WriteLine($"No hostname found: {result}");
 
-        };
-        var cmd = Cli.Wrap(COMMAND_UNAME).WithArguments(UNAME_ARG_NAME) | (hostnameFound, hostnameNotFound);
+    //    };
+    //    var cmd = Cli.Wrap(COMMAND_UNAME).WithArguments(UNAME_ARG_NAME) | (hostnameFound, hostnameNotFound);
 
-        try {
-            await cmd.ExecuteAsync();
-        }
-        catch (Exception ex) {
-            hostnameNotFound(ex.Message);
-        }
+    //    try {
+    //        await cmd.ExecuteAsync();
+    //    }
+    //    catch (Exception ex) {
+    //        hostnameNotFound(ex.Message);
+    //    }
 
 
-    }
+    //}
 
     async Task<string> getOsReleaseFile(bool debug = false) {
         var response = string.Empty;
@@ -218,7 +213,7 @@ try {
         return string.Empty;
     }
 
-   
+
     async Task<SystemInfoModel> getOsInfo(string releaseFile, bool debug = false) {
         var model = new SystemInfoModel();
         var response = new StringBuilder();
@@ -241,12 +236,12 @@ try {
             Regex regex = new Regex(pattern, RegexOptions.Multiline);
             string targetString = response.ToString();
 
-            
+
             foreach (Match match in regex.Matches(targetString)) {
                 if (match.Success) {
                     var keyLookup = match.Groups["key"].Value.ToLower().Replace("_", string.Empty);
                     var value = match.Groups["value"].Value;
-                    if(nameof(model.ID).ToLower().CompareTo(keyLookup) == 0) {
+                    if (nameof(model.ID).ToLower().CompareTo(keyLookup) == 0) {
                         model.ID = value;
                     }
                     else if (nameof(model.Name).ToLower().CompareTo(keyLookup) == 0) {
@@ -272,7 +267,7 @@ try {
                     }
                 }
             }
-                return model;
+            return model;
         }
         catch (Exception ex) {
             sysInfoFailed(ex.Message);
@@ -282,7 +277,7 @@ try {
     }
 
     async Task DiscoverDistro(bool debug = false) {
-        
+
 
         var sysInfoFailed = (string result) => {
             Console.WriteLine($"Details system info not located using method #1 ({result})");

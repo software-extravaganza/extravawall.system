@@ -13,7 +13,7 @@ namespace ExtravaWallSetup.GUI {
     
     public partial class InstallerView {
         
-        public InstallerView() {
+        public InstallerView(InstallManager install) {
             InitializeComponent();
             this.wizard.ColorScheme = this.blackOnGreen;
         }

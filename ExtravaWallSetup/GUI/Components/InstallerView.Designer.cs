@@ -29,12 +29,7 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.ProgressBar progressBar;
         
-        private Terminal.Gui.StatusBar statusBar;
-        
-        private Terminal.Gui.StatusItem f1EditMe;
-        
         private void InitializeComponent() {
-            this.statusBar = new Terminal.Gui.StatusBar();
             this.progressBar = new Terminal.Gui.ProgressBar();
             this.wizard = new Terminal.Gui.Wizard();
             this.redOnBlack = new Terminal.Gui.ColorScheme();
@@ -74,10 +69,9 @@ namespace ExtravaWallSetup.GUI {
             this.ColorScheme = this.greenOnBlack;
             this.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.wizard.Width = Dim.Fill(0);
-            this.wizard.Height = Dim.Fill(2);
+            this.wizard.Height = Dim.Fill(0);
             this.wizard.X = 0;
             this.wizard.Y = 0;
-            this.wizard.ColorScheme = this.blackOnGreen;
             this.wizard.Modal = false;
             this.wizard.Data = "wizard";
             this.wizard.Text = "";
@@ -103,18 +97,6 @@ namespace ExtravaWallSetup.GUI {
             this.progressBar.ProgressBarFormat = Terminal.Gui.ProgressBarFormat.SimplePlusPercentage;
             this.progressBar.SegmentCharacter = '█';
             this.wizard.Add(this.progressBar);
-            this.statusBar.Width = Dim.Fill(0);
-            this.statusBar.Height = 1;
-            this.statusBar.X = 0;
-            this.statusBar.Y = Pos.AnchorEnd(1);
-            this.statusBar.ColorScheme = this.redOnBlack;
-            this.statusBar.Data = "statusBar";
-            this.statusBar.Text = "";
-            this.statusBar.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.f1EditMe = new Terminal.Gui.StatusItem(((Terminal.Gui.Key)(1048588u)), "F1 - Edit Me", null);
-            this.statusBar.Items = new Terminal.Gui.StatusItem[] {
-                    this.f1EditMe};
-            this.Add(this.statusBar);
         }
     }
 }
