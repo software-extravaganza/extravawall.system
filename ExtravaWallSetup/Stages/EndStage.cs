@@ -25,10 +25,12 @@ namespace ExtravaWallSetup.Stages
         protected override async Task Execute()
         {
             var isSuccess = string.IsNullOrWhiteSpace(ExitError);
+            var banner = new BannerView(isSuccess ? BannerType.ExitSuccess : BannerType.ExitFail);
             var title = isSuccess ? (ustring)"Install Successfull" : "Install failed";  //💪 😖
-            var content = isSuccess ? (ustring)"Go play in traffic (network traffic)" : $"{ExitError}"; //🙃 😩
+            var content = (ustring)$"{banner.Text}" + (isSuccess ? string.Empty : $"{ExitError}"); //🙃 😩
             //var msg = isSuccess ? MessageBox.Query(title, content) : MessageBox.ErrorQuery(title, content);
             _view = new ExitView(isSuccess, title, content);
+            _view.SetHeight(banner.BannerHeight + 6);
             Console.Add(_view);
             await Task.CompletedTask;
         }

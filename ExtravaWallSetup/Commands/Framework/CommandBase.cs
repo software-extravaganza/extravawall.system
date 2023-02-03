@@ -2,6 +2,7 @@
 using ExtravaWallSetup.GUI.Framework;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,6 +20,7 @@ namespace ExtravaWallSetup.Commands.Framework
         private StringBuilder _standardOutput = new StringBuilder();
         private StringBuilder _errorOutput = new StringBuilder();
         private StringBuilder _exceptionOutput = new StringBuilder();
+        private IReadOnlyDictionary<string, string?> _debianEnvironmentVariables = new ReadOnlyDictionary<string, string?>(new Dictionary<string, string?> { { "DEBIAN_FRONTEND", "noninteractive" } });
         protected ICommandView _commandView { get; set; }
         protected CommandOutputType? _overriddenOutputType { get; set; }
 
@@ -54,9 +56,19 @@ namespace ExtravaWallSetup.Commands.Framework
             };
         }
 
-        protected async Task<CommandResultPlus> RunRawAsync(Command command)
+        protected async Task<CommandResultPlus> RunRawAsync(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null)
         {
-            var finalCommand = command | (commandStandardOutput, commandErrorOutput);
+            var standardOutputDelegate = (string o) => {
+                commandStandardOutput(o);
+                customStandardOutput?.Invoke(o);
+            };
+
+            var errorOutputDelegate = (string o) => {
+                commandErrorOutput(o);
+                customErrorOutput?.Invoke(o);
+            };
+
+            var finalCommand = prepareCommand(command) | (standardOutputDelegate, errorOutputDelegate);
             var startTime = DateTimeOffset.Now;
             CommandResult? commandResult;
             try
@@ -72,14 +84,18 @@ namespace ExtravaWallSetup.Commands.Framework
             return new CommandResultPlus(commandResult, _standardOutput.ToString(), _errorOutput.ToString(), _exceptionOutput.ToString());
         }
 
-        protected async Task<(bool success, string result)> RunAsync(Command command)
-        {
-            return await RunAsync<string>(command);
+        private Command prepareCommand(Command command) {
+            return command.WithEnvironmentVariables(_debianEnvironmentVariables);
         }
 
-        protected async Task<(bool success, TReturn result)> RunAsync<TReturn>(Command command)
+        protected async Task<(bool success, string result)> RunAsync(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null)
         {
-            var rawResult = await RunRawAsync(command);
+            return await RunAsync<string>(command, customStandardOutput, customErrorOutput);
+        }
+
+        protected async Task<(bool success, TReturn result)> RunAsync<TReturn>(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null)
+        {
+            var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
             var success = rawResult.Result.ExitCode == 0;
             var resultString = success ? rawResult.StandardOutput : rawResult.ExceptionOutput.Length > 0 ? rawResult.ExceptionOutput : rawResult.ErrorOutput;
             var conversionTypeName = (Nullable.GetUnderlyingType(typeof(TReturn)) ?? typeof(TReturn)).Name;

@@ -10,10 +10,14 @@
 namespace ExtravaWallSetup.GUI {
     using NStack;
     using Terminal.Gui;
-    
-    
+
+
     public partial class ExitView {
-        
+
+        public void SetHeight(int height) {
+            Height = height;
+            contentLabel.Height = Height - 6;
+        }
         public ExitView(bool isSuccess, ustring title, ustring content) {
             InitializeComponent();
             this.contentLabel.WordWrap = true;

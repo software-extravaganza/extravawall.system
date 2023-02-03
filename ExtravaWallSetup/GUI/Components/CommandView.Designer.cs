@@ -14,11 +14,11 @@ namespace ExtravaWallSetup.GUI {
     
     
     public partial class CommandView : Terminal.Gui.View {
-        
-        private Terminal.Gui.Label commandResult;
+         
+        private ExtravaLabel commandResult;
 
         private void InitializeComponent() {
-            this.commandResult = new Terminal.Gui.Label();
+            this.commandResult = new ExtravaLabel();
             this.Width = 4;
             this.Height = 1;
             this.X = 0;

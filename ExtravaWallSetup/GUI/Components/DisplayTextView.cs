@@ -16,6 +16,68 @@ namespace ExtravaWallSetup.GUI
     using System.Linq.Expressions;
     using Terminal.Gui;
 
+    public class ExtravaProgressBar : ProgressBar {
+        public override bool OnMouseEnter(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            this.SuperView.OnMouseEnter(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseLeave(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            this.SuperView.OnMouseLeave(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseEvent(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            SuperView.OnMouseEvent(mouseEvent);
+            return false;
+        }
+    }
+
+    public class ExtravaTextView : TextView {
+        public override bool OnMouseEnter(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            this.SuperView.OnMouseEnter(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseLeave(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            this.SuperView.OnMouseLeave(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseEvent(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            SuperView.OnMouseEvent(mouseEvent);
+            return false;
+        }
+    }
+    public class ExtravaLabel : View {
+        public ExtravaLabel() {
+            
+        }
+
+        public override bool OnMouseEnter(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            SuperView?.OnMouseEnter(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseLeave(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            SuperView?.OnMouseLeave(mouseEvent);
+            return false;
+        }
+
+        public override bool OnMouseEvent(MouseEvent mouseEvent) {
+            Application.UngrabMouse();
+            SuperView?.OnMouseEvent(mouseEvent);
+            return false;
+        }
+    }
 
     public partial class DisplayTextView : ITextOutput {
         int currentWidth = 0, currentHeight = 0;
@@ -46,7 +108,7 @@ namespace ExtravaWallSetup.GUI
         }
 
         private void printOut(ustring output, bool newLine) {
-            textOutput.Text = textOutput.Text + output.Replace("\r\n", "\n").Replace("\t", "    ").Replace(" ", "\u00A0") + (newLine ? Environment.NewLine : string.Empty);
+            textOutput.Text = textOutput.Text + ((newLine ? Environment.NewLine : string.Empty) + output).Replace("\r\n", "\n").Replace("\t", "    ");//.Replace(" ", "\u00A0");
             var countOfLines = 0;
             textOutput.GetCurrentWidth(out currentWidth);
             foreach(var line in textOutput.Text.ToString().Split('\n')) {

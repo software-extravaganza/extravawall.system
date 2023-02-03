@@ -17,13 +17,13 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.ColorScheme greenOnBlack;
         
-        private Terminal.Gui.Label menuTitleLabel;
+        private ExtravaLabel menuTitleLabel;
         
         private Terminal.Gui.ListView listView;
         
         private void InitializeComponent() {
             this.listView = new Terminal.Gui.ListView();
-            this.menuTitleLabel = new Terminal.Gui.Label();
+            this.menuTitleLabel = new ExtravaLabel();
             this.greenOnBlack = new Terminal.Gui.ColorScheme();
             this.greenOnBlack.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.Green, Terminal.Gui.Color.Black);
             this.greenOnBlack.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);

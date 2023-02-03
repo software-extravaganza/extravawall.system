@@ -17,31 +17,31 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.ColorScheme greenOnBlack;
         
-        private Terminal.Gui.Label banner;
+        private ExtravaLabel bannerText;
         
         
         private void InitializeComponent() {
-            this.banner = new Terminal.Gui.Label();
+            this.bannerText = new ExtravaLabel();
             this.greenOnBlack = new Terminal.Gui.ColorScheme();
             this.greenOnBlack.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.Green, Terminal.Gui.Color.Black);
             this.greenOnBlack.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
             this.greenOnBlack.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.Green, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Black);
-            this.Width = Dim.Fill(0);
+            this.Width = 70;
             this.Height = 15;
             this.X = 0;
             this.Y = 0;
             this.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.banner.Width = Dim.Fill(0);
-            this.banner.Height = 15;
-            this.banner.X = 0;
-            this.banner.Y = 0;
-            this.banner.Data = "banner";
-            this.banner.Text = "Banner";
-            this.banner.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.banner.CanFocus = false;
-            this.Add(this.banner);
+            this.bannerText.Width = Dim.Fill(0);
+            this.bannerText.Height = 15;
+            this.bannerText.X = 0;
+            this.bannerText.Y = 0;
+            this.bannerText.Data = "banner";
+            this.bannerText.Text = "Banner";
+            this.bannerText.TextAlignment = Terminal.Gui.TextAlignment.Left;
+            this.bannerText.CanFocus = false;
+            this.Add(this.bannerText);
             
         }
     }

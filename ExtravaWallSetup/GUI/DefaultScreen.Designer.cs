@@ -9,6 +9,7 @@
 //  </auto-generated>
 // -----------------------------------------------------------------------------
 namespace ExtravaWallSetup.GUI {
+    using ExtravaWallSetup.GUI.Framework;
     using System;
     using Terminal.Gui;
     
@@ -29,7 +30,7 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.FrameView consoleView;
         
-        private Terminal.Gui.ScrollView consoleScrollView;
+        private ExtravScrollView consoleScrollView;
         
         private Terminal.Gui.FrameView infoFrame;
         
@@ -50,7 +51,7 @@ namespace ExtravaWallSetup.GUI {
             this.cpuGraph = new Terminal.Gui.GraphView();
             this.infoTable = new Terminal.Gui.TableView();
             this.infoFrame = new Terminal.Gui.FrameView();
-            this.consoleScrollView = new Terminal.Gui.ScrollView();
+            this.consoleScrollView = new ExtravScrollView();
             this.consoleView = new Terminal.Gui.FrameView();
             this.titleLabel = new Terminal.Gui.Label();
             this.lineView = new Terminal.Gui.LineView();

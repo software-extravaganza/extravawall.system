@@ -15,6 +15,7 @@ namespace ExtravaWallSetup.GUI {
     using Hardware.Info;
     using System;
     using System.Data;
+    using System.Diagnostics;
     using System.Reflection;
     using System.Runtime.InteropServices;
     using System.Threading.Tasks;
@@ -41,10 +42,19 @@ namespace ExtravaWallSetup.GUI {
         private float _memGraphOffset;
         private ColorScheme _defaultInfoTableColorScheme;
         private ColorScheme _defaultInfoTableColumnColorScheme;
-        public ScrollView VirtualConsoleView => consoleScrollView;
+        public ExtravScrollView VirtualConsoleView => consoleScrollView;
         private TaskCompletionSource _layoutInitializedCompletionSource;
         public Task LayoutInitialized => _layoutInitializedCompletionSource.Task;
         public TableView InfoTable => infoTable;
+
+        public override bool ProcessHotKey(KeyEvent keyEvent) {
+            if(keyEvent.Key == Key.Esc) {
+                Terminal.Gui.Application.Shutdown();
+            }
+
+            return base.ProcessHotKey(keyEvent);
+        }
+
         public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource) {
             _layoutInitializedCompletionSource = layoutInitializedCompletionSource;
             InitializeComponent();

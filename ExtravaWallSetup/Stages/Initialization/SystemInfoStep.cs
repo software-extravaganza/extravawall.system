@@ -17,7 +17,7 @@ namespace ExtravaWallSetup.Stages.Initialization {
         public override short StepOrder => 0;
 
         protected override async Task Execute() {
-            Console.Add(new BannerView());
+            Console.Add(new BannerView(BannerType.Welcome));
 
             Install.AddOrUpdateSystemInfo("Architecture", RuntimeInformation.OSArchitecture.ToString());
             Install.AddOrUpdateSystemInfo("Dotnet", RuntimeInformation.FrameworkDescription.ToString());

@@ -10,6 +10,35 @@ using Terminal.Gui;
 using static Terminal.Gui.View;
 
 namespace ExtravaWallSetup.GUI.Framework {
+    public class ExtravScrollView : ScrollView { 
+        private ExtravScrollView? findScrollView(View parent) {
+            if (parent is ExtravScrollView scrollView) {
+                return scrollView;
+            }
+            else if (parent.SuperView != null) {
+                return findScrollView(parent.SuperView);
+            }
+
+            return null;
+        }
+
+        public override bool ProcessHotKey(KeyEvent keyEvent) {
+            if (keyEvent.Key == Key.CursorUp) {
+                findScrollView(this)?.ScrollUp(1);
+            }
+            else if (keyEvent.Key == Key.CursorDown) {
+                findScrollView(this)?.ScrollDown(1);
+            }
+            else if (keyEvent.Key == Key.CursorRight) {
+                findScrollView(this)?.ScrollRight(1);
+            }
+            else if (keyEvent.Key == Key.CursorLeft) {
+                findScrollView(this)?.ScrollLeft(1);
+            }
+            return base.ProcessHotKey(keyEvent);
+        }
+    }
+
     public class VirtualConsoleManager {
         private InstallManager _installManager;
         private DefaultScreen _defaultScreen;
@@ -17,12 +46,14 @@ namespace ExtravaWallSetup.GUI.Framework {
         private int _totalScrollWidth;
         private int _totalScrollHeight = 2;
 
-        public VirtualConsoleManager(InstallManager installManager, DefaultScreen defaultScreen, ScrollView consoleView) {
+        public VirtualConsoleManager(InstallManager installManager, DefaultScreen defaultScreen, ExtravScrollView consoleView) {
             _installManager = installManager;
             _defaultScreen = defaultScreen;
             _consoleView = consoleView;
+            _consoleView.KeepContentAlwaysInViewport = true;
             Application.Resized = defaultScreen_Resized;
-            _defaultScreen.KeyPress += defaultScreen_KeyDown;
+            _defaultScreen.KeyDown += defaultScreen_KeyDown;
+            
         }
 
         public ITextOutput GetNewWriter(Color foreground = Color.Green, Color background = Color.Black) {
@@ -31,10 +62,19 @@ namespace ExtravaWallSetup.GUI.Framework {
             return textView;
         }
 
+        public IProgressBar GetNewProgressBar(float initialProgress, string text = "") {
+            var progressView = new DisplayProgressBar(initialProgress, text);
+            Add(progressView);
+            return progressView;
+        }
+
         public async Task CommandAsync<T>(Action<T, CommandView> actions, bool printResult = false) where T : ICommand, new() {
             await Task.Run(async () => {
-                var commandView = Add(new CommandView());
+                var commandView = new CommandView();
                 var command = new T();
+                if (printResult) {
+                    Add(commandView);
+                }
                 command.SetOutput(printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None);
                 command.SetCommandView(commandView);
                 actions.Invoke(command, commandView);
@@ -43,8 +83,12 @@ namespace ExtravaWallSetup.GUI.Framework {
 
         public async Task CommandAsync<T>(Func<T, CommandView, Task> actions, bool printResult = false) where T : ICommand, new() {
             await Task.Run(async () => {
-                var commandView = Add(new CommandView());
+                var commandView = new CommandView();
                 var command = new T();
+
+                if (printResult) {
+                    Add(commandView);
+                }
                 command.SetOutput(printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None);
                 command.SetCommandView(commandView);
                 await actions.Invoke(command, commandView);
@@ -65,75 +109,87 @@ namespace ExtravaWallSetup.GUI.Framework {
         private IDictionary<View, Point> _consoleChildrenPositions = new Dictionary<View, Point>();
         public T Add<T>(T view) where T : View {
             Application.MainLoop.Invoke(() => {
-                var lowestPosition = _consoleView.Subviews.First().Subviews.LastOrDefault();
-                int? calculatedBottom = null;
-                if (lowestPosition != null && _consoleChildrenSizes.ContainsKey(lowestPosition) && _consoleChildrenPositions.ContainsKey(lowestPosition)) {
-                    calculatedBottom = _consoleChildrenSizes[lowestPosition].Height + _consoleChildrenPositions[lowestPosition].Y;
-                }
-                _consoleView.Add(view);
-                view.GetCurrentWidth(out int currentWidth);
-                view.GetCurrentHeight(out int currentHeight);
-                var size = new Size(currentWidth, currentHeight);
-                var widthIsFill = view.Width == Dim.Fill(0);
-                var heightIsFill = view.Height == Dim.Fill(0);
-                if (widthIsFill) {
-                    _consoleView.GetCurrentWidth(out int scrollViewWidth);
-                    size.Width = scrollViewWidth - 1;
-                    view.Width = size.Width;
-                }
+                lock (_lockScrollViewRefresh) {
+                    var lowestPosition = _consoleView.Subviews.First().Subviews.LastOrDefault();
+                    int? calculatedBottom = null;
+                    if (lowestPosition != null && _consoleChildrenSizes.ContainsKey(lowestPosition) && _consoleChildrenPositions.ContainsKey(lowestPosition)) {
+                        calculatedBottom = _consoleChildrenSizes[lowestPosition].Height + _consoleChildrenPositions[lowestPosition].Y;
+                    }
+                    _consoleView.Add(view);
+                    view.GetCurrentWidth(out int currentWidth);
+                    view.GetCurrentHeight(out int currentHeight);
+                    var size = new Size(currentWidth, currentHeight);
+                    var widthIsFill = view.Width == Dim.Fill(0);
+                    var heightIsFill = view.Height == Dim.Fill(0);
+                    if (widthIsFill) {
+                        _consoleView.GetCurrentWidth(out int scrollViewWidth);
+                        size.Width = scrollViewWidth - 1;
+                        view.Width = size.Width;
+                    }
 
-                if (heightIsFill) {
-                    _consoleView.GetCurrentHeight(out int scrollViewHeight);
-                    size.Height = scrollViewHeight - 1;
-                    view.Height = size.Height;
+                    if (heightIsFill) {
+                        _consoleView.GetCurrentHeight(out int scrollViewHeight);
+                        size.Height = scrollViewHeight - 1;
+                        view.Height = size.Height;
+                    }
+
+                    var position = new Point(0, calculatedBottom ?? 0);
+                    _consoleChildrenSizes.Add(view, size);
+                    _consoleChildrenPositions.Add(view, position);
+                    view.X = position.X;
+                    view.Y = position.Y;
+                    //view.Y = lowestPosition == null ? Pos.At(0) : Pos.Bottom(lowestPosition) + 1;
+                    //view.Y = ;
+                    //view.X = Pos.At(0);
+                    _totalScrollWidth += currentWidth;
+                    _totalScrollHeight += currentHeight;
+                    _consoleView.SetFocus();
+                    
+                    RefreshConsole();
                 }
-                
-                var position = new Point(0, calculatedBottom ?? 0);
-                _consoleChildrenSizes.Add(view, size);
-                _consoleChildrenPositions.Add(view, position);
-                view.X = position.X;
-                view.Y = position.Y;
-                //view.Y = lowestPosition == null ? Pos.At(0) : Pos.Bottom(lowestPosition) + 1;
-                //view.Y = ;
-                //view.X = Pos.At(0);
-                _totalScrollWidth += currentWidth;
-                _totalScrollHeight += currentHeight;
-                _consoleView.SetFocus();
-                RefreshConsole();
             });
 
             return view;
         }
 
-        private void resetConsoleScroll(View viewRefresh = null, Size? size = null) {
+        object _lockScrollViewRefresh = new object();
+        private void resetConsoleScroll(View? viewRefresh = null, Size? size = null) {
             Application.MainLoop.Invoke(() => {
-                var widthDiff = 0;
-                var heightDiff = 0;
-                if (viewRefresh != null) {
-                    int currentWidth = 0;
-                    int currentHeight = 0;
-                    if (size is not null) {
-                        currentWidth = size.Value.Width;
-                        currentHeight = size.Value.Height;
-                    }
-                    else {
-                        viewRefresh.GetCurrentWidth(out currentWidth);
-                        viewRefresh.GetCurrentHeight(out currentHeight);
+                lock (_lockScrollViewRefresh) {
+                    var widthDiff = 0;
+                    var heightDiff = 0;
+                    if (viewRefresh != null) {
+                        int currentWidth = 0;
+                        int currentHeight = 0;
+                        if (size is not null) {
+                            currentWidth = size.Value.Width;
+                            currentHeight = size.Value.Height;
+                        }
+                        else {
+                            viewRefresh.GetCurrentWidth(out currentWidth);
+                            viewRefresh.GetCurrentHeight(out currentHeight);
+                        }
+
+                        if (_consoleChildrenSizes.ContainsKey(viewRefresh)) {
+                            var storedSize = _consoleChildrenSizes[viewRefresh];
+                            widthDiff = currentWidth - storedSize.Width;
+                            heightDiff = currentHeight - storedSize.Height;
+                            _consoleChildrenSizes[viewRefresh] = new Size(currentWidth, currentHeight);
+                        }
+                         _totalScrollHeight += heightDiff;
                     }
 
-                    if (_consoleChildrenSizes.ContainsKey(viewRefresh)) {
-                        var storedSize = _consoleChildrenSizes[viewRefresh];
-                        widthDiff = currentWidth - storedSize.Width;
-                        heightDiff = currentHeight - storedSize.Height;
-                        _consoleChildrenSizes[viewRefresh] = new Size(currentWidth, currentHeight);
-                    }
-                    _totalScrollHeight += heightDiff;
+                    //_totalScrollHeight = _consoleChildrenSizes.Sum(v => v.Value.Height);
+                    _consoleView.GetCurrentWidth(out int scrollViewWidth);
+                    _consoleView.GetCurrentHeight(out int scrollViewHeight);
+                    _consoleView.ContentSize = new Size(_totalScrollWidth, _totalScrollHeight);
+                    _consoleView.ContentOffset = new Point(0, _totalScrollHeight);
+                    _consoleView.ContentOffset = new Point(0,0);
+                    _consoleView.ScrollDown(_totalScrollHeight);
+                    //_consoleView.Subviews.FirstOrDefault(v => v.GetType() == typeof(ScrollBarView))?.
+                    // _consoleView.ScrollDown(heightDiff+ scrollViewHeight);
+                    _consoleView.SetNeedsDisplay();
                 }
-                _consoleView.GetCurrentWidth(out int scrollViewWidth);
-                _consoleView.GetCurrentHeight(out int scrollViewHeight);
-                _consoleView.ContentSize = new Size(_totalScrollWidth, _totalScrollHeight);
-                _consoleView.ContentOffset = new Point(0, _consoleView.ContentSize.Height);
-                _consoleView.SetNeedsDisplay();
             });
         }
 
@@ -146,11 +202,11 @@ namespace ExtravaWallSetup.GUI.Framework {
             }
         }
 
-        public void RefreshConsole(View viewRefresh = null, Size? size = null) {
+        public void RefreshConsole(View? viewRefresh = null, Size? size = null) {
+            resetConsoleScroll(viewRefresh, size);
             Application.MainLoop.Invoke(() => {
                 _defaultScreen.Redraw(_defaultScreen.Bounds);
             });
-            resetConsoleScroll(viewRefresh, size);
         }
     }
 }

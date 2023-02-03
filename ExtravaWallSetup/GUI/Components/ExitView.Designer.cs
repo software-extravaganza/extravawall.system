@@ -22,17 +22,17 @@ namespace ExtravaWallSetup.GUI {
         private Terminal.Gui.ColorScheme greenOnBlackCustom;
         
         private Terminal.Gui.ColorScheme blackOnGreenCustom;
+
+        private ExtravaLabel titleLabel;
         
-        private Terminal.Gui.Label titleLabel;
-        
-        private Terminal.Gui.TextView contentLabel;
+        private ExtravaTextView contentLabel;
         
         private Terminal.Gui.Button exitButton;
         
         private void InitializeComponent() {
             this.exitButton = new Terminal.Gui.Button();
-            this.contentLabel = new Terminal.Gui.TextView();
-            this.titleLabel = new Terminal.Gui.Label();
+            this.contentLabel = new ExtravaTextView();
+            this.titleLabel = new ExtravaLabel();
             this.redOnBlackCustom = new Terminal.Gui.ColorScheme();
             this.redOnBlackCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
             this.redOnBlackCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
@@ -57,7 +57,7 @@ namespace ExtravaWallSetup.GUI {
             this.blackOnGreenCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.BrightGreen);
             this.blackOnGreenCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.BrightGreen);
             this.blackOnGreenCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.BrightGreen);
-            this.Width = 75;
+            this.Width = 70;
             this.Height = 10;
             this.X = 0;
             this.Y = 0;
@@ -74,7 +74,7 @@ namespace ExtravaWallSetup.GUI {
             this.Add(this.titleLabel);
             this.contentLabel.Width = Dim.Fill(1);
             this.contentLabel.Height = Dim.Fill(3);
-            this.contentLabel.X = 2;
+            this.contentLabel.X = 1;
             this.contentLabel.Y = Pos.Bottom(titleLabel) + 1;
             this.contentLabel.AllowsTab = true;
             this.contentLabel.AllowsReturn = true;
@@ -85,7 +85,7 @@ namespace ExtravaWallSetup.GUI {
             this.Add(this.contentLabel);
             this.exitButton.Width = 18;
             this.exitButton.Height = 1;
-            this.exitButton.X = 0;
+            this.exitButton.X = 1;
             this.exitButton.Y = Pos.Bottom(contentLabel) + 1;
             this.exitButton.Data = "exitButton";
             this.exitButton.Text = "Exit Installer";

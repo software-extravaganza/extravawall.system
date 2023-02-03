@@ -15,7 +15,7 @@ namespace ExtravaWallSetup.GUI {
     
     public partial class DisplayTextView : Terminal.Gui.View {
         
-        private Terminal.Gui.Label textOutput;
+        private ExtravaLabel textOutput;
         private ColorScheme greenOnBlack;
 
         private void InitializeComponent() {
@@ -25,7 +25,7 @@ namespace ExtravaWallSetup.GUI {
             this.greenOnBlack.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.Green, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Black);
-            this.textOutput = new Terminal.Gui.Label();
+            this.textOutput = new ExtravaLabel();
             this.Width = 4;
             this.Height = 1;
             this.X = 0;
