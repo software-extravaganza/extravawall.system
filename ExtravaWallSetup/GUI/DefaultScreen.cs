@@ -93,7 +93,7 @@ namespace ExtravaWallSetup.GUI {
             consoleScrollView.ShowVerticalScrollIndicator = true;
             consoleScrollView.ColorScheme = Colors.TopLevel;
             consoleScrollView.WantMousePositionReports = true;
-            consoleScrollView.SetFocus();
+            //consoleScrollView.SetFocus();
             consoleScrollView.AutoSize = true;
 
             _systemTimer = new Timer((o) => {

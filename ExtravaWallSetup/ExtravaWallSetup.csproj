@@ -14,6 +14,13 @@
 		<IlcOptimizationPreference>Size</IlcOptimizationPreference>-->
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <None Remove="debian-install.sh" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	</PropertyGroup>
 	<!--<PropertyGroup>
 		<PublishSingleFile>true</PublishSingleFile>
 		<PublishTrimmed>true</PublishTrimmed>
@@ -49,6 +56,9 @@
 	</PropertyGroup>-->
 
 	<ItemGroup>
+	  <Content Include="debian-install.sh">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
 	  <Content Include="TrimRoots.xml" />
 	</ItemGroup>
 

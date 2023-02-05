@@ -30,6 +30,7 @@ namespace ExtravaWallSetup.GUI {
 
             this.titleLabel.Text = title;
             contentLabel.Text = content;
+            exitButton.SetFocus();
         }
 
         private void ExitButton_Clicked() {

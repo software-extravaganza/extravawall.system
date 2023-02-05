@@ -24,6 +24,7 @@ namespace ExtravaWallSetup.GUI
             this.listView.MouseClick += ListView_MouseClick;
             this.listView.KeyPress += ListView_KeyPress;
             this.DrawContentComplete += StartMenuView_DrawContentCompleteAsync;
+            this.listView.SetFocus();
         }
 
         private async void StartMenuView_DrawContentCompleteAsync(Rect obj) {

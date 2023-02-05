@@ -49,7 +49,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             await Task.CompletedTask;
         }
 
-        public abstract record BasePackage(string Name, v Version) {
+        public abstract record BasePackage(string Name, v Version) : IPackage {
             public abstract bool ShouldMarkToInstall { get; }
 
         }
@@ -57,7 +57,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             public override bool ShouldMarkToInstall => false;
         }
 
-        public record PackageNeeded(string Name, v Version, params PackageDependency[] Dependencies) : BasePackage(Name, Version) {
+        public record PackageNeeded(string Name, v Version, params IPackage[] Dependencies) : BasePackage(Name, Version) {
             public override bool ShouldMarkToInstall => true;
 
         }
@@ -68,7 +68,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
                 AddRange(dependencies);
             }
 
-            public IEnumerable<BasePackage> AllPackagesToCheck() {
+            public IEnumerable<IPackage> AllPackagesToCheck() {
                 foreach(var neededPackage in this) {
                     yield return neededPackage;
                     foreach(var dependencyPackage in neededPackage.Dependencies) {
@@ -143,10 +143,21 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
                     new PackageDependency( "libxml2", new v(2,9) ),
                     new PackageDependency( "poppler-data", new v(0,4) ),
                     new PackageDependency( "xdg-user-dirs", new v(0,17) )
-                )
+                ),
+                new PackageNeeded("aspnetcore-runtime-7.0", new v(7),
+                    new PackageNeeded("dotnet-runtime-7.0", new v(7),
+                        new PackageDependency("dotnet-hostfxr-7.0", new v(7)),
+                        new PackageDependency("libicu67:amd64", new v(67)),
+                        new PackageDependency("dotnet-runtime-deps-7.0", new v(7)),
+                        new PackageDependency("dotnet-host", new v(7))
+                    )
+                ),
+                 new PackageNeeded("postgresql-13", new v(13)),
+                 new PackageNeeded("postgresql-client-13", new v(13))
             );
 
-            var packagesNotInsalled = new List<BasePackage>();
+            //postgresql postgresql-contrib
+            var packagesNotInsalled = new List<IPackage>();
             foreach (var package in packagesThatAreNeeded.AllPackagesToCheck()) {
                 writer.WriteLine($"Looking for installed package '{package.Name}' (>={package.Version})...");
                 var isInstalled = false;

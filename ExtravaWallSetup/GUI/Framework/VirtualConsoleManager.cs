@@ -143,7 +143,7 @@ namespace ExtravaWallSetup.GUI.Framework {
                     //view.X = Pos.At(0);
                     _totalScrollWidth += currentWidth;
                     _totalScrollHeight += currentHeight;
-                    _consoleView.SetFocus();
+                    //_consoleView.SetFocus();
                     
                     RefreshConsole();
                 }
