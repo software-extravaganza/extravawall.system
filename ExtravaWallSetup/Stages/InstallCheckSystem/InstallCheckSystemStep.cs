@@ -140,7 +140,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
                     new PackageDependency( "libssh2-1", new v(1,9) ),
                     new PackageDependency( "libwebpmux3", new v(0,6) ),
                     new PackageDependency( "libwebp6", new v(0,6) ),
-                    new PackageDependency( "libxml2", new v(2,9) ),
+                    new PackageDependency( "libxml2", new v(2,9) ), 
                     new PackageDependency( "poppler-data", new v(0,4) ),
                     new PackageDependency( "xdg-user-dirs", new v(0,17) )
                 ),
