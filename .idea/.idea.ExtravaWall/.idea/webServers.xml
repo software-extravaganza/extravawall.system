@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="18e5c6e2-fc17-412e-861f-eaa0511a8553" name="Local Root">
+        <fileTransfer rootFolder="/home/phil/src/extrava/extravawall/ExtravaWallSetup/bin/remote" accessType="SFTP" host="localhost" port="22" sshConfigId="b8c06707-c112-4006-8644-290ceeb8073b" sshConfig="root@localhost:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

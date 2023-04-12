@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="Local Root" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="Local Root">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$/ExtravaWall.sln" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/ExtravaWallSetup.csproj" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/Framework/CommandBase.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/Framework/CommandOutputType.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/Framework/CommandResultPlus.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/Framework/CommandSettings.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/Framework/NoCommandResultCOnverstionToTypeException.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/BasicCommands.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/PackageCommands.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Commands/UnameCommand.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/BannerView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/CommandView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/DisplayProgressBar.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/DisplayTextView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/ExitView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/InstallerView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/IProgressBar.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/ITextOutput.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/StartMenuView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/WelcomeBanner.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/ElevateMenuView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/BannerView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/CommandView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/DisplayProgressBar.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/DisplayTextView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/ExitView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/InstallerView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/StartMenuView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Components/ElevateMenuView.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Framework/DiscoBarSeries.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Framework/ICommandView.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Framework/TerminalScheduler.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/Framework/VirtualConsoleManager.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/DefaultScreen.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/GUI/DefaultScreen.Designer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/EmptyStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/IStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/StageManager.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/StageType.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/StepBase.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Framework/StepComparer.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Initialization/MenuStageStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/Initialization/SystemInfoStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/InstallBegin/InstallBeginStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/InstallCheckSystem/InstallCheckSystemStep.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/InstallCheckSystem/IPackage.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Stages/EndStage.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Properties/launchSettings.json" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/obj/Debug/net7.0/ExtravaWallSetup.GlobalUsings.g.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/obj/Debug/net7.0/ExtravaWallSetup.AssemblyInfo.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/obj/Debug/net7.0/ExtravaWallSetup.GeneratedMSBuildEditorConfig.editorconfig" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/InstallManager.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/Program.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/SystemInfoModel.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/FodyWeavers.xml" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/debian-install.sh" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/TrimRoots.xml" web="/" />
+            <mapping local="/usr/local/share/dotnet/sdk/7.0.202/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_7_default.editorconfig" web="/" />
+            <mapping local="$PROJECT_DIR$/ExtravaWallSetup/CommandLineRaw.cs" web="/" />
+            <mapping local="$PROJECT_DIR$/nuget.config" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
