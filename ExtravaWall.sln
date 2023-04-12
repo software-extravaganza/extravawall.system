@@ -8,7 +8,14 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "solution", "solution", "{28DD0B08-D1BC-467F-A4BD-DCF1C216D7DC}"
 	ProjectSection(SolutionItems) = preProject
 		nuget.config = nuget.config
+		global.json = global.json
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrivilegedActionHelper", "PrivilegedActionHelper\PrivilegedActionHelper.csproj", "{D11132EB-BECC-4725-9679-B99350C199AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaWall.Network", "ExtravaWall.Network\ExtravaWall.Network.csproj", "{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaWallSetup.Tests", "ExtravaWallSetup.Tests\ExtravaWallSetup.Tests.csproj", "{F9530278-EA4A-43E0-8FC7-981811B35EF8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,11 +27,27 @@ Global
 		{FAB830D6-0C4B-4B38-94B0-15B88204D02E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FAB830D6-0C4B-4B38-94B0-15B88204D02E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FAB830D6-0C4B-4B38-94B0-15B88204D02E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D11132EB-BECC-4725-9679-B99350C199AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D11132EB-BECC-4725-9679-B99350C199AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D11132EB-BECC-4725-9679-B99350C199AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D11132EB-BECC-4725-9679-B99350C199AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {41AABE80-2080-44AB-9054-89672D7963DF}
+	EndGlobalSection
+	GlobalSection(RiderSharedRunConfigurations) = postSolution
+		File = ExtravaWallSetup\FodyWeavers.xml
+		File = ExtravaWallSetup\TrimRoots.xml
 	EndGlobalSection
 EndGlobal

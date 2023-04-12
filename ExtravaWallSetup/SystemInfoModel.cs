@@ -1,18 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace ExtravaWallSetup;
 
-namespace ExtravaWallSetup {
-    public class SystemInfoModel {
-        public string PrettyName { get; set; }
-        public string Name { get; set; }
-        public string VersionId { get; set; }
-        public string VersonCodeName { get; set; }
-        public string ID { get; set; }
-        public Uri HomeUrl { get; set; }
-        public Uri SupportUrl { get; set; }
-        public Uri BugReportUrl { get; set; }
-    }
+[System.Diagnostics.DebuggerDisplay("{DebuggerDisplay,nq}")]
+public class SystemInfoModel
+{
+    public string ID { get; set; } = null!;
+    public string PrettyName { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public string VersionId { get; set; } = null!;
+    public string VersionCodeName { get; set; } = null!;
+    public Uri HomeUrl { get; set; } = null!;
+    public Uri SupportUrl { get; set; } = null!;
+    public Uri BugReportUrl { get; set; } = null!;
+
+    [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
+    private string DebuggerDisplay => ToString() ?? string.Empty;
 }

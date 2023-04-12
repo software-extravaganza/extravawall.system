@@ -102,6 +102,20 @@ namespace ExtravaWallSetup.Commands {
                 };
 
                 var errorHandler = (string o) => {
+                    var message = o.ToLower();
+                    if(message.Contains("unable") && message.Contains("locate")){
+                        var packageRegex = @"package\s+(.*)";
+                        Match match = Regex.Match(message, packageRegex);
+                        if (match.Success)
+                        {
+                            string missingPackagesStrand = match.Groups[1].Value;
+                            var missingPackages = missingPackagesStrand.Split(' ');
+                            if(missingPackages.Length <= 0){
+                                missingPackages = new []{ missingPackagesStrand };
+                            }
+                            
+                        }
+                    }
                     progress.SendUpdate(new PackageCommandUpdate(false, 0, o));
                 };
 

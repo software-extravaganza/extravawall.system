@@ -37,22 +37,33 @@ namespace ExtravaWallSetup.GUI
     }
 
     public class ExtravaTextView : TextView {
+
+        public bool CanSelect { get; set; } = false;
         public override bool OnMouseEnter(MouseEvent mouseEvent) {
-            Application.UngrabMouse();
-            this.SuperView.OnMouseEnter(mouseEvent);
-            return false;
+            if (!CanSelect) {
+                Application.UngrabMouse();
+                this.SuperView.OnMouseEnter(mouseEvent);
+            }
+            
+            return CanSelect;
         }
 
         public override bool OnMouseLeave(MouseEvent mouseEvent) {
-            Application.UngrabMouse();
-            this.SuperView.OnMouseLeave(mouseEvent);
-            return false;
+            if (!CanSelect) {
+                Application.UngrabMouse();
+                this.SuperView.OnMouseLeave(mouseEvent);
+            }
+
+            return CanSelect;
         }
 
         public override bool OnMouseEvent(MouseEvent mouseEvent) {
-            Application.UngrabMouse();
-            SuperView.OnMouseEvent(mouseEvent);
-            return false;
+            if (!CanSelect) {
+                Application.UngrabMouse();
+                SuperView.OnMouseEvent(mouseEvent);
+            }
+
+            return CanSelect;
         }
     }
     public class ExtravaLabel : View {

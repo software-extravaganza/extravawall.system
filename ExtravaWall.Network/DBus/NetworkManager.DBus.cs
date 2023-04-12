@@ -2,13 +2,44 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using ExtravaWall.Network;
 using Tmds.DBus;
 
 [assembly: InternalsVisibleTo(Tmds.DBus.Connection.DynamicAssemblyName)]
 namespace NetworkManager.DBus
 {
+    public enum DeviceState : uint
+    {
+        [Description("Unknown")]
+        Unknown = 0,
+        [Description("Unmanaged")]
+        Unmanaged = 10,
+        [Description("Unavailable")]
+        Unavailable = 20,
+        [Description("Disconnected")]
+        Disconnected = 30,
+        [Description("Prepare")]
+        Prepare = 40,
+        [Description("Config")]
+        Config = 50,
+        [Description("NeedAuth")]
+        NeedAuth = 60,
+        [Description("IpConfig")]
+        IpConfig = 70,
+        [Description("IpCheck")]
+        IpCheck = 80,
+        [Description("Secondaries")]
+        Secondaries = 90,
+        [Description("Activated")]
+        Activated = 100,
+        [Description("Deactivating")]
+        Deactivating = 110,
+        [Description("Failed")]
+        Failed = 120
+    }
+    
     [DBusInterface("org.freedesktop.DBus.ObjectManager")]
-    interface IObjectManager : IDBusObject
+    public interface IObjectManager : IDBusObject
     {
         Task<IDictionary<ObjectPath, IDictionary<string, IDictionary<string, object>>>> GetManagedObjectsAsync();
         Task<IDisposable> WatchInterfacesAddedAsync(Action<(ObjectPath objectPath, IDictionary<string, IDictionary<string, object>> interfacesAndProperties)> handler, Action<Exception> onError = null);
@@ -16,7 +47,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager")]
-    interface INetworkManager : IDBusObject
+    public interface INetworkManager : IDBusObject
     {
         Task ReloadAsync(uint Flags);
         Task<ObjectPath[]> GetDevicesAsync();
@@ -48,7 +79,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class NetworkManagerProperties
+    public class NetworkManagerProperties
     {
         private ObjectPath[] _devices = default(ObjectPath[]);
         public ObjectPath[] Devices
@@ -401,7 +432,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class NetworkManagerExtensions
+    public static class NetworkManagerExtensions
     {
         public static Task<ObjectPath[]> GetDevicesAsync(this INetworkManager o) => o.GetAsync<ObjectPath[]>("Devices");
         public static Task<ObjectPath[]> GetAllDevicesAsync(this INetworkManager o) => o.GetAsync<ObjectPath[]>("AllDevices");
@@ -422,7 +453,7 @@ namespace NetworkManager.DBus
         public static Task<bool> GetStartupAsync(this INetworkManager o) => o.GetAsync<bool>("Startup");
         public static Task<string> GetVersionAsync(this INetworkManager o) => o.GetAsync<string>("Version");
         public static Task<uint[]> GetCapabilitiesAsync(this INetworkManager o) => o.GetAsync<uint[]>("Capabilities");
-        public static Task<uint> GetStateAsync(this INetworkManager o) => o.GetAsync<uint>("State");
+        public static Task<DeviceState> GetStateAsync(this INetworkManager o) => o.GetAsync<DeviceState>("State");
         public static Task<uint> GetConnectivityAsync(this INetworkManager o) => o.GetAsync<uint>("Connectivity");
         public static Task<bool> GetConnectivityCheckAvailableAsync(this INetworkManager o) => o.GetAsync<bool>("ConnectivityCheckAvailable");
         public static Task<bool> GetConnectivityCheckEnabledAsync(this INetworkManager o) => o.GetAsync<bool>("ConnectivityCheckEnabled");
@@ -436,7 +467,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.DHCP4Config")]
-    interface IDHCP4Config : IDBusObject
+    public interface IDHCP4Config : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<DHCP4ConfigProperties> GetAllAsync();
@@ -445,7 +476,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class DHCP4ConfigProperties
+    public class DHCP4ConfigProperties
     {
         private IDictionary<string, object> _options = default(IDictionary<string, object>);
         public IDictionary<string, object> Options
@@ -462,13 +493,13 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class DHCP4ConfigExtensions
+    public static class DHCP4ConfigExtensions
     {
         public static Task<IDictionary<string, object>> GetOptionsAsync(this IDHCP4Config o) => o.GetAsync<IDictionary<string, object>>("Options");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.IP4Config")]
-    interface IIP4Config : IDBusObject
+    public interface IIP4Config : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<IP4ConfigProperties> GetAllAsync();
@@ -477,7 +508,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class IP4ConfigProperties
+    public class IP4ConfigProperties
     {
         private uint[][] _addresses = default(uint[][]);
         public uint[][] Addresses
@@ -662,7 +693,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class IP4ConfigExtensions
+    public static class IP4ConfigExtensions
     {
         public static Task<uint[][]> GetAddressesAsync(this IIP4Config o) => o.GetAsync<uint[][]>("Addresses");
         public static Task<IDictionary<string, object>[]> GetAddressDataAsync(this IIP4Config o) => o.GetAsync<IDictionary<string, object>[]>("AddressData");
@@ -680,7 +711,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Connection.Active")]
-    interface IActive : IDBusObject
+    public interface IActive : IDBusObject
     {
         Task<IDisposable> WatchStateChangedAsync(Action<(uint state, uint reason)> handler, Action<Exception> onError = null);
         Task<T> GetAsync<T>(string prop);
@@ -690,7 +721,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class ActiveProperties
+    public class ActiveProperties
     {
         private ObjectPath _connection = default(ObjectPath);
         public ObjectPath Connection
@@ -917,7 +948,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class ActiveExtensions
+    public static class ActiveExtensions
     {
         public static Task<ObjectPath> GetConnectionAsync(this IActive o) => o.GetAsync<ObjectPath>("Connection");
         public static Task<ObjectPath> GetSpecificObjectAsync(this IActive o) => o.GetAsync<ObjectPath>("SpecificObject");
@@ -925,10 +956,10 @@ namespace NetworkManager.DBus
         public static Task<string> GetUuidAsync(this IActive o) => o.GetAsync<string>("Uuid");
         public static Task<string> GetTypeAsync(this IActive o) => o.GetAsync<string>("Type");
         public static Task<ObjectPath[]> GetDevicesAsync(this IActive o) => o.GetAsync<ObjectPath[]>("Devices");
-        public static Task<uint> GetStateAsync(this IActive o) => o.GetAsync<uint>("State");
+        public static Task<DeviceState> GetStateAsync(this IActive o) => o.GetAsync<DeviceState>("State");
         public static Task<uint> GetStateFlagsAsync(this IActive o) => o.GetAsync<uint>("StateFlags");
         public static Task<bool> GetDefaultAsync(this IActive o) => o.GetAsync<bool>("Default");
-        public static Task<ObjectPath> GetIp4ConfigAsync(this IActive o) => o.GetAsync<ObjectPath>("Ip4Config");
+        public static Task<IIP4Config> GetIp4ConfigAsync(this IActive o) => o.GetAsync<IIP4Config>("Ip4Config");
         public static Task<ObjectPath> GetDhcp4ConfigAsync(this IActive o) => o.GetAsync<ObjectPath>("Dhcp4Config");
         public static Task<bool> GetDefault6Async(this IActive o) => o.GetAsync<bool>("Default6");
         public static Task<ObjectPath> GetIp6ConfigAsync(this IActive o) => o.GetAsync<ObjectPath>("Ip6Config");
@@ -938,7 +969,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Statistics")]
-    interface IStatistics : IDBusObject
+    public interface IStatistics : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<StatisticsProperties> GetAllAsync();
@@ -947,7 +978,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class StatisticsProperties
+    public class StatisticsProperties
     {
         private uint _refreshRateMs = default(uint);
         public uint RefreshRateMs
@@ -992,7 +1023,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class StatisticsExtensions
+    public static class StatisticsExtensions
     {
         public static Task<uint> GetRefreshRateMsAsync(this IStatistics o) => o.GetAsync<uint>("RefreshRateMs");
         public static Task<ulong> GetTxBytesAsync(this IStatistics o) => o.GetAsync<ulong>("TxBytes");
@@ -1001,13 +1032,13 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device")]
-    interface IDevice : IDBusObject
+    public interface IDevice : IDBusObject
     {
         Task ReapplyAsync(IDictionary<string, IDictionary<string, object>> Connection, ulong VersionId, uint Flags);
         Task<(IDictionary<string, IDictionary<string, object>> connection, ulong versionId)> GetAppliedConnectionAsync(uint Flags);
         Task DisconnectAsync();
         Task DeleteAsync();
-        Task<IDisposable> WatchStateChangedAsync(Action<(uint newState, uint oldState, uint reason)> handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchStateChangedAsync(Action<(DeviceState newState, DeviceState oldState, uint reason)> handler, Action<Exception> onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<DeviceProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1015,7 +1046,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class DeviceProperties
+    public class DeviceProperties
     {
         private string _udi = default(string);
         public string Udi
@@ -1466,7 +1497,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class DeviceExtensions
+    public static class DeviceExtensions
     {
         public static Task<string> GetUdiAsync(this IDevice o) => o.GetAsync<string>("Udi");
         public static Task<string> GetPathAsync(this IDevice o) => o.GetAsync<string>("Path");
@@ -1477,10 +1508,10 @@ namespace NetworkManager.DBus
         public static Task<string> GetFirmwareVersionAsync(this IDevice o) => o.GetAsync<string>("FirmwareVersion");
         public static Task<uint> GetCapabilitiesAsync(this IDevice o) => o.GetAsync<uint>("Capabilities");
         public static Task<uint> GetIp4AddressAsync(this IDevice o) => o.GetAsync<uint>("Ip4Address");
-        public static Task<uint> GetStateAsync(this IDevice o) => o.GetAsync<uint>("State");
+        public static Task<DeviceState> GetStateAsync(this IDevice o) => o.GetAsync<DeviceState>("State");
         public static Task<(uint, uint)> GetStateReasonAsync(this IDevice o) => o.GetAsync<(uint, uint)>("StateReason");
         public static Task<ObjectPath> GetActiveConnectionAsync(this IDevice o) => o.GetAsync<ObjectPath>("ActiveConnection");
-        public static Task<ObjectPath> GetIp4ConfigAsync(this IDevice o) => o.GetAsync<ObjectPath>("Ip4Config");
+        public static Task<IIP4Config> GetIp4ConfigAsync(this IDevice o) => o.GetAsync<IIP4Config>("Ip4Config");
         public static Task<ObjectPath> GetDhcp4ConfigAsync(this IDevice o) => o.GetAsync<ObjectPath>("Dhcp4Config");
         public static Task<ObjectPath> GetIp6ConfigAsync(this IDevice o) => o.GetAsync<ObjectPath>("Ip6Config");
         public static Task<ObjectPath> GetDhcp6ConfigAsync(this IDevice o) => o.GetAsync<ObjectPath>("Dhcp6Config");
@@ -1505,7 +1536,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Wired")]
-    interface IWired : IDBusObject
+    public interface IWired : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<WiredProperties> GetAllAsync();
@@ -1514,7 +1545,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class WiredProperties
+    public class WiredProperties
     {
         private string _hwAddress = default(string);
         public string HwAddress
@@ -1587,7 +1618,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class WiredExtensions
+    public static class WiredExtensions
     {
         public static Task<string> GetHwAddressAsync(this IWired o) => o.GetAsync<string>("HwAddress");
         public static Task<string> GetPermHwAddressAsync(this IWired o) => o.GetAsync<string>("PermHwAddress");
@@ -1597,7 +1628,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Bridge")]
-    interface IBridge : IDBusObject
+    public interface IBridge : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<BridgeProperties> GetAllAsync();
@@ -1606,7 +1637,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class BridgeProperties
+    public class BridgeProperties
     {
         private string _hwAddress = default(string);
         public string HwAddress
@@ -1651,7 +1682,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class BridgeExtensions
+    public static class BridgeExtensions
     {
         public static Task<string> GetHwAddressAsync(this IBridge o) => o.GetAsync<string>("HwAddress");
         public static Task<bool> GetCarrierAsync(this IBridge o) => o.GetAsync<bool>("Carrier");
@@ -1659,7 +1690,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Generic")]
-    interface IGeneric : IDBusObject
+    public interface IGeneric : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<GenericProperties> GetAllAsync();
@@ -1668,7 +1699,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class GenericProperties
+    public class GenericProperties
     {
         private string _hwAddress = default(string);
         public string HwAddress
@@ -1699,14 +1730,14 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class GenericExtensions
+    public static class GenericExtensions
     {
         public static Task<string> GetHwAddressAsync(this IGeneric o) => o.GetAsync<string>("HwAddress");
         public static Task<string> GetTypeDescriptionAsync(this IGeneric o) => o.GetAsync<string>("TypeDescription");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.AgentManager")]
-    interface IAgentManager : IDBusObject
+    public interface IAgentManager : IDBusObject
     {
         Task RegisterAsync(string Identifier);
         Task RegisterWithCapabilitiesAsync(string Identifier, uint Capabilities);
@@ -1714,7 +1745,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.DnsManager")]
-    interface IDnsManager : IDBusObject
+    public interface IDnsManager : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<DnsManagerProperties> GetAllAsync();
@@ -1723,7 +1754,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class DnsManagerProperties
+    public class DnsManagerProperties
     {
         private string _mode = default(string);
         public string Mode
@@ -1768,7 +1799,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class DnsManagerExtensions
+    public static class DnsManagerExtensions
     {
         public static Task<string> GetModeAsync(this IDnsManager o) => o.GetAsync<string>("Mode");
         public static Task<string> GetRcManagerAsync(this IDnsManager o) => o.GetAsync<string>("RcManager");
@@ -1776,7 +1807,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.IP6Config")]
-    interface IIP6Config : IDBusObject
+    public interface IIP6Config : IDBusObject
     {
         Task<T> GetAsync<T>(string prop);
         Task<IP6ConfigProperties> GetAllAsync();
@@ -1785,7 +1816,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class IP6ConfigProperties
+    public class IP6ConfigProperties
     {
         private (byte[], uint, byte[])[] _addresses = default((byte[], uint, byte[])[]);
         public (byte[], uint, byte[])[] Addresses
@@ -1928,7 +1959,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class IP6ConfigExtensions
+    public static class IP6ConfigExtensions
     {
         public static Task<(byte[], uint, byte[])[]> GetAddressesAsync(this IIP6Config o) => o.GetAsync<(byte[], uint, byte[])[]>("Addresses");
         public static Task<IDictionary<string, object>[]> GetAddressDataAsync(this IIP6Config o) => o.GetAsync<IDictionary<string, object>[]>("AddressData");
@@ -1943,7 +1974,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Settings")]
-    interface ISettings : IDBusObject
+    public interface ISettings : IDBusObject
     {
         Task<ObjectPath[]> ListConnectionsAsync();
         Task<ObjectPath> GetConnectionByUuidAsync(string Uuid);
@@ -1962,7 +1993,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class SettingsProperties
+    public class SettingsProperties
     {
         private ObjectPath[] _connections = default(ObjectPath[]);
         public ObjectPath[] Connections
@@ -2007,7 +2038,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class SettingsExtensions
+    public static class SettingsExtensions
     {
         public static Task<ObjectPath[]> GetConnectionsAsync(this ISettings o) => o.GetAsync<ObjectPath[]>("Connections");
         public static Task<string> GetHostnameAsync(this ISettings o) => o.GetAsync<string>("Hostname");
@@ -2015,7 +2046,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Settings.Connection")]
-    interface IConnection : IDBusObject
+    public interface IConnection : IDBusObject
     {
         Task UpdateAsync(IDictionary<string, IDictionary<string, object>> Properties);
         Task UpdateUnsavedAsync(IDictionary<string, IDictionary<string, object>> Properties);
@@ -2034,7 +2065,7 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    class ConnectionProperties
+    public class ConnectionProperties
     {
         private bool _unsaved = default(bool);
         public bool Unsaved
@@ -2079,7 +2110,7 @@ namespace NetworkManager.DBus
         }
     }
 
-    static class ConnectionExtensions
+    public static class ConnectionExtensions
     {
         public static Task<bool> GetUnsavedAsync(this IConnection o) => o.GetAsync<bool>("Unsaved");
         public static Task<uint> GetFlagsAsync(this IConnection o) => o.GetAsync<uint>("Flags");

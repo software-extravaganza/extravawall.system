@@ -63,15 +63,15 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
         }
 
         public class PackageNeededCollection : List<PackageNeeded> {
-           
+
             public PackageNeededCollection(params PackageNeeded[] dependencies) {
                 AddRange(dependencies);
             }
 
             public IEnumerable<IPackage> AllPackagesToCheck() {
-                foreach(var neededPackage in this) {
+                foreach (var neededPackage in this) {
                     yield return neededPackage;
-                    foreach(var dependencyPackage in neededPackage.Dependencies) {
+                    foreach (var dependencyPackage in neededPackage.Dependencies) {
                         yield return dependencyPackage;
                     }
                 }
@@ -86,63 +86,63 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
                     new PackageDependency("chafa", new v(1, 6))
                 ),
                 new PackageNeeded("neofetch", new v(7, 1),
-                   new PackageDependency( "libmagickwand-6.q16-6", new v(6,9) ),
-                    new PackageDependency( "ghostscript", new v(9, 53) ),
-                    new PackageDependency( "libgs9", new v(9, 53) ),
-                    new PackageDependency( "libfontconfig1", new v(2, 13) ),
-                    new PackageDependency( "fontconfig-config", new v(2, 13) ),
-                    new PackageDependency( "fonts-dejavu-core", new v(2,37) ),
-                    new PackageDependency( "fonts-droid-fallback", new v(6,0) ),
-                    new PackageDependency( "fonts-noto-mono", new v(20201225) ),
-                    new PackageDependency( "libgs9-common", new v(9, 53) ),
-                    new PackageDependency( "fonts-urw-base35", new v(20200910) ),
-                    new PackageDependency( "gsfonts", new v(8, 11) ),
-                    new PackageDependency( "imagemagick-6-common", new v(1,11) ),
-                    new PackageDependency( "libheif1", new v(1, 11) ),
-                    new PackageDependency( "libaom0", new v(1) ),
-                    new PackageDependency( "libcups2", new v(2,3) ),
-                    new PackageDependency( "libavahi-client3", new v(0,8) ),
-                    new PackageDependency( "libavahi-common3", new v(0,8) ),
-                    new PackageDependency( "libavahi-common-data", new v(0,8) ),
-                    new PackageDependency( "libcurl4", new v(7,74) ),
-                    new PackageDependency( "libfreetype6", new v(2,10) ),
-                    new PackageDependency( "libbrotli1", new v(1) ),
-                    new PackageDependency( "libchafa0", new v(1,6) ),
-                    new PackageDependency( "libdav1d4", new v(0,7) ),
-                    new PackageDependency( "libde265-0", new v(1,0) ),
-                    new PackageDependency( "libtiff5", new v(4,2) ),
-                    new PackageDependency( "libdeflate0", new v(1,7) ),
-                    new PackageDependency( "libfftw3-double3", new v(3,3) ),
-                    new PackageDependency( "shared-mime-info", new v(2,0) ),
-                    new PackageDependency( "liblqr-1-0", new v(0,4) ),
-                    new PackageDependency( "libglib2.0-0", new v(2,66) ),
-                    new PackageDependency( "libglib2.0-data", new v(2,66) ),
-                    new PackageDependency( "libgomp1", new v(10,2) ),
-                    new PackageDependency( "libidn11", new v(1,33) ),
-                    new PackageDependency( "libijs-0.35", new v(0,35) ),
-                    new PackageDependency( "libjbig0", new v(2,1) ),
-                    new PackageDependency( "libjbig2dec0", new v(0,19) ),
-                    new PackageDependency( "libjpeg62-turbo", new v(2,0) ),
-                    new PackageDependency( "liblcms2-2", new v(2,12) ),
-                    new PackageDependency( "libldap-2.4-2", new v(2,4) ),
-                    new PackageDependency( "libldap-common", new v(2,4) ),
-                    new PackageDependency( "libnghttp2-14", new v(1,43) ),
-                    new PackageDependency( "libx265-192", new v(3,4) ),
-                    new PackageDependency( "libnuma1", new v(2,0) ),
-                    new PackageDependency( "libopenjp2-7", new v(2,4) ),
-                    new PackageDependency( "libpaper-utils", new v(1,1) ),
-                    new PackageDependency( "libpaper1", new v(1,1) ),
-                    new PackageDependency( "libpng16-16", new v(1,6) ),
-                    new PackageDependency( "librtmp1", new v(2,4) ),
-                    new PackageDependency( "libsasl2-2", new v(2,1) ),
-                    new PackageDependency( "libsasl2-modules", new v(2,1) ),
-                    new PackageDependency( "libsasl2-modules-db", new v(2,1) ),
-                    new PackageDependency( "libssh2-1", new v(1,9) ),
-                    new PackageDependency( "libwebpmux3", new v(0,6) ),
-                    new PackageDependency( "libwebp6", new v(0,6) ),
-                    new PackageDependency( "libxml2", new v(2,9) ), 
-                    new PackageDependency( "poppler-data", new v(0,4) ),
-                    new PackageDependency( "xdg-user-dirs", new v(0,17) )
+                   new PackageDependency("libmagickwand-6.q16-6", new v(6, 9)),
+                    new PackageDependency("ghostscript", new v(9, 53)),
+                    new PackageDependency("libgs9", new v(9, 53)),
+                    new PackageDependency("libfontconfig1", new v(2, 13)),
+                    new PackageDependency("fontconfig-config", new v(2, 13)),
+                    new PackageDependency("fonts-dejavu-core", new v(2, 37)),
+                    new PackageDependency("fonts-droid-fallback", new v(6, 0)),
+                    new PackageDependency("fonts-noto-mono", new v(20201225)),
+                    new PackageDependency("libgs9-common", new v(9, 53)),
+                    new PackageDependency("fonts-urw-base35", new v(20200910)),
+                    new PackageDependency("gsfonts", new v(8, 11)),
+                    new PackageDependency("imagemagick-6-common", new v(1, 11)),
+                    new PackageDependency("libheif1", new v(1, 11)),
+                    new PackageDependency("libaom0", new v(1)),
+                    new PackageDependency("libcups2", new v(2, 3)),
+                    new PackageDependency("libavahi-client3", new v(0, 8)),
+                    new PackageDependency("libavahi-common3", new v(0, 8)),
+                    new PackageDependency("libavahi-common-data", new v(0, 8)),
+                    new PackageDependency("libcurl4", new v(7, 74)),
+                    new PackageDependency("libfreetype6", new v(2, 10)),
+                    new PackageDependency("libbrotli1", new v(1)),
+                    new PackageDependency("libchafa0", new v(1, 6)),
+                    new PackageDependency("libdav1d4", new v(0, 7)),
+                    new PackageDependency("libde265-0", new v(1, 0)),
+                    new PackageDependency("libtiff5", new v(4, 2)),
+                    new PackageDependency("libdeflate0", new v(1, 7)),
+                    new PackageDependency("libfftw3-double3", new v(3, 3)),
+                    new PackageDependency("shared-mime-info", new v(2, 0)),
+                    new PackageDependency("liblqr-1-0", new v(0, 4)),
+                    new PackageDependency("libglib2.0-0", new v(2, 66)),
+                    new PackageDependency("libglib2.0-data", new v(2, 66)),
+                    new PackageDependency("libgomp1", new v(10, 2)),
+                    new PackageDependency("libidn11", new v(1, 33)),
+                    new PackageDependency("libijs-0.35", new v(0, 35)),
+                    new PackageDependency("libjbig0", new v(2, 1)),
+                    new PackageDependency("libjbig2dec0", new v(0, 19)),
+                    new PackageDependency("libjpeg62-turbo", new v(2, 0)),
+                    new PackageDependency("liblcms2-2", new v(2, 12)),
+                    new PackageDependency("libldap-2.4-2", new v(2, 4)),
+                    new PackageDependency("libldap-common", new v(2, 4)),
+                    new PackageDependency("libnghttp2-14", new v(1, 43)),
+                    new PackageDependency("libx265-192", new v(3, 4)),
+                    new PackageDependency("libnuma1", new v(2, 0)),
+                    new PackageDependency("libopenjp2-7", new v(2, 4)),
+                    new PackageDependency("libpaper-utils", new v(1, 1)),
+                    new PackageDependency("libpaper1", new v(1, 1)),
+                    new PackageDependency("libpng16-16", new v(1, 6)),
+                    new PackageDependency("librtmp1", new v(2, 4)),
+                    new PackageDependency("libsasl2-2", new v(2, 1)),
+                    new PackageDependency("libsasl2-modules", new v(2, 1)),
+                    new PackageDependency("libsasl2-modules-db", new v(2, 1)),
+                    new PackageDependency("libssh2-1", new v(1, 9)),
+                    new PackageDependency("libwebpmux3", new v(0, 6)),
+                    new PackageDependency("libwebp6", new v(0, 6)),
+                    new PackageDependency("libxml2", new v(2, 9)),
+                    new PackageDependency("poppler-data", new v(0, 4)),
+                    new PackageDependency("xdg-user-dirs", new v(0, 17))
                 ),
                 new PackageNeeded("aspnetcore-runtime-7.0", new v(7),
                     new PackageNeeded("dotnet-runtime-7.0", new v(7),
@@ -176,7 +176,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             }
 
             var packagesToInstallVerbose = packagesNotInsalled.Select(p => p.Name).ToArray();
-            var packagesToInstall = packagesNotInsalled.Where(p=> p.ShouldMarkToInstall).Select(p => p.Name).ToArray();
+            var packagesToInstall = packagesNotInsalled.Where(p => p.ShouldMarkToInstall).Select(p => p.Name).ToArray();
             if (packagesToInstall.Length <= 0) {
                 writer.WriteLine($"All required packages were already installed!\n - {string.Join(',', packagesToInstallVerbose)}");
             }
@@ -288,7 +288,10 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             }
             else {
                 writer.Write($"\t{DECLARE_FAILED}");
-                Install.RequestEndOnNextStep("Installation requires an ELEVATED execution (sudo make me a sandwich).");
+                var elevateMenu = new ElevateMenuView(Install, writer);
+                Console.Add(elevateMenu);
+                writer.WriteLine("If you would like to attempt to re-run as admin, press CTRL+A.");
+                await elevateMenu.ChoiceMade;
                 return false;
             }
 

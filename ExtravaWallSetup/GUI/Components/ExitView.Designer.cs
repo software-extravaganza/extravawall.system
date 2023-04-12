@@ -17,9 +17,13 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.ColorScheme redOnBlackCustom;
         
+        private Terminal.Gui.ColorScheme redOnBlackButtonCustom;
+        
         private Terminal.Gui.ColorScheme blackOnRedCustom;
         
         private Terminal.Gui.ColorScheme greenOnBlackCustom;
+        
+        private Terminal.Gui.ColorScheme greenOnBlackButtonCustom;
         
         private Terminal.Gui.ColorScheme blackOnGreenCustom;
 
@@ -28,10 +32,13 @@ namespace ExtravaWallSetup.GUI {
         private ExtravaTextView contentLabel;
         
         private Terminal.Gui.Button exitButton;
+        private Terminal.Gui.Button copyButton;
         
         private void InitializeComponent() {
             this.exitButton = new Terminal.Gui.Button();
+            this.copyButton = new Terminal.Gui.Button();
             this.contentLabel = new ExtravaTextView();
+            this.contentLabel.CanSelect = true;
             this.titleLabel = new ExtravaLabel();
             this.redOnBlackCustom = new Terminal.Gui.ColorScheme();
             this.redOnBlackCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
@@ -39,18 +46,30 @@ namespace ExtravaWallSetup.GUI {
             this.redOnBlackCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Brown);
             this.redOnBlackCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Brown);
             this.redOnBlackCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Black);
+            this.redOnBlackButtonCustom = new Terminal.Gui.ColorScheme();
+            this.redOnBlackButtonCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
+            this.redOnBlackButtonCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.Black);
+            this.redOnBlackButtonCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.White);
+            this.redOnBlackButtonCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightRed, Terminal.Gui.Color.White);
+            this.redOnBlackButtonCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Gray);
             this.blackOnRedCustom = new Terminal.Gui.ColorScheme();
             this.blackOnRedCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Red);
             this.blackOnRedCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Red);
             this.blackOnRedCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Red);
-            this.blackOnRedCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Red);
-            this.blackOnRedCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Red);
+            this.blackOnRedCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Brown);
+            this.blackOnRedCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Red);
             this.greenOnBlackCustom = new Terminal.Gui.ColorScheme();
             this.greenOnBlackCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
-            this.greenOnBlackCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
-            this.greenOnBlackCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Brown);
+            this.greenOnBlackCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Brown);
+            this.greenOnBlackCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
             this.greenOnBlackCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Brown);
             this.greenOnBlackCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Black);
+            this.greenOnBlackButtonCustom = new Terminal.Gui.ColorScheme();
+            this.greenOnBlackButtonCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
+            this.greenOnBlackButtonCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Black);
+            this.greenOnBlackButtonCustom.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.White);
+            this.greenOnBlackButtonCustom.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.White);
+            this.greenOnBlackButtonCustom.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Gray);
             this.blackOnGreenCustom = new Terminal.Gui.ColorScheme();
             this.blackOnGreenCustom.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.BrightGreen);
             this.blackOnGreenCustom.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.BrightGreen);
@@ -90,8 +109,19 @@ namespace ExtravaWallSetup.GUI {
             this.exitButton.Data = "exitButton";
             this.exitButton.Text = "Exit Installer";
             this.exitButton.TextAlignment = Terminal.Gui.TextAlignment.Centered;
-            this.exitButton.IsDefault = false;
+            this.exitButton.IsDefault = true;
+            this.exitButton.ColorScheme = redOnBlackButtonCustom;
             this.Add(this.exitButton);
+            this.copyButton.Width = 18;
+            this.copyButton.Height = 1;
+            this.copyButton.X = Pos.Right(exitButton) + 1;
+            this.copyButton.Y = Pos.Bottom(contentLabel) + 1;
+            this.copyButton.Data = "copyButton";
+            this.copyButton.Text = "Copy Result";
+            this.copyButton.TextAlignment = Terminal.Gui.TextAlignment.Centered;
+            this.copyButton.IsDefault = false;
+            this.copyButton.ColorScheme = redOnBlackButtonCustom;
+            this.Add(this.copyButton);
         }
     }
 }

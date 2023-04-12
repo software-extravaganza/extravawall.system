@@ -7,6 +7,10 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
+
+using ExtravaWall.Network;
+using Humanizer;
+
 namespace ExtravaWallSetup.GUI {
     using DynamicData;
     using ExtravaWallSetup.Commands;
@@ -34,6 +38,7 @@ namespace ExtravaWallSetup.GUI {
         private ScatterSeries _memPoints;
         private ScatterSeries _cpuPoints;
         private List<Bar> _cpuBars;
+        private List<Bar> _networkBars;
         private float _memPercentage;
         private float _cpuPercentage;
         private DataRow _cpuRow;
@@ -55,11 +60,13 @@ namespace ExtravaWallSetup.GUI {
             return base.ProcessHotKey(keyEvent);
         }
 
-        public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource) {
+        public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource, InstallManager installManager) {
             _layoutInitializedCompletionSource = layoutInitializedCompletionSource;
+            _installManager = installManager;
             InitializeComponent();
             _memPoints = new ScatterSeries();
             _cpuPoints = new ScatterSeries();
+            _networkPoints = new ScatterSeries();
             _hardwareInfo = new HardwareInfo();
             
             _startTime = DateTime.Now;
@@ -69,14 +76,20 @@ namespace ExtravaWallSetup.GUI {
             _memBars = new List<BarSeries.Bar>();
             _cpuSeries = new DiscoBarSeries();
             _cpuBars = new List<BarSeries.Bar>();
+            _networkSeries = new DiscoBarSeries(10_000);
+            _networkBars = new List<BarSeries.Bar>();
             _memSeries.Bars = _memBars;
             _cpuSeries.Bars = _cpuBars;
+            _networkSeries.Bars = _networkBars;
             memGraph.Series.Add(_memSeries);
             cpuGraph.Series.Add(_cpuSeries);
+            networkGraph.Series.Add(_networkSeries);
             _cpuGraphOffset = 0f;
             _memGraphOffset = 0f;
+            _networkGraphOffset = 0f;
             memGraph.AutoSize = true;
             cpuGraph.AutoSize = true;
+            networkGraph.AutoSize = true;
             _defaultInfoTableColorScheme = new ColorScheme() {
                 Normal = new Terminal.Gui.Attribute(Color.Gray, Color.Blue)
             };
@@ -96,10 +109,10 @@ namespace ExtravaWallSetup.GUI {
             //consoleScrollView.SetFocus();
             consoleScrollView.AutoSize = true;
 
-            _systemTimer = new Timer((o) => {
+            _systemTimer = new Timer(async (o) => {
                 // Note the check for Mainloop being valid. System.Timers can run after they are Disposed.
                 // This code must be defensive for that. 
-                updateGraphs();
+                await updateGraphs();
                 Application.MainLoop?.Invoke(drawGraphs);
 
             }, null, 0, _systemTimerTick);
@@ -112,16 +125,36 @@ namespace ExtravaWallSetup.GUI {
         }
 
         bool good = false;
-        
+        private readonly InstallManager _installManager;
+        private (ulong tx, ulong rx) _networkInfo;
+        private DateTime _networkInfoTimestamp;
+        private (ulong tx, ulong rx) _previousNetworkInfo;
+        private DateTime _previousNetworkInfoTimestamp;
+        private double _networkUpSpeed;
+        private double _networkDownSpeed;
+        private readonly DiscoBarSeries _networkSeries;
+        private readonly float _networkGraphOffset;
+        private readonly ScatterSeries _networkPoints;
 
-        private void updateGraphs() {
 
+        private async Task updateGraphs() {
 
+            _previousNetworkInfo = _networkInfo;
+            _previousNetworkInfoTimestamp = _networkInfoTimestamp;
+            _networkInfo = await NetworkHelpers.GetBytesSentReceivedAsync();
+            _networkInfoTimestamp = DateTime.Now;
             _hardwareInfo.RefreshMemoryStatus();
             _hardwareInfo.RefreshCPUList();
             //var timeDiff = (float)(DateTime.Now - _startTime).TotalMilliseconds;
             _memPercentage = (float)(1m - ((decimal)_hardwareInfo.MemoryStatus.AvailablePhysical / _hardwareInfo.MemoryStatus.TotalPhysical));
             _cpuPercentage = (float)(_hardwareInfo.CpuList.Average(c => (decimal)c.PercentProcessorTime) / 100);
+            var bytesUp = (float)_networkInfo.tx - _previousNetworkInfo.tx;
+            bytesUp = bytesUp < 0 ? 0 : bytesUp;
+            var bytesDown = (float)_networkInfo.rx - _previousNetworkInfo.rx;
+            bytesDown = bytesDown < 0 ? 0 : bytesDown;
+            
+            _networkUpSpeed = bytesUp <= 0 ? 0 : bytesUp / (_networkInfoTimestamp - _previousNetworkInfoTimestamp).TotalSeconds;
+            _networkDownSpeed = bytesDown <= 0 ? 0 : bytesDown / (_networkInfoTimestamp - _previousNetworkInfoTimestamp).TotalSeconds;
             //var newMemPoint = new PointF(timeDiff / 1000, _memPercentage);
             //var newCpuPoint = new PointF(timeDiff / 1000, _cpuPercentage);
             var stiple = new GraphCellToRender('\u2588');
@@ -129,17 +162,30 @@ namespace ExtravaWallSetup.GUI {
             //_cpuPoints.Points.Add(newCpuPoint);
             _memBars.Add(new BarSeries.Bar(null, stiple, _memPercentage));
             _cpuBars.Add(new BarSeries.Bar(null, stiple, _cpuPercentage));
+            _networkBars.Add(new BarSeries.Bar(null, stiple, bytesUp/1000f));
+            _networkBars.Add(new BarSeries.Bar(null, stiple, bytesDown/1000f));
             memGraph.GetCurrentWidth(out int memGraphWidth);
             cpuGraph.GetCurrentWidth(out int cpuGraphWidth);
+            networkGraph.GetCurrentWidth(out int networkGraphWidth);
             memGraph.GetCurrentHeight(out int memGraphHeight);
             cpuGraph.GetCurrentHeight(out int cpuGraphHeight);
+            networkGraph.GetCurrentHeight(out int networkGraphHeight);
 
-            while (_memBars.Count > memGraphWidth && _memBars.Count > 0) {
-                _memBars.RemoveAt(0);
+            try {
+                while (_memBars.Count > memGraphWidth && _memBars.Count > 0) {
+                    _memBars.RemoveAt(0);
+                }
+
+                while (_cpuBars.Count > cpuGraphWidth && _cpuBars.Count > 0) {
+                    _cpuBars.RemoveAt(0);
+                }
+                
+                while (_networkBars.Count > networkGraphWidth && _networkBars.Count > 0) {
+                    _networkBars.RemoveAt(0);
+                }
             }
-
-            while (_cpuBars.Count > cpuGraphWidth && _cpuBars.Count > 0) {
-                _cpuBars.RemoveAt(0);
+            catch (ArgumentOutOfRangeException aoorEx) {
+                // swallow
             }
             //memGraph.ScrollOffset = new PointF(_memGraphOffset, 0);
             //cpuGraph.ScrollOffset = new PointF(_cpuGraphOffset, 0);
@@ -162,12 +208,19 @@ namespace ExtravaWallSetup.GUI {
 
             memGraph.SetNeedsDisplay();
             cpuGraph.SetNeedsDisplay();
+            networkGraph.SetNeedsDisplay();
             cpuGraphLabel.Text = _cpuPercentage.ToString("CPU - 00%");
             memGraphLabel.Text = _memPercentage.ToString("Mem - 00%");
+
+            var humanizedUpload = (_networkUpSpeed == Double.NaN || _networkUpSpeed <= 0 ? 0 : _networkUpSpeed).Bytes().Per(1.Seconds()).Humanize("#").Replace(" ", "").PadLeft(7);
+            var humanizedDownload = (_networkDownSpeed == Double.NaN || _networkDownSpeed <= 0 ? 0 : _networkDownSpeed).Bytes().Per(1.Seconds()).Humanize("#").Replace(" ", "").PadLeft(7);
+            networkGraphLabel.Text = _memPercentage.ToString($"Net - {UP_ARROW}{humanizedUpload} {DOWN_ARROW}{humanizedDownload}");
             infoTable.SetNeedsDisplay();
 
         }
 
+        private const char UP_ARROW = (char)9650;
+        private const char DOWN_ARROW = (char)9660;
     }
 
 

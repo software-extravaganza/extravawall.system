@@ -37,6 +37,8 @@ namespace ExtravaWallSetup.GUI {
         private Terminal.Gui.TableView infoTable;
         
         private Terminal.Gui.GraphView cpuGraph;
+
+        private Terminal.Gui.GraphView networkGraph;
         
         private Terminal.Gui.Label cpuGraphLabel;
         
@@ -44,11 +46,15 @@ namespace ExtravaWallSetup.GUI {
         
         private Terminal.Gui.Label memGraphLabel;
         
+        private Terminal.Gui.Label networkGraphLabel;
+        
         private void InitializeComponent() {
             this.memGraphLabel = new Terminal.Gui.Label();
             this.memGraph = new Terminal.Gui.GraphView();
             this.cpuGraphLabel = new Terminal.Gui.Label();
             this.cpuGraph = new Terminal.Gui.GraphView();
+            this.networkGraphLabel = new Terminal.Gui.Label();
+            this.networkGraph = new Terminal.Gui.GraphView();
             this.infoTable = new Terminal.Gui.TableView();
             this.infoFrame = new Terminal.Gui.FrameView();
             this.consoleScrollView = new ExtravScrollView();
@@ -227,6 +233,36 @@ namespace ExtravaWallSetup.GUI {
             this.memGraphLabel.Text = "Mem";
             this.memGraphLabel.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.infoFrame.Add(this.memGraphLabel);
+            this.networkGraph.Width = Dim.Percent(100f);
+            this.networkGraph.Height = 7;
+            this.networkGraph.X = Pos.Left(memGraph);
+            this.networkGraph.Y = Pos.Bottom(memGraph) + 1;
+            this.networkGraph.Data = "networkGraph";
+            this.networkGraph.TextAlignment = Terminal.Gui.TextAlignment.Left;
+            this.networkGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White,Color.Blue);
+            this.networkGraph.ScrollOffset = new Terminal.Gui.PointF(0F, 0F);
+            this.networkGraph.MarginLeft = 0u;
+            this.networkGraph.MarginBottom = 0u;
+            this.networkGraph.CellSize = new Terminal.Gui.PointF(1F, 15_000F);
+            this.networkGraph.AxisX.Visible = false;
+            this.networkGraph.AxisX.Increment = 1F;
+            this.networkGraph.AxisX.ShowLabelsEvery = 5u;
+            this.networkGraph.AxisX.Minimum = 1F;
+            this.networkGraph.AxisX.Text = "Mem";
+            this.networkGraph.AxisY.Visible = true;
+            this.networkGraph.AxisY.Increment = 15_000F;
+            this.networkGraph.AxisY.ShowLabelsEvery = 0u;
+            this.networkGraph.AxisY.Minimum = 0;
+            this.networkGraph.AxisY.Text = null;
+            this.infoFrame.Add(this.networkGraph);
+            this.networkGraphLabel.Width = 3;
+            this.networkGraphLabel.Height = 1;
+            this.networkGraphLabel.X = Pos.Center();
+            this.networkGraphLabel.Y = Pos.Top(networkGraph) + 1;
+            this.networkGraphLabel.Data = "memGraphLabel";
+            this.networkGraphLabel.Text = "Net";
+            this.networkGraphLabel.TextAlignment = Terminal.Gui.TextAlignment.Left;
+            this.infoFrame.Add(this.networkGraphLabel);
         }
     }
 }

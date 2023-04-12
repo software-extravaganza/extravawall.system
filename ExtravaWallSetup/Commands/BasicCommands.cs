@@ -40,6 +40,7 @@ namespace ExtravaWallSetup.Commands
 
             bool isSupported = (osName, osVersion) switch {
                 ("debian", {Major: > 10 }) => true,
+                ("ubuntu", {Major: > 20 }) => true,
                 _ => false
             };
 

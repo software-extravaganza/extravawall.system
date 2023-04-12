@@ -5,13 +5,14 @@
 		<TargetFramework>net7.0</TargetFramework>
 		<RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers>
 		
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings> 
+		<Nullable>enable</Nullable> 
 		<!--<PublishAot>true</PublishAot>-->
 		<!--<StaticICULinking>true</StaticICULinking>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
 		<IlcDisableReflection>true</IlcDisableReflection>
 		<IlcOptimizationPreference>Size</IlcOptimizationPreference>-->
+        <!-- <CodeAnalysisRuleSet>..\roslynator.ruleset</CodeAnalysisRuleSet>  -->
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -20,6 +21,10 @@
 
 	<PropertyGroup>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+	  <DebugType>full</DebugType>
 	</PropertyGroup>
 	<!--<PropertyGroup>
 		<PublishSingleFile>true</PublishSingleFile>
@@ -60,8 +65,16 @@
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
 	  <Content Include="TrimRoots.xml" />
+	  <None Remove="attach_debugger.sh" />
+	  <Content Include="attach_debugger.sh">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
 	</ItemGroup>
-
+	
+	<ItemGroup>
+		<EmbeddedResource Include="../PrivilegedActionHelper/bin/Debug/net7.0/PrivilegedActionHelper" LogicalName="PrivilegedActionHelper" />
+	</ItemGroup>
+	
 	<ItemGroup>
 		<PackageReference Include="CliWrap" Version="3.6.0" />
 		<PackageReference Include="Figgle.Generator" Version="0.5.1" />
@@ -78,6 +91,14 @@
 		<PackageReference Include="semver" Version="2.2.0" />
 		<PackageReference Include="Spectre.Console" Version="0.46.0" />
 		<PackageReference Include="Terminal.Gui" Version="1.9.0" />
+		<PackageReference Include="Tmds.DBus" Version="0.14.0" />
 		<PackageReference Include="Tomlyn" Version="0.16.2" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\ExtravaWall.Network\ExtravaWall.Network.csproj" />
+	  <ProjectReference Include="..\PrivilegedActionHelper\PrivilegedActionHelper.csproj" />
+	</ItemGroup>
+
+    
 </Project>

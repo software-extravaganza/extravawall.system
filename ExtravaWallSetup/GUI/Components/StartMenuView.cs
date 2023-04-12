@@ -51,7 +51,7 @@ namespace ExtravaWallSetup.GUI
                     await _installManager.InstallAsync();
                     break;
                 case 1:
-                    await _installManager.Recover();
+                    await _installManager.RecoverAsync();
                     break;
                 case 2:
                     _installManager.Exit();

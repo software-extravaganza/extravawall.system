@@ -21,11 +21,22 @@ namespace ExtravaWallSetup.GUI {
         public ExitView(bool isSuccess, ustring title, ustring content) {
             InitializeComponent();
             this.contentLabel.WordWrap = true;
-            this.contentLabel.Enabled = false;
+            this.contentLabel.Enabled = true;
             exitButton.Clicked += ExitButton_Clicked;
+            copyButton.Clicked += CopyButtonOnClicked;
+            exitButton.Enter+= ButtonOnEnter;
+            copyButton.Enter+= ButtonOnEnter;
+            contentLabel.Enter += ButtonOnEnter;
+            
+            if (!Clipboard.IsSupported) {
+                copyButton.Text = "Select text";
+            }
+            
             if (isSuccess) {
                 this.ColorScheme = blackOnGreenCustom;
                 this.titleLabel.ColorScheme = greenOnBlackCustom;
+                this.exitButton.ColorScheme = greenOnBlackButtonCustom;
+                this.copyButton.ColorScheme = greenOnBlackButtonCustom;
             }
 
             this.titleLabel.Text = title;
@@ -33,8 +44,29 @@ namespace ExtravaWallSetup.GUI {
             exitButton.SetFocus();
         }
 
+        private void ButtonOnEnter(FocusEventArgs obj) {
+            exitButton.SetNeedsDisplay();
+            copyButton.SetNeedsDisplay();
+            contentLabel.SetNeedsDisplay();
+        }
+
+        private void CopyButtonOnClicked() {
+            var clipboardData = contentLabel?.Text?.ToString();
+            if (string.IsNullOrWhiteSpace(clipboardData)) {
+                return;
+            }
+
+            if (Clipboard.IsSupported && !Clipboard.TrySetClipboardData(clipboardData)) {
+                var errorWriter = InstallManager.Instance.Console.GetNewWriter(Color.Red, Color.Black);
+                errorWriter.WriteLine("Could not copy to clipboard");
+            }
+            else if (!Clipboard.IsSupported) {
+                contentLabel.SelectAll();
+            }
+        }
+
         private void ExitButton_Clicked() {
-            InstallManager.Instance.Exit();
+            InstallManager.Instance?.Exit(contentLabel?.Text?.ToString());
         }
     }
 }

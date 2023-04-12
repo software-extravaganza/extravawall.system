@@ -13,7 +13,7 @@ namespace ExtravaWallSetup.GUI {
     using Terminal.Gui;
     
     
-    public partial class StartMenuView : Terminal.Gui.View {
+    public partial class ElevateMenuView : Terminal.Gui.View {
         
         private Terminal.Gui.ColorScheme greenOnBlack;
         
@@ -30,30 +30,29 @@ namespace ExtravaWallSetup.GUI {
             this.greenOnBlack.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.Green, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.BrightGreen, Terminal.Gui.Color.Magenta);
             this.greenOnBlack.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Gray, Terminal.Gui.Color.Black);
-            this.Width = 30;
+            this.Width = 65;
             this.Height = 5;
             this.X = 0;
             this.Y = 0;
             this.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.menuTitleLabel.Width = 30;
+            this.menuTitleLabel.Width = 65;
             this.menuTitleLabel.Height = 1;
             this.menuTitleLabel.X = 0;
             this.menuTitleLabel.Y = 0;
             this.menuTitleLabel.ColorScheme = this.greenOnBlack;
             this.menuTitleLabel.Data = "menuTitleLabel";
-            this.menuTitleLabel.Text = "Please choose an option:";
+            this.menuTitleLabel.Text = "Would you like to attempt to re-run with elevated permission?";
             this.menuTitleLabel.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.Add(this.menuTitleLabel);
-            this.listView.Width = 10;
+            this.listView.Width = 40;
             this.listView.Height = 3;
             this.listView.X = 2;
             this.listView.Y = Pos.Bottom(menuTitleLabel) + 1;
             this.listView.Data = "listView";
             this.listView.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.listView.Source = new Terminal.Gui.ListWrapper(new string[] {
-                        "Install",
-                        "Recovery",
-                        "Quit"});
+                        "Yes: re-run with elevated permission",
+                        "No: Quit"});
             this.Add(this.listView);
         }
     }

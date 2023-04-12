@@ -1,4 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 using CliWrap;
 using ExtravaWallSetup;
 using Terminal.Gui;
@@ -18,7 +18,8 @@ using ReactiveUI;
 using System.Reactive.Concurrency;
 using ExtravaWallSetup.GUI.Framework;
 
-try {
+try
+{
     //var rule = new Rule($"[red]ExtravaWall Installer ({RuntimeInformation.OSArchitecture})[/]");
     //AnsiConsole.Write(rule);
 
@@ -29,23 +30,49 @@ try {
     //        .SplitRows(
     //            new Layout("top"),
     //            new Layout("bottom")));
-    Terminal.Gui.Application.Init();
+    string? tempFile = null;
 
-    Terminal.Gui.Application.Driver.ULCorner = '\u256D';
-    Terminal.Gui.Application.Driver.URCorner = '\u256E';
-    Terminal.Gui.Application.Driver.LLCorner = '\u2570';
-    Terminal.Gui.Application.Driver.LRCorner = '\u256F';
+    for (int i = 0; i < args.Length; i++)
+    {
+        if (args[i] == "--debug")
+        {
+            Debugger.Launch();
+        }
+        else if (args[i] == "--temp-file" && i + 1 < args.Length)
+        {
+            tempFile = args[i + 1];
+            break;
+        }
+    }
+
+    if (!string.IsNullOrEmpty(tempFile))
+    {
+        File.WriteAllText(tempFile, "1");
+    }
+
     RxApp.MainThreadScheduler = TerminalScheduler.Default;
     RxApp.TaskpoolScheduler = TaskPoolScheduler.Default;
-    var installManager = new InstallManager();
-    Terminal.Gui.Application.Top.Add(installManager.DefaultScreen);
-    try {
-        Terminal.Gui.Application.Run();
-    }
-    catch (Exception ex) {
-    }
-    Terminal.Gui.Application.Shutdown();
 
+    InstallManager.RestartAndRunElevated(() =>
+    {
+        try
+        {
+            // var priviledgeManager = new PriviledgeManager();
+            // var result = priviledgeManager.ExtractHelper();
+            //
+            Terminal.Gui.Application.Init();
+            Terminal.Gui.Application.Driver.ULCorner = '\u256D';
+            Terminal.Gui.Application.Driver.URCorner = '\u256E';
+            Terminal.Gui.Application.Driver.LLCorner = '\u2570';
+            Terminal.Gui.Application.Driver.LRCorner = '\u256F';
+            var installManager = new InstallManager(Terminal.Gui.Application.MainLoop);
+            Terminal.Gui.Application.Top.Add(installManager.DefaultScreen);
+            Terminal.Gui.Application.Run();
+        }
+        catch (Exception ex) { }
+
+        Terminal.Gui.Application.Shutdown();
+    });
     //Environment.ProcessorCount
     //var table = new Table();
     //table.Border(TableBorder.Rounded);
@@ -105,7 +132,6 @@ try {
     const string SHELL_ARG_INTERPRET = "-c";
     const string SHELL_COMMAND_LS_ARG_SYS_INFO = "ls /etc/*-release";
 
-   
     ////var files = new DirectoryInfo(AppContext.BaseDirectory).GetFiles();
     ////foreach (var file in files) {
     ////    Console.WriteLine(file);
@@ -187,119 +213,146 @@ try {
 
     //}
 
-    async Task<string> getOsReleaseFile(bool debug = false) {
+    async Task<string> getOsReleaseFile(bool debug = false)
+    {
         var response = string.Empty;
-        var sysInfo = (string result) => {
+        var sysInfo = (string result) =>
+        {
             response = result ?? string.Empty;
-            if (debug) {
+            if (debug)
+            {
                 Console.WriteLine($"Release file found: {result}");
             }
         };
 
-        var sysInfoFailed = (string result) => {
+        var sysInfoFailed = (string result) =>
+        {
             Console.WriteLine($"Locating release file failed ({result})");
         };
 
-        var syscmd = Cli.Wrap(COMMAND_SHELL).WithArguments(new[] { SHELL_ARG_INTERPRET, SHELL_COMMAND_LS_ARG_SYS_INFO }) | (sysInfo, sysInfoFailed);
+        var syscmd =
+            Cli.Wrap(COMMAND_SHELL)
+                .WithArguments(new[] { SHELL_ARG_INTERPRET, SHELL_COMMAND_LS_ARG_SYS_INFO })
+            | (sysInfo, sysInfoFailed);
 
-        try {
+        try
+        {
             await syscmd.ExecuteAsync();
             return response;
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             sysInfoFailed(ex.Message);
         }
 
         return string.Empty;
     }
 
-
-    async Task<SystemInfoModel> getOsInfo(string releaseFile, bool debug = false) {
+    async Task<SystemInfoModel> getOsInfo(string releaseFile, bool debug = false)
+    {
         var model = new SystemInfoModel();
         var response = new StringBuilder();
-        var sysInfo = (string result) => {
+        var sysInfo = (string result) =>
+        {
             response.AppendLine(result ?? string.Empty);
-            if (debug) {
+            if (debug)
+            {
                 Console.WriteLine($"Extracted os info: {result}");
             }
         };
 
-        var sysInfoFailed = (string result) => {
+        var sysInfoFailed = (string result) =>
+        {
             Console.WriteLine($"Extracting os info failed ({result})");
         };
 
-        var syscmd = Cli.Wrap(COMMAND_SHELL).WithArguments(new[] { SHELL_ARG_INTERPRET, $"{SHELL_COMMAND_CAT} {releaseFile}" }) | (sysInfo, sysInfoFailed);
+        var syscmd =
+            Cli.Wrap(COMMAND_SHELL)
+                .WithArguments(new[] { SHELL_ARG_INTERPRET, $"{SHELL_COMMAND_CAT} {releaseFile}" })
+            | (sysInfo, sysInfoFailed);
 
-        try {
+        try
+        {
             await syscmd.ExecuteAsync();
             string pattern = @"^(?<key>[^=]+)=""?(?<value>[^""]*)""?$";
             Regex regex = new Regex(pattern, RegexOptions.Multiline);
             string targetString = response.ToString();
 
-
-            foreach (Match match in regex.Matches(targetString)) {
-                if (match.Success) {
+            foreach (var match in regex.Matches(targetString).Cast<Match>())
+            {
+                if (match.Success)
+                {
                     var keyLookup = match.Groups["key"].Value.ToLower().Replace("_", string.Empty);
                     var value = match.Groups["value"].Value;
-                    if (nameof(model.ID).ToLower().CompareTo(keyLookup) == 0) {
+                    if (nameof(model.ID).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.ID = value;
                     }
-                    else if (nameof(model.Name).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.Name).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.Name = value;
                     }
-                    else if (nameof(model.VersonCodeName).ToLower().CompareTo(keyLookup) == 0) {
-                        model.VersonCodeName = value;
+                    else if (nameof(model.VersionCodeName).ToLower().CompareTo(keyLookup) == 0)
+                    {
+                        model.VersionCodeName = value;
                     }
-                    else if (nameof(model.SupportUrl).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.SupportUrl).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.SupportUrl = new Uri(value);
                     }
-                    else if (nameof(model.BugReportUrl).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.BugReportUrl).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.BugReportUrl = new Uri(value);
                     }
-                    else if (nameof(model.HomeUrl).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.HomeUrl).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.HomeUrl = new Uri(value);
                     }
-                    else if (nameof(model.PrettyName).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.PrettyName).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.PrettyName = value;
                     }
-                    else if (nameof(model.VersionId).ToLower().CompareTo(keyLookup) == 0) {
+                    else if (nameof(model.VersionId).ToLower().CompareTo(keyLookup) == 0)
+                    {
                         model.VersionId = value;
                     }
                 }
             }
+
             return model;
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             sysInfoFailed(ex.Message);
         }
 
         return model;
     }
 
-    async Task DiscoverDistro(bool debug = false) {
-
-
-        var sysInfoFailed = (string result) => {
+    async Task DiscoverDistro(bool debug = false)
+    {
+        var sysInfoFailed = (string result) =>
             Console.WriteLine($"Details system info not located using method #1 ({result})");
-        };
 
-        try {
+        try
+        {
             var releaseFile = await getOsReleaseFile();
-            if (string.IsNullOrWhiteSpace(releaseFile)) {
+            if (string.IsNullOrWhiteSpace(releaseFile))
+            {
                 sysInfoFailed("Release file is not found");
                 return;
             }
+
             var systemInfo = await getOsInfo(releaseFile);
             Console.WriteLine($"Got it: {systemInfo.PrettyName} 😉");
-
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             sysInfoFailed(ex.Message);
         }
     }
-
 }
-catch (Exception ex) {
+catch (Exception ex)
+{
     Console.Error.WriteLine($"General failure: {ex.Message} :: {ex}");
 }
-
