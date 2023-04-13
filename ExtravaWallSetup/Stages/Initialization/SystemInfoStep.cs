@@ -12,7 +12,6 @@ using System.Threading.Tasks;
 using ExtravaWall.Network;
 using Tmds.DBus;
 using NetworkManager.DBus;
-using ReactiveMarbles.ObservableEvents;
 using ReactiveUI;
 using Terminal.Gui;
 
@@ -24,18 +23,17 @@ namespace ExtravaWallSetup.Stages.Initialization {
 
         public override short StepOrder => 0;
 
-    
 
-        public override void Initialize(InstallManager installManager) {
-            base.Initialize(installManager);
-            
+
+        public override void Initialize() {
+
             _isMonitoringNetwork.Subscribe(async (isMonitoringNetwork) => {
                 if (!isMonitoringNetwork) {
                     await MonitorNetworkState();
                 }
             });
 
-            installManager.InitializedTask.ContinueWith(task => _isMonitoringNetwork.OnNext(false));
+            Install.InitializedTask.ContinueWith(task => _isMonitoringNetwork.OnNext(false));
         }
 
 
@@ -53,12 +51,14 @@ namespace ExtravaWallSetup.Stages.Initialization {
 
         private Subject<bool> _isMonitoringNetwork = new Subject<bool>();
 
+        public SystemInfoStep(InstallManager installManager) : base(installManager) {
+        }
 
         private async Task MonitorNetworkState() {
             if (Install.NetworkManager is null) {
-                    
+
             }
-            
+
             foreach (var devicePath in await Install.NetworkManager.GetDevicesAsync()) {
                 var device = Install.DbusSystem.CreateProxy<IDevice>("org.freedesktop.NetworkManager", devicePath);
                 //var deviceType = await device.GetDeviceTypeAsync();
@@ -80,8 +80,7 @@ namespace ExtravaWallSetup.Stages.Initialization {
                             var description = $"{address}{descriptionPostfix}";
                             Install.AddOrUpdateSystemInfo(propertyKey, description);
                         }
-                    }
-                    else {
+                    } else {
                         Install.AddOrUpdateSystemInfo(propertyKeyPrefix, stateDescription);
                     }
                 };

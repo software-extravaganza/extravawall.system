@@ -35,6 +35,9 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
         private const string DECLARE_FAILED = $"{FAIL_MARK} Failed";
         private const string DECLARE_NOT_FOUND = $"{FAIL_MARK} Not Found (will install)";
 
+        public InstallCheckSystemStep(InstallManager installManager) : base(installManager) {
+        }
+
         protected override async Task Execute() {
             var success = await installerHeaders(0, "Checking basics", CheckBasics)
             && await installerHeaders(1, "Looking for system tools & commands", async (w) => await CheckForCommands(w, "which", "uname", "apt-get"))
@@ -167,8 +170,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
 
                 if (isInstalled) {
                     writer.Write($"\t{DECLARE_SUCCESS}");
-                }
-                else {
+                } else {
                     writer.Write($"\t{DECLARE_NOT_FOUND}");
                     packagesNotInsalled.Add(package);
                 }
@@ -179,8 +181,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             var packagesToInstall = packagesNotInsalled.Where(p => p.ShouldMarkToInstall).Select(p => p.Name).ToArray();
             if (packagesToInstall.Length <= 0) {
                 writer.WriteLine($"All required packages were already installed!\n - {string.Join(',', packagesToInstallVerbose)}");
-            }
-            else {
+            } else {
                 writer.WriteLine();
                 writer.WriteLine($"Installing all packages that were not found\n - {string.Join(',', packagesToInstallVerbose)}");
                 await Console.CommandAsync<PackageCommands>(async (cmd, output) => {
@@ -191,8 +192,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
             if (installTask is null || (installUpdate?.IsFailed ?? true)) {
                 // todo: write fail state for progress bar
                 return false;
-            }
-            else {
+            } else {
                 var progress = Console.GetNewProgressBar(0, "Installing...");
                 installUpdate.ProgressChanged += (sender, update) => {
                     progress.UpdateProgress(update.PercentComplete);
@@ -251,8 +251,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
 
             if (commandIsFound) {
                 writer.Write($"\t{DECLARE_SUCCESS}");
-            }
-            else {
+            } else {
                 writer.Write($"\t{DECLARE_FAILED}");
                 Install.RequestEndOnNextStep($"Installation requires the '{command}' command.");
             }
@@ -270,8 +269,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
 
             if (isSupportedOs) {
                 writer.Write($"\t{DECLARE_SUCCESS}");
-            }
-            else {
+            } else {
                 writer.Write($"\t{DECLARE_FAILED}");
                 Install.RequestEndOnNextStep("Installation requires an OS that is supported.");
                 return false;
@@ -285,8 +283,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
 
             if (isElevated) {
                 writer.Write($"\t{DECLARE_SUCCESS}");
-            }
-            else {
+            } else {
                 writer.Write($"\t{DECLARE_FAILED}");
                 var elevateMenu = new ElevateMenuView(Install, writer);
                 Console.Add(elevateMenu);

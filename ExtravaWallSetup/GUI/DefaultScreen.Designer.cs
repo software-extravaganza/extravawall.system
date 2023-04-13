@@ -12,42 +12,44 @@ namespace ExtravaWallSetup.GUI {
     using ExtravaWallSetup.GUI.Framework;
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class DefaultScreen : Terminal.Gui.Toplevel {
-        
+
         private Terminal.Gui.ColorScheme redOnBlack;
-        
+
         private Terminal.Gui.ColorScheme blueOnBlack;
-        
+
         private Terminal.Gui.ColorScheme greenOnBlack;
-        
+
         private Terminal.Gui.ColorScheme whiteOnBlue;
-        
+
+        private Terminal.Gui.ColorScheme blackOnBlue;
+
         private Terminal.Gui.LineView lineView;
-        
+
         private Terminal.Gui.Label titleLabel;
-        
+
         private Terminal.Gui.FrameView consoleView;
-        
-        private ExtravScrollView consoleScrollView;
-        
+
+        private ExtravaScrollView consoleScrollView;
+
         private Terminal.Gui.FrameView infoFrame;
-        
+
         private Terminal.Gui.TableView infoTable;
-        
+
         private Terminal.Gui.GraphView cpuGraph;
 
         private Terminal.Gui.GraphView networkGraph;
-        
+
         private Terminal.Gui.Label cpuGraphLabel;
-        
+
         private Terminal.Gui.GraphView memGraph;
-        
+
         private Terminal.Gui.Label memGraphLabel;
-        
+
         private Terminal.Gui.Label networkGraphLabel;
-        
+
         private void InitializeComponent() {
             this.memGraphLabel = new Terminal.Gui.Label();
             this.memGraph = new Terminal.Gui.GraphView();
@@ -57,7 +59,7 @@ namespace ExtravaWallSetup.GUI {
             this.networkGraph = new Terminal.Gui.GraphView();
             this.infoTable = new Terminal.Gui.TableView();
             this.infoFrame = new Terminal.Gui.FrameView();
-            this.consoleScrollView = new ExtravScrollView();
+            this.consoleScrollView = new ExtravaScrollView();
             this.consoleView = new Terminal.Gui.FrameView();
             this.titleLabel = new Terminal.Gui.Label();
             this.lineView = new Terminal.Gui.LineView();
@@ -85,6 +87,12 @@ namespace ExtravaWallSetup.GUI {
             this.whiteOnBlue.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Blue);
             this.whiteOnBlue.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Blue);
             this.whiteOnBlue.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.White, Terminal.Gui.Color.Blue);
+            this.blackOnBlue = new Terminal.Gui.ColorScheme();
+            this.blackOnBlue.Normal = new Terminal.Gui.Attribute(Terminal.Gui.Color.Black, Terminal.Gui.Color.Blue);
+            this.blackOnBlue.HotNormal = new Terminal.Gui.Attribute(Terminal.Gui.Color.Black, Terminal.Gui.Color.Blue);
+            this.blackOnBlue.Focus = new Terminal.Gui.Attribute(Terminal.Gui.Color.Black, Terminal.Gui.Color.Blue);
+            this.blackOnBlue.HotFocus = new Terminal.Gui.Attribute(Terminal.Gui.Color.Black, Terminal.Gui.Color.Blue);
+            this.blackOnBlue.Disabled = new Terminal.Gui.Attribute(Terminal.Gui.Color.Black, Terminal.Gui.Color.Blue);
             this.Width = Dim.Fill(0);
             this.Height = Dim.Fill(0);
             this.X = 0;
@@ -129,7 +137,7 @@ namespace ExtravaWallSetup.GUI {
             this.consoleScrollView.Height = Dim.Fill(0);
             this.consoleScrollView.X = 0;
             this.consoleScrollView.Y = 0;
-            this.consoleScrollView.ContentSize = new Size(20,10);
+            this.consoleScrollView.ContentSize = new Size(20, 10);
             this.consoleScrollView.Data = "consoleScrollView";
             this.consoleScrollView.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.consoleView.Add(this.consoleScrollView);
@@ -167,10 +175,12 @@ namespace ExtravaWallSetup.GUI {
             infoTableTableProperty = new System.Data.DataColumn();
             infoTableTableProperty.ColumnName = "Property";
             infoTableTable.Columns.Add(infoTableTableProperty);
+            infoTable.Style.ColumnStyles[infoTableTableProperty] = new TableView.ColumnStyle { MaxWidth = 15, MinWidth = 10, MinAcceptableWidth = 10, ColorGetter = (col) => whiteOnBlue };
             System.Data.DataColumn infoTableTableValue;
             infoTableTableValue = new System.Data.DataColumn();
             infoTableTableValue.ColumnName = "Value";
             infoTableTable.Columns.Add(infoTableTableValue);
+            infoTable.Style.ColumnStyles[infoTableTableValue] = new TableView.ColumnStyle { MaxWidth = 50, MinWidth = 5, MinAcceptableWidth = 5, ColorGetter = (col) => blackOnBlue, };
             this.infoTable.Table = infoTableTable;
             this.infoFrame.Add(this.infoTable);
             this.cpuGraph.Width = Dim.Percent(100f);
@@ -179,7 +189,7 @@ namespace ExtravaWallSetup.GUI {
             this.cpuGraph.Y = Pos.Bottom(infoTable) + 1;
             this.cpuGraph.Data = "cpuGraph";
             this.cpuGraph.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.cpuGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White,Color.Blue);
+            this.cpuGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White, Color.Blue);
             this.cpuGraph.ScrollOffset = new Terminal.Gui.PointF(0F, 0F);
             this.cpuGraph.MarginLeft = 0u;
             this.cpuGraph.MarginBottom = 0u;
@@ -209,7 +219,7 @@ namespace ExtravaWallSetup.GUI {
             this.memGraph.Y = Pos.Bottom(cpuGraph) + 1;
             this.memGraph.Data = "memGraph";
             this.memGraph.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.memGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White,Color.Blue);
+            this.memGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White, Color.Blue);
             this.memGraph.ScrollOffset = new Terminal.Gui.PointF(0F, 0F);
             this.memGraph.MarginLeft = 0u;
             this.memGraph.MarginBottom = 0u;
@@ -239,7 +249,7 @@ namespace ExtravaWallSetup.GUI {
             this.networkGraph.Y = Pos.Bottom(memGraph) + 1;
             this.networkGraph.Data = "networkGraph";
             this.networkGraph.TextAlignment = Terminal.Gui.TextAlignment.Left;
-            this.networkGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White,Color.Blue);
+            this.networkGraph.GraphColor = Terminal.Gui.Attribute.Make(Color.White, Color.Blue);
             this.networkGraph.ScrollOffset = new Terminal.Gui.PointF(0F, 0F);
             this.networkGraph.MarginLeft = 0u;
             this.networkGraph.MarginBottom = 0u;

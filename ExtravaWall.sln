@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
@@ -9,6 +9,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "solution", "solution", "{28
 	ProjectSection(SolutionItems) = preProject
 		nuget.config = nuget.config
 		global.json = global.json
+		omnisharp.json = omnisharp.json
+		.editorconfig = .editorconfig
+		.csharpierrc = .csharpierrc
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrivilegedActionHelper", "PrivilegedActionHelper\PrivilegedActionHelper.csproj", "{D11132EB-BECC-4725-9679-B99350C199AE}"

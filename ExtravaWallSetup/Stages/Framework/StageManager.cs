@@ -21,7 +21,7 @@ namespace ExtravaWallSetup.Stages.Framework {
         private string _exitError = string.Empty;
 
         public StageType CurrentStage { get; private set; }
-        public IStep CurrentStep { get; private set; } = new EmptyStep();
+        public IStep CurrentStep { get; private set; }
         public bool CurrentStageIsOnLastStep { get; private set; }
 
         private List<StageType> _remainingStages;
@@ -30,15 +30,16 @@ namespace ExtravaWallSetup.Stages.Framework {
             _installManager = installManager;
             _defaultScreen = defaultScreen;
             _remainingStages = ((StageType[])Enum.GetValues(typeof(StageType))).OrderBy(x => x).ToList();
+            CurrentStep = new EmptyStep(_installManager);
             setCurrentStage(StageType.Initialize);
 
             // Add steps
-            addStep(new SystemInfoStep());
-            addStep(new MenuStageStep());
-            addStep(new InstallBeginStep());
-            addStep(new InstallCheckSystemStep());
+            addStep(new SystemInfoStep(_installManager));
+            addStep(new MenuStageStep(_installManager));
+            addStep(new InstallBeginStep(_installManager));
+            addStep(new InstallCheckSystemStep(_installManager));
 
-            addStep(new EndStage());
+            addStep(new EndStage(_installManager));
         }
 
         public void RequestEndOnNextStep(string error) {
@@ -112,8 +113,8 @@ namespace ExtravaWallSetup.Stages.Framework {
         private IStep enumerateNextStep() {
             var currentStage = getCurrentStage();
             if (currentStage == null) {
-                var end = new EndStage();
-                end.Initialize(_installManager);
+                var end = new EndStage(_installManager);
+                end.Initialize();
                 CurrentStageIsOnLastStep = true;
                 return end;
             }
@@ -148,14 +149,14 @@ namespace ExtravaWallSetup.Stages.Framework {
                 _allSteps.Add(step.Stage, new SortedSet<IStep>(new StepComparer()));
             }
 
-            step.Initialize(_installManager);
+            step.Initialize();
             var stage = _allSteps[step.Stage];
             stage.Add(step);
         }
 
         private async Task beginStep() {
             if (!string.IsNullOrWhiteSpace(_exitError) && CurrentStep is EndStage endStep) {
-               endStep.ExitError = _exitError;
+                endStep.ExitError = _exitError;
             }
 
             await CurrentStep.BeginExecute();

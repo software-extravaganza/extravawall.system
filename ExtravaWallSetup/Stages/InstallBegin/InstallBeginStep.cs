@@ -9,6 +9,8 @@ using Terminal.Gui;
 
 namespace ExtravaWallSetup.Stages.Install {
     public class InstallBeginStep : StepBase {
+        public InstallBeginStep(InstallManager installManager) : base(installManager) {
+        }
 
         public override string Name => "Install Starting...";
 
@@ -20,7 +22,7 @@ namespace ExtravaWallSetup.Stages.Install {
 
         protected override async Task Execute() {
             Console.GetNewWriter().WriteLine("Beginning installation...");
-            
+
             await Task.Delay(2000);
         }
     }

@@ -9,11 +9,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Terminal.Gui;
 
-namespace ExtravaWallSetup.Stages
-{
-    public class EndStage : StepBase
-    {
+namespace ExtravaWallSetup.Stages {
+    public class EndStage : StepBase {
         private ExitView _view;
+
+        public EndStage(InstallManager installManager) : base(installManager) {
+        }
 
         public override string Name => "End";
 
@@ -22,8 +23,7 @@ namespace ExtravaWallSetup.Stages
         public override short StepOrder => 0;
         public string ExitError { get; set; }
 
-        protected override async Task Execute()
-        {
+        protected override async Task Execute() {
             var isSuccess = string.IsNullOrWhiteSpace(ExitError);
             var banner = new BannerView(isSuccess ? BannerType.ExitSuccess : BannerType.ExitFail);
             var title = isSuccess ? (ustring)"Install Successfull" : "Install failed";  //💪 😖

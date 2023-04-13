@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace ExtravaWallSetup.Stages.Framework {
     public class EmptyStep : StepBase {
+        public EmptyStep(InstallManager installManager) : base(installManager) {
+        }
+
         public override string Name => "";
 
         public override StageType Stage => StageType.None;

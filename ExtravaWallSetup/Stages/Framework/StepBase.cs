@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 
 namespace ExtravaWallSetup.Stages.Framework {
     public abstract class StepBase : IStep {
-        protected InstallManager Install => _installManager;
-        private InstallManager _installManager;
+        protected InstallManager Install { get; private set; }
         private TaskCompletionSource _taskCompletionSource = new TaskCompletionSource();
         protected VirtualConsoleManager Console => Install.Console;
         public abstract string Name { get; }
@@ -25,11 +24,9 @@ namespace ExtravaWallSetup.Stages.Framework {
                 IsExecuting = true;
                 Install.AddOrUpdateSystemInfo("Install Stage", Name);
                 await Execute();
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
 
-            }
-            finally {
+            } finally {
                 if (AutoComplete) {
                     NotifyThatStepIsComplete();
                 }
@@ -45,11 +42,10 @@ namespace ExtravaWallSetup.Stages.Framework {
                 await Complete();
                 IsExecuting = false;
                 IsComplete = true;
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
 
             }
-            
+
         }
         protected abstract Task Execute();
 
@@ -60,8 +56,10 @@ namespace ExtravaWallSetup.Stages.Framework {
             await Task.CompletedTask;
         }
 
-        public virtual void Initialize(InstallManager installManager) {
-            _installManager = installManager;
+        protected StepBase(InstallManager installManager) {
+            Install = installManager;
         }
+
+        public virtual void Initialize() { }
     }
 }

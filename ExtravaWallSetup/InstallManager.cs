@@ -14,45 +14,47 @@ using Tmds.DBus;
 namespace ExtravaWallSetup;
 
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
-public class InstallManager : IDisposable
-{
-    public static InstallManager? Instance { get; private set; }
+public class InstallManager : IDisposable {
+    public static InstallManager Instance { get; private set; } = null!;
     public static bool ShouldRun { get; set; }
-    public VirtualConsoleManager? Console { get; private set; }
+    public VirtualConsoleManager Console { get; private set; }
 
     private readonly StageManager _stageManager;
 
-    private readonly IDictionary<string, System.Data.DataRow> _systemInfo =
-        new Dictionary<string, System.Data.DataRow>();
+    private readonly IDictionary<string, System.Data.DataRow> _systemInfo = new Dictionary<string, System.Data.DataRow>();
 
     private readonly MainLoop _mainLoop;
 
-    public INetworkManager? NetworkManager { get; private set; }
-    public static Connection DbusSystem => Connection.System;
+    public INetworkManager NetworkManager { get; private set; }
+    public Connection DbusSystem => Connection.System;
     public event Action OnExiting;
     public event Action OnExited;
 
-    public InstallManager(MainLoop mainLoop)
-    {
+
+    public InstallManager(MainLoop mainLoop) {
         Instance = this;
         _mainLoop = mainLoop;
         var layoutInitializedTaskCompletionSource = new TaskCompletionSource();
+        DefaultScreen = new DefaultScreen(layoutInitializedTaskCompletionSource, this);
+        Console = new VirtualConsoleManager(DefaultScreen, DefaultScreen.VirtualConsoleView);
+
         _ = layoutInitializedTaskCompletionSource.Task
             .ToObservable()
             .Subscribe(async unit => await OnConsoleLayoutInitializedAsync(unit));
-        DefaultScreen = new DefaultScreen(layoutInitializedTaskCompletionSource, this);
+
         _stageManager = new StageManager(this, DefaultScreen);
+        NetworkManager = DbusSystem.CreateProxy<INetworkManager>(
+            "org.freedesktop.NetworkManager",
+            "/org/freedesktop/NetworkManager"
+        );
     }
 
-    private async Task OnConsoleLayoutInitializedAsync(Unit unit)
-    {
+    private async Task OnConsoleLayoutInitializedAsync(Unit unit) {
         await InitializeAsync();
     }
 
-    private void SystemOnStateChanged(object? sender, ConnectionStateChangedEventArgs args)
-    {
-        if (args.State != ConnectionState.Disconnecting)
-        {
+    private void SystemOnStateChanged(object? sender, ConnectionStateChangedEventArgs args) {
+        if (args.State != ConnectionState.Disconnecting) {
             return;
         }
 
@@ -63,20 +65,15 @@ public class InstallManager : IDisposable
 
     public Task InitializedTask => _initializationCompletionSource.Task;
 
-    public async Task InitializeAsync()
-    {
-        Console = new VirtualConsoleManager(this, DefaultScreen, DefaultScreen.VirtualConsoleView);
+    public async Task InitializeAsync() {
         DbusSystem.StateChanged += SystemOnStateChanged;
         _ = await Connection.System.ConnectAsync();
-        NetworkManager = DbusSystem.CreateProxy<INetworkManager>(
-            "org.freedesktop.NetworkManager",
-            "/org/freedesktop/NetworkManager"
-        );
-
-        if (_stageManager.CurrentStage == StageType.Initialize)
-        {
-            await _stageManager.AdvanceToStage(StageType.Menu);
-        }
+        _mainLoop.Invoke(async () => {
+            DefaultScreen.Initialize();
+            if (_stageManager.CurrentStage == StageType.Initialize) {
+                await _stageManager.AdvanceToStage(StageType.Menu);
+            }
+        });
 
         AppDomain.CurrentDomain.ProcessExit += (object? sender, EventArgs args) => { };
 
@@ -87,24 +84,20 @@ public class InstallManager : IDisposable
         _ = _initializationCompletionSource.TrySetResult();
     }
 
-    public async Task InstallAsync()
-    {
+    public async Task InstallAsync() {
         await _stageManager.SkipToStageAndRemoveSkipped(StageType.InstallBegin);
     }
 
-    public async Task RecoverAsync()
-    {
+    public async Task RecoverAsync() {
         //todo: implement
         await Task.CompletedTask;
     }
 
-    public void Exit(string? exitContent = null)
-    {
+    public void Exit(string? exitContent = null) {
         OnExiting?.Invoke();
         Application.Shutdown();
         var hasError = !string.IsNullOrWhiteSpace(exitContent);
-        if (hasError)
-        {
+        if (hasError) {
             System.Console.WriteLine(BannerView.ExtravaWall + BannerView.Version + exitContent);
             // if (IsDebug) {
             //     System.Console.WriteLine("\n\nPRESS ENTER");
@@ -116,19 +109,15 @@ public class InstallManager : IDisposable
         OnExited?.Invoke();
     }
 
-    public void RequestEndOnNextStep(string reason)
-    {
+    public void RequestEndOnNextStep(string reason) {
         _stageManager.RequestEndOnNextStep(reason);
     }
 
     public DefaultScreen DefaultScreen { get; }
 
-    public void AddOrUpdateSystemInfo(string property, string value)
-    {
-        _mainLoop.Invoke(() =>
-        {
-            if (_systemInfo.TryGetValue(property, out var matchRow))
-            {
+    public void AddOrUpdateSystemInfo(string property, string value) {
+        _mainLoop.Invoke(() => {
+            if (_systemInfo.TryGetValue(property, out var matchRow)) {
                 matchRow.ItemArray = new object[] { property, value };
                 DefaultScreen.InfoTable.SetNeedsDisplay();
                 return;
@@ -140,25 +129,19 @@ public class InstallManager : IDisposable
         });
     }
 
-    public void RemoveSystemInfo(string property)
-    {
+    public void RemoveSystemInfo(string property) {
         _mainLoop.Invoke(() => _systemInfo.RemoveIfContained(property));
     }
 
-    public void RemoveSystemInfoByPattern(string pattern)
-    {
+    public void RemoveSystemInfoByPattern(string pattern) {
         RemoveSystemInfoByPattern(new Regex(pattern));
     }
 
-    public void RemoveSystemInfoByPattern(Regex pattern)
-    {
-        _mainLoop.Invoke(() =>
-        {
-            foreach (var info in _systemInfo.ToArray())
-            {
+    public void RemoveSystemInfoByPattern(Regex pattern) {
+        _mainLoop.Invoke(() => {
+            foreach (var info in _systemInfo.ToArray()) {
                 var match = pattern.Match(info.Key);
-                if (match.Success)
-                {
+                if (match.Success) {
                     DefaultScreen.InfoTable.Table.Rows.Remove(info.Value);
                     _ = _systemInfo.RemoveIfContained(info.Key);
                 }
@@ -166,15 +149,12 @@ public class InstallManager : IDisposable
         });
     }
 
-    private static bool HasElevatedPermissions()
-    {
+    private static bool HasElevatedPermissions() {
         return (int)Interop.geteuid() == 0;
     }
 
-    public static void RestartAndRunElevated(Action action)
-    {
-        if (!HasElevatedPermissions())
-        {
+    public static void RestartAndRunElevated(bool noRoot, Action action) {
+        if (!noRoot && !HasElevatedPermissions()) {
             //var writer = Console.GetNewWriter(Color.Gray);
             System.Console.WriteLine("This application requires elevated permissions to run.");
             System.Console.WriteLine("Please enter the root password to continue.");
@@ -205,8 +185,7 @@ public class InstallManager : IDisposable
         action();
     }
 
-    void IDisposable.Dispose()
-    {
+    void IDisposable.Dispose() {
         DefaultScreen.Dispose();
     }
 }

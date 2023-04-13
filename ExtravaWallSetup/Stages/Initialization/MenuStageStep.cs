@@ -11,6 +11,9 @@ namespace ExtravaWallSetup.Stages.Initialization {
     public class MenuStageStep : StepBase {
         private StartMenuView _view;
 
+        public MenuStageStep(InstallManager installManager) : base(installManager) {
+        }
+
         public override string Name => "Menu";
 
         public override StageType Stage => StageType.Menu;

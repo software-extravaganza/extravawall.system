@@ -9,6 +9,6 @@
         Task StepTask { get; }
         Task BeginExecute();
         Task BeginComplete();
-        void Initialize(InstallManager installManager);
+        void Initialize();
     }
 }
