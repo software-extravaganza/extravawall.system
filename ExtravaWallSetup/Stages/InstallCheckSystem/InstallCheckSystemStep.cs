@@ -155,8 +155,8 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
                         new PackageDependency("dotnet-host", new v(7))
                     )
                 ),
-                 new PackageNeeded("postgresql-13", new v(13)),
-                 new PackageNeeded("postgresql-client-13", new v(13))
+                new PackageNeeded("postgresql-13", new v(13)),
+                new PackageNeeded("postgresql-client-13", new v(13))
             );
 
             //postgresql postgresql-contrib
