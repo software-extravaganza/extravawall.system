@@ -115,6 +115,7 @@ public class InstallManager : IDisposable {
 
     public DefaultScreen DefaultScreen { get; }
 
+
     public void AddOrUpdateSystemInfo(string property, string value) {
         _mainLoop.Invoke(() => {
             if (_systemInfo.TryGetValue(property, out var matchRow)) {

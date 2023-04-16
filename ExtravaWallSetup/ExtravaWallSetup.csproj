@@ -1,33 +1,28 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<OutputType>Exe</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
-		<RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers>
-		
-		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-		<ImplicitUsings>enable</ImplicitUsings> 
-		<Nullable>enable</Nullable> 
-		<!--<PublishAot>true</PublishAot>-->
-		<!--<StaticICULinking>true</StaticICULinking>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!--<PublishAot>true</PublishAot>-->
+    <!--<StaticICULinking>true</StaticICULinking>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
 		<IlcDisableReflection>true</IlcDisableReflection>
 		<IlcOptimizationPreference>Size</IlcOptimizationPreference>-->
-        <!-- <CodeAnalysisRuleSet>..\roslynator.ruleset</CodeAnalysisRuleSet>  -->
-	</PropertyGroup>
-
-	<ItemGroup>
-	  <None Remove="debian-install.sh" />
-	</ItemGroup>
-
-	<PropertyGroup>
-		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-	</PropertyGroup>
-
-	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-	  <DebugType>full</DebugType>
-	</PropertyGroup>
-	<!--<PropertyGroup>
+    <!-- <CodeAnalysisRuleSet>..\roslynator.ruleset</CodeAnalysisRuleSet>  -->
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="debian-install.sh" />
+  </ItemGroup>
+  <PropertyGroup>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  <!--<PropertyGroup>
 		<PublishSingleFile>true</PublishSingleFile>
 		<PublishTrimmed>true</PublishTrimmed>
 		<SelfContained>true</SelfContained>
@@ -51,8 +46,7 @@
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 	</PropertyGroup>-->
-
-	<!--<PropertyGroup>
+  <!--<PropertyGroup>
 		<PublishAot>false</PublishAot>
 		<StripSymbols>true</StripSymbols>
 		<NoStdLib>true</NoStdLib>
@@ -60,51 +54,45 @@
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
 	</PropertyGroup>-->
-
-	<ItemGroup>
-	  <Content Include="debian-install.sh">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Content>
-	  <Content Include="TrimRoots.xml" />
-	  <None Remove="attach_debugger.sh" />
-	  <Content Include="attach_debugger.sh">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Content>
-	</ItemGroup>
-	
-	<ItemGroup>
-		<EmbeddedResource Include="../PrivilegedActionHelper/bin/Debug/net7.0/PrivilegedActionHelper" LogicalName="PrivilegedActionHelper" />
-	</ItemGroup>
-	
-	<ItemGroup>
-		<PackageReference Include="CliWrap" Version="3.6.0" />
-		<PackageReference Include="Figgle" Version="0.5.1" />
-		<PackageReference Include="Figgle.Generator" Version="0.5.1" />
-		<PackageReference Include="Hardware.Info" Version="10.1.1" />
-		<PackageReference Include="Humanizer.Core" Version="2.14.1" />
-		<PackageReference Include="Microsoft.DotNet.ILCompiler; runtime.win-x64.Microsoft.DotNet.ILCompiler; runtime.linux-x64.Microsoft.DotNet.ILCompiler" Version="8.0.0-alpha.1.23077.2" />
-		<PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
-		<PackageReference Include="ReactiveMarbles.ObservableEvents.SourceGenerator" Version="1.2.3">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="ReactiveUI" Version="18.4.1" />
-		<PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
-		<PackageReference Include="Roslynator.Analyzers" Version="4.2.0">
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		  <PrivateAssets>all</PrivateAssets>
-		</PackageReference>
-		<PackageReference Include="semver" Version="2.2.0" />
-		<PackageReference Include="Spectre.Console" Version="0.46.0" />
-		<PackageReference Include="Terminal.Gui" Version="1.10.1" />
-		<PackageReference Include="Tmds.DBus" Version="0.14.0" />
-		<PackageReference Include="Tomlyn" Version="0.16.2" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <ProjectReference Include="..\ExtravaWall.Network\ExtravaWall.Network.csproj" />
-	  <ProjectReference Include="..\PrivilegedActionHelper\PrivilegedActionHelper.csproj" />
-	</ItemGroup>
-
-    
+  <ItemGroup>
+    <Content Include="debian-install.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TrimRoots.xml" />
+    <None Remove="attach_debugger.sh" />
+    <Content Include="attach_debugger.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../PrivilegedActionHelper/bin/Debug/net7.0/PrivilegedActionHelper" LogicalName="PrivilegedActionHelper" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CliWrap" Version="3.6.0" />
+    <PackageReference Include="Figgle" Version="0.5.1" />
+    <PackageReference Include="Figgle.Generator" Version="0.5.1" />
+    <PackageReference Include="Hardware.Info" Version="10.1.1" />
+    <PackageReference Include="Humanizer.Core" Version="2.14.1" />
+    <PackageReference Include="Microsoft.DotNet.ILCompiler; runtime.win-x64.Microsoft.DotNet.ILCompiler; runtime.linux-x64.Microsoft.DotNet.ILCompiler" Version="8.0.0-alpha.1.23077.2" />
+    <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
+    <PackageReference Include="ReactiveMarbles.ObservableEvents.SourceGenerator" Version="1.2.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ReactiveUI" Version="18.4.1" />
+    <PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.2.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="semver" Version="2.2.0" />
+    <PackageReference Include="Spectre.Console" Version="0.46.0" />
+    <PackageReference Include="Terminal.Gui" Version="1.10.1" />
+    <PackageReference Include="Tmds.DBus" Version="0.14.0" />
+    <PackageReference Include="Tomlyn" Version="0.16.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ExtravaWall.Network\ExtravaWall.Network.csproj" />
+    <ProjectReference Include="..\PrivilegedActionHelper\PrivilegedActionHelper.csproj" />
+  </ItemGroup>
 </Project>

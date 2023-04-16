@@ -24,19 +24,28 @@ namespace ExtravaWallSetup.Commands {
             return isWindows ? isWindowsElevated() : isPosixElevated();
         }
 
+
+        /// <summary>
+        /// Checks for a supported OS to install ExtravaWall on.
+        /// <code>
+        /// var isSupported = new BasicCommands().IsSupportedOs();
+        /// </code>
+        /// </summary>
+        /// <returns><typeparamref name="bool"/> value that represents a supported OS.</returns>
         public bool IsSupportedOs() {
             var runtimeIdentifier = RuntimeInformation.RuntimeIdentifier;
-            string pattern =
+            const string pattern =
                 @"(?<name>[^\.]+)\.(?<version>[^-]*)-?(?<architecture>[^-]*)-?(?<qualifiers>.*)";
-            Regex regex = new Regex(pattern, RegexOptions.Multiline);
+            var regex = new Regex(pattern, RegexOptions.Multiline);
             var osName = string.Empty;
             var osVersion = new SemVersion(0, 0);
 
-            foreach (Match match in regex.Matches(runtimeIdentifier)) {
+            foreach (Match match in regex.Matches(runtimeIdentifier).Cast<Match>()) {
                 if (match.Success) {
                     osName = (
                         match.Groups.ContainsKey("name") ? match.Groups["name"].Value : string.Empty
-                    ).ToLower();
+                    )
+                        .ToLower();
                     osVersion = SemVersion.Parse(
                         match.Groups.ContainsKey("version")
                             ? match.Groups["version"].Value
