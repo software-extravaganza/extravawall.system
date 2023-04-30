@@ -12,13 +12,18 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "solution", "solution", "{28
 		omnisharp.json = omnisharp.json
 		.editorconfig = .editorconfig
 		.csharpierrc = .csharpierrc
+		.gitignore = .gitignore
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrivilegedActionHelper", "PrivilegedActionHelper\PrivilegedActionHelper.csproj", "{D11132EB-BECC-4725-9679-B99350C199AE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaWall.Network", "ExtravaWall.Network\ExtravaWall.Network.csproj", "{4FE667AA-469B-46D0-A27C-FE1B3BF2F27D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaWallSetup.Tests", "ExtravaWallSetup.Tests\ExtravaWallSetup.Tests.csproj", "{F9530278-EA4A-43E0-8FC7-981811B35EF8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaWallSetup.Test", "ExtravaWallSetup.Test\ExtravaWallSetup.Test.csproj", "{F9530278-EA4A-43E0-8FC7-981811B35EF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaCore", "ExtravaCore\ExtravaCore.csproj", "{0C8714EB-4758-4B14-9551-A4B57885642D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaCore.Test", "ExtravaCore.Test\ExtravaCore.Test.csproj", "{48C33913-57C9-46F5-BDAF-F8316BC79DD8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,6 +47,14 @@ Global
 		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F9530278-EA4A-43E0-8FC7-981811B35EF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C8714EB-4758-4B14-9551-A4B57885642D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C8714EB-4758-4B14-9551-A4B57885642D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C8714EB-4758-4B14-9551-A4B57885642D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C8714EB-4758-4B14-9551-A4B57885642D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48C33913-57C9-46F5-BDAF-F8316BC79DD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48C33913-57C9-46F5-BDAF-F8316BC79DD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48C33913-57C9-46F5-BDAF-F8316BC79DD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48C33913-57C9-46F5-BDAF-F8316BC79DD8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

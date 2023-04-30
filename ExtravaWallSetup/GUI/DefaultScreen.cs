@@ -13,8 +13,6 @@ using Humanizer;
 
 namespace ExtravaWallSetup.GUI {
     using DynamicData;
-    using ExtravaWallSetup.Commands;
-    using ExtravaWallSetup.Commands.Framework;
     using ExtravaWallSetup.GUI.Framework;
     using Hardware.Info;
     using System;
@@ -60,9 +58,9 @@ namespace ExtravaWallSetup.GUI {
             return base.ProcessHotKey(keyEvent);
         }
 
-        public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource, InstallManager installManager) {
+        public DefaultScreen(TaskCompletionSource layoutInitializedCompletionSource) {
             _layoutInitializedCompletionSource = layoutInitializedCompletionSource;
-            _installManager = installManager;
+
             InitializeComponent();
             _memPoints = new ScatterSeries();
             _cpuPoints = new ScatterSeries();
@@ -117,7 +115,6 @@ namespace ExtravaWallSetup.GUI {
         }
 
         bool good = false;
-        private readonly InstallManager _installManager;
         private (ulong tx, ulong rx) _networkInfo;
         private DateTime _networkInfoTimestamp;
         private (ulong tx, ulong rx) _previousNetworkInfo;
@@ -134,7 +131,7 @@ namespace ExtravaWallSetup.GUI {
 
             _previousNetworkInfo = _networkInfo;
             _previousNetworkInfoTimestamp = _networkInfoTimestamp;
-            _networkInfo = await NetworkHelpers.GetBytesSentReceivedAsync();
+            _networkInfo = NetworkHelpers.GetBytesSentReceived();
             _networkInfoTimestamp = DateTime.Now;
             _hardwareInfo.RefreshMemoryStatus();
             _hardwareInfo.RefreshCPUList();

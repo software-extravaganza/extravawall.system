@@ -1,4 +1,4 @@
-﻿using ExtravaWallSetup.Commands;
+﻿using ExtravaCore.Commands;
 using ExtravaWallSetup.GUI;
 using ExtravaWallSetup.Stages.Framework;
 using Hardware.Info;
@@ -264,7 +264,7 @@ namespace ExtravaWallSetup.Stages.InstallCheckSystem {
 
             var isSupportedOs = false;
             await Console.CommandAsync<BasicCommands>((cmd, output) => {
-                isSupportedOs = cmd.IsSupportedOs();
+                isSupportedOs = true; //todo: cmd.IsSupportedOs();
             });
 
             if (isSupportedOs) {

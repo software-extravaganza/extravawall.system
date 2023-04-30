@@ -1,4 +1,4 @@
-﻿using ExtravaWallSetup.Commands.Framework;
+﻿using ExtravaCore.Commands;
 using Terminal.Gui;
 using static Terminal.Gui.View;
 
@@ -10,11 +10,13 @@ public class VirtualConsoleManager {
     private readonly ScrollView _consoleView;
     private int _totalScrollWidth;
     private int _totalScrollHeight = 2;
+    private ExtravaServiceProvider _services;
 
-    public VirtualConsoleManager(DefaultScreen defaultScreen, ExtravaScrollView consoleView) {
+    public VirtualConsoleManager(ExtravaServiceProvider _serviceProvider, DefaultScreen defaultScreen) {
         _defaultScreen = defaultScreen;
-        _consoleView = consoleView;
+        _consoleView = defaultScreen.VirtualConsoleView;
         _consoleView.KeepContentAlwaysInViewport = true;
+        _services = _serviceProvider;
         Application.Resized = defaultScreen_Resized;
         _defaultScreen.KeyDown += defaultScreen_KeyDown;
     }
@@ -32,10 +34,10 @@ public class VirtualConsoleManager {
     }
 
     public async Task CommandAsync<T>(Action<T, CommandView> actions, bool printResult = false)
-        where T : ICommand, new() {
+        where T : ICommand {
         await Task.Run(() => {
             var commandView = new CommandView();
-            var command = new T();
+            var command = _services.GetService<T>();
             if (printResult) {
                 _ = Add(commandView);
             }
@@ -51,10 +53,10 @@ public class VirtualConsoleManager {
     }
 
     public async Task CommandAsync<T>(Func<T, CommandView, Task> actions, bool printResult = false)
-        where T : ICommand, new() {
+        where T : ICommand {
         await Task.Run(async () => {
             var commandView = new CommandView();
-            var command = new T();
+            var command = _services.GetService<T>();
 
             if (printResult) {
                 _ = Add(commandView);

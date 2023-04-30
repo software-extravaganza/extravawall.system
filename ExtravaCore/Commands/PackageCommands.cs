@@ -1,9 +1,8 @@
-﻿using CliWrap;
-using ExtravaWallSetup.Commands.Framework;
+using CliWrap;
 using Semver;
 using System.Text.RegularExpressions;
 
-namespace ExtravaWallSetup.Commands {
+namespace ExtravaCore.Commands {
     public record OsPackage(string Name, SemVersion Version);
     public class PackageCommands : CommandBase<PackageCommands> {
         //dpkg-query --no-pager --showformat='${Package}\t${Version}\n' -W PACKAGE
@@ -19,6 +18,10 @@ namespace ExtravaWallSetup.Commands {
         const string APTGET_ARG_LIST = "list";
         const string APTGET_ARG_VERY_QUIET = "-qq";
         const string APTCACHE_ARG_SEARCH = "search";
+
+        public PackageCommands(CommandOptions options) : base(options) {
+        }
+
         public async Task<(bool success, IList<OsPackage> packages)> PackagesInstalled(string? package = null) {
             var packages = new List<OsPackage>();
             var args = new List<string> { DPKG_ARG_NO_PAGER, DPKG_ARG_SHOW_FORMAT, DPKG_ARG_SHOW_PACKAGE };
@@ -58,6 +61,7 @@ namespace ExtravaWallSetup.Commands {
 
             return (success, packages);
         }
+
         public record PackageCommandUpdate(bool? IsSuccessful, float PercentComplete, string? Message = null);
 
         public interface IPackageCommandProgress {
@@ -83,6 +87,7 @@ namespace ExtravaWallSetup.Commands {
                 LastUpdate = update;
             }
         }
+
         private (Task, IPackageCommandProgress) packageCommandWithProgress(Command command) {
             var progress = new PackageCommandProgress();
             var action = async () => {

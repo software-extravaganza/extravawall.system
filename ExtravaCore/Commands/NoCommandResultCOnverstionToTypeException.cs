@@ -1,11 +1,9 @@
-﻿namespace ExtravaWallSetup.Commands.Framework;
+namespace ExtravaCore.Commands;
 
-internal class NoCommandResultConversionToTypeException : Exception
-{
+internal class NoCommandResultConversionToTypeException : Exception {
     private readonly string _conversionTypeName;
 
-    public NoCommandResultConversionToTypeException(string conversionTypeName)
-    {
+    public NoCommandResultConversionToTypeException(string conversionTypeName) {
         _conversionTypeName = conversionTypeName;
     }
 

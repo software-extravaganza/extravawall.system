@@ -4,6 +4,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!--<PublishAot>true</PublishAot>-->
@@ -73,6 +74,7 @@
     <PackageReference Include="Figgle.Generator" Version="0.5.1" />
     <PackageReference Include="Hardware.Info" Version="10.1.1" />
     <PackageReference Include="Humanizer.Core" Version="2.14.1" />
+    <PackageReference Include="Jab" Version="0.8.6" />
     <PackageReference Include="Microsoft.DotNet.ILCompiler; runtime.win-x64.Microsoft.DotNet.ILCompiler; runtime.linux-x64.Microsoft.DotNet.ILCompiler" Version="8.0.0-alpha.1.23077.2" />
     <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
     <PackageReference Include="ReactiveMarbles.ObservableEvents.SourceGenerator" Version="1.2.3">
@@ -81,12 +83,14 @@
     </PackageReference>
     <PackageReference Include="ReactiveUI" Version="18.4.1" />
     <PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
-    <PackageReference Include="Roslynator.Analyzers" Version="4.2.0">
+    <PackageReference Include="Roslynator.Analyzers" Version="4.3.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="semver" Version="2.2.0" />
     <PackageReference Include="Spectre.Console" Version="0.46.0" />
+    <PackageReference Include="StrongInject" Version="1.4.4" />
+    <PackageReference Include="System.Composition.AttributedModel" Version="7.0.0" />
     <PackageReference Include="Terminal.Gui" Version="1.10.1" />
     <PackageReference Include="Tmds.DBus" Version="0.14.0" />
     <PackageReference Include="Tomlyn" Version="0.16.2" />
@@ -94,5 +98,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ExtravaWall.Network\ExtravaWall.Network.csproj" />
     <ProjectReference Include="..\PrivilegedActionHelper\PrivilegedActionHelper.csproj" />
+    <ProjectReference Include="..\ExtravaCore\ExtravaCore.csproj" />
   </ItemGroup>
 </Project>

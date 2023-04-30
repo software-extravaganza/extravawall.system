@@ -16,7 +16,8 @@ namespace ExtravaWallSetup.Stages.Framework {
     public class StageManager {
         private IDictionary<StageType, ICollection<IStep>> _allSteps = new Dictionary<StageType, ICollection<IStep>>();
         private IDictionary<StageType, IEnumerator<IStep>> _stageEnumerators = new Dictionary<StageType, IEnumerator<IStep>>();
-        private InstallManager _installManager;
+        private EndStage _endStage;
+        private ExtravaServiceProvider _serviceProvider;
         private DefaultScreen _defaultScreen;
         private string _exitError = string.Empty;
 
@@ -26,20 +27,23 @@ namespace ExtravaWallSetup.Stages.Framework {
 
         private List<StageType> _remainingStages;
 
-        public StageManager(InstallManager installManager, DefaultScreen defaultScreen) {
-            _installManager = installManager;
+        public StageManager(ExtravaServiceProvider serviceProvider, DefaultScreen defaultScreen) {
+            _serviceProvider = serviceProvider;
             _defaultScreen = defaultScreen;
             _remainingStages = ((StageType[])Enum.GetValues(typeof(StageType))).OrderBy(x => x).ToList();
-            CurrentStep = new EmptyStep(_installManager);
+        }
+
+        public void Initialize() {
+            CurrentStep = _serviceProvider.GetService<EmptyStep>();
+            _endStage = _serviceProvider.GetService<EndStage>();
+
+            addStep(_serviceProvider.GetService<SystemInfoStep>());
+            addStep(_serviceProvider.GetService<MenuStageStep>());
+            addStep(_serviceProvider.GetService<InstallBeginStep>());
+            addStep(_serviceProvider.GetService<InstallCheckSystemStep>());
+            addStep(_endStage);
+
             setCurrentStage(StageType.Initialize);
-
-            // Add steps
-            addStep(new SystemInfoStep(_installManager));
-            addStep(new MenuStageStep(_installManager));
-            addStep(new InstallBeginStep(_installManager));
-            addStep(new InstallCheckSystemStep(_installManager));
-
-            addStep(new EndStage(_installManager));
         }
 
         public void RequestEndOnNextStep(string error) {
@@ -113,10 +117,9 @@ namespace ExtravaWallSetup.Stages.Framework {
         private IStep enumerateNextStep() {
             var currentStage = getCurrentStage();
             if (currentStage == null) {
-                var end = new EndStage(_installManager);
-                end.Initialize();
+                _endStage.Initialize();
                 CurrentStageIsOnLastStep = true;
-                return end;
+                return _endStage;
             }
 
             if (!_stageEnumerators.ContainsKey(currentStage.Value)) {

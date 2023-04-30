@@ -26,6 +26,38 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "test",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "test with coverage",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "--collect:\"XPlat Code Coverage\"",
+                "/p:CollectCoverage=true",
+                "/p:CoverletOutputFormat=lcov",
+                "/p:CoverletOutput=TestResults/lcov.info",
+                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
             "label": "watch",
             "command": "dotnet",
             "type": "process",
@@ -34,6 +66,22 @@
                 "run",
                 "--project",
                 "${workspaceFolder}/ExtravaWallSetup/ExtravaWallSetup.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "watch tests",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "test",
+                "--project",
+                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj",
+                "--collect:\"XPlat Code Coverage\"",
+                "/p:CollectCoverage=true",
+                "/p:CoverletOutputFormat=lcov",
+                "/p:CoverletOutput=TestResults/lcov.info"
             ],
             "problemMatcher": "$msCompile"
         },

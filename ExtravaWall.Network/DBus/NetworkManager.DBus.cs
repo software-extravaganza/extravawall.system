@@ -779,7 +779,7 @@ namespace NetworkManager.DBus
             }
         }
 
-        private string _type = default(string);
+        private string _type;
         public string Type
         {
             get

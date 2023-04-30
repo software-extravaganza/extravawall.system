@@ -5,30 +5,24 @@ using Tmds.DBus;
 
 namespace ExtravaWall.Network;
 
-public class NetworkHelpers {
-    public static async Task<(ulong tx, ulong rx)> GetBytesSentReceivedAsync() {
-
+public static class NetworkHelpers {
+    public static (ulong tx, ulong rx) GetBytesSentReceived() {
         ulong txBytes = 0;
         ulong rxBytes = 0;
         try {
             var networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
             foreach (var networkInterface in networkInterfaces) {
-            
                 //Get the properties
                 txBytes += (ulong)networkInterface.GetIPv4Statistics().BytesSent;
                 rxBytes += (ulong)networkInterface.GetIPv4Statistics().BytesReceived;
-            
             }
-        }
-        catch (Exception ex) {
-            
+        } catch (Exception ex) {
+
         }
 
         return (txBytes, rxBytes);
     }
-    
-   
 
     public static IPAddress ConvertUintToIpAddress(uint ip) {
         byte[] bytes = BitConverter.GetBytes(ip);
@@ -40,7 +34,7 @@ public class NetworkHelpers {
     }
 
     public static List<IPAddressInfo> ConvertUintToIp4Addresses(uint[][] dbusIpAddressInfoArray) {
-        List<IPAddressInfo> addressNetworkPairs = new List<IPAddressInfo>();
+        var addressNetworkPairs = new List<IPAddressInfo>();
         foreach (var dbusIpAddressInfo in dbusIpAddressInfoArray) {
             addressNetworkPairs.Add(new IPAddressInfo(dbusIpAddressInfo));
         }

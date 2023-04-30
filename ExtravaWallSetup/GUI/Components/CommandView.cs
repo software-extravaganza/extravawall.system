@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 namespace ExtravaWallSetup.GUI {
     using CliWrap;
-    using ExtravaWallSetup.Commands.Framework;
+    using ExtravaCore.Commands;
     using ExtravaWallSetup.GUI.Framework;
     using System.Linq.Expressions;
     using Terminal.Gui;

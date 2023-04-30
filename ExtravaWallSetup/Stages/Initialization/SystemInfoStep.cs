@@ -1,5 +1,4 @@
-﻿using ExtravaWallSetup.Commands;
-using ExtravaWallSetup.GUI;
+﻿using ExtravaWallSetup.GUI;
 using ExtravaWallSetup.Stages.Framework;
 using System;
 using System.Collections.Generic;

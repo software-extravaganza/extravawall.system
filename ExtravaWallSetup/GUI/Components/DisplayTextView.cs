@@ -7,10 +7,8 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI
-{
+namespace ExtravaWallSetup.GUI {
     using CliWrap;
-    using ExtravaWallSetup.Commands.Framework;
     using ExtravaWallSetup.GUI.Framework;
     using NStack;
     using System.Linq.Expressions;
@@ -44,7 +42,7 @@ namespace ExtravaWallSetup.GUI
                 Application.UngrabMouse();
                 this.SuperView.OnMouseEnter(mouseEvent);
             }
-            
+
             return CanSelect;
         }
 
@@ -68,7 +66,7 @@ namespace ExtravaWallSetup.GUI
     }
     public class ExtravaLabel : View {
         public ExtravaLabel() {
-            
+
         }
 
         public override bool OnMouseEnter(MouseEvent mouseEvent) {
@@ -122,7 +120,7 @@ namespace ExtravaWallSetup.GUI
             textOutput.Text = textOutput.Text + ((newLine ? Environment.NewLine : string.Empty) + output).Replace("\r\n", "\n").Replace("\t", "    ");//.Replace(" ", "\u00A0");
             var countOfLines = 0;
             textOutput.GetCurrentWidth(out currentWidth);
-            foreach(var line in textOutput.Text.ToString().Split('\n')) {
+            foreach (var line in textOutput.Text.ToString().Split('\n')) {
                 countOfLines += 1;
                 currentWidth = currentWidth > line.Length ? currentWidth : line.Length;
             }

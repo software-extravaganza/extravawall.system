@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CliWrap" Version="3.6.0" />
+    <PackageReference Include="semver" Version="2.2.0" />
+    <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
+  </ItemGroup>
+</Project>
