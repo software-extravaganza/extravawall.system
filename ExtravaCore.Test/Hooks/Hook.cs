@@ -1,7 +1,7 @@
 using System;
 using TechTalk.SpecFlow;
 
-namespace ExtravaCore.Tests.Hooks
+namespace ExtravaCore.Test.Hooks
 {
     [Binding]
     public class Hooks

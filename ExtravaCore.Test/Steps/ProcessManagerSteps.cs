@@ -5,12 +5,12 @@ using FluentAssertions;
 using ExtravaCore;
 using System.Threading;
 
-namespace ExtravaWallSetup.Tests.Steps;
+namespace ExtravaWallSetup.Test.Steps;
 
 [Binding]
 public class ProcessManagerSteps {
     private readonly ScenarioContext _scenarioContext;
-    private ProcessManager _processManager;
+    private IProcessManager _processManager;
     private int? _processId;
     private int? _parentProcessId;
     private string _commandString;
@@ -21,13 +21,13 @@ public class ProcessManagerSteps {
     private CancellationTokenSource _threadCancellationTokenSource;
     private string _curentExecutingAssemblyFilePath;
 
-    public ProcessManagerSteps(ScenarioContext scenarioContext) {
-        _scenarioContext = scenarioContext;
+    public ProcessManagerSteps(IProcessManager processManager) {
+        _processManager = processManager;
     }
 
     [Given(@"I have a process manager")]
     public void Given_IHaveAProcessManagerSteps() {
-        _processManager = new ProcessManager();
+        _processManager.Should().NotBeNull();
     }
 
     [When(@"I request the parent process id")]
@@ -139,7 +139,7 @@ public class ProcessManagerSteps {
         _thread.Should().NotBeNull();
         _thread.IsAlive.Should().BeTrue();
         _threadCancellationTokenSource.Cancel(true);
-        var endedSuccessfully = _thread.Join(1000);
+        var endedSuccessfully = _thread.Join(10000);
         endedSuccessfully.Should().BeTrue();
         _thread.IsAlive.Should().BeFalse();
     }

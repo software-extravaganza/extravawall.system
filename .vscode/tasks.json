@@ -31,7 +31,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj"
+                "${workspaceFolder}/ExtravaCore.Test/ExtravaCore.Test.csproj"
             ],
             "problemMatcher": "$msCompile",
             "group": {
@@ -47,9 +47,9 @@
                 "test",
                 "--collect:\"XPlat Code Coverage\"",
                 "/p:CollectCoverage=true",
-                "/p:CoverletOutputFormat=lcov",
-                "/p:CoverletOutput=TestResults/lcov.info",
-                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj"
+                "/p:CoverletOutputFormat=opencover%2ccobertura%2clcov",
+                "/p:CoverletOutput=TestResults/",
+                "${workspaceFolder}/ExtravaCore.Test/ExtravaCore.Test.csproj"
             ],
             "problemMatcher": "$msCompile",
             "group": {
@@ -77,11 +77,11 @@
                 "watch",
                 "test",
                 "--project",
-                "${workspaceFolder}/ExtravaCore.Tests/ExtravaCore.Tests.csproj",
+                "${workspaceFolder}/ExtravaCore.Test/ExtravaCore.Test.csproj",
                 "--collect:\"XPlat Code Coverage\"",
                 "/p:CollectCoverage=true",
-                "/p:CoverletOutputFormat=lcov",
-                "/p:CoverletOutput=TestResults/lcov.info"
+                "/p:CoverletOutputFormat=opencover%2ccobertura%2clcov",
+                "/p:CoverletOutput=TestResults/"
             ],
             "problemMatcher": "$msCompile"
         },

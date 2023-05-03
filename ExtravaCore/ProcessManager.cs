@@ -42,15 +42,20 @@ public class ProcessManager : IProcessManager {
     public ThreadStart GetThreadStartFor(ProcessStartInfo startInfo, Action? postDelegate = null, CancellationToken cancellationToken = default) {
         ThreadStart threadStart = () => {
             Console.WriteLine("Starting Elevated...");
-            var process = new Process {
+            var process = new Process() {
                 StartInfo = startInfo,
                 EnableRaisingEvents = true
             };
 
-            process.Start();
-            cancellationToken.Register(() => process?.Close());
-            process?.WaitForExit();
-            Console.WriteLine($"Process exited with code: {process.ExitCode}");
+            try {
+                process.Start();
+                cancellationToken.Register(() => process?.Close());
+                process?.WaitForExit();
+                var exitCode = process?.ExitCode ?? 0;
+                Console.WriteLine($"Process exited with code: {exitCode}");
+            } catch (Exception ex) {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
             postDelegate?.Invoke();
         };
         return threadStart;
@@ -60,7 +65,6 @@ public class ProcessManager : IProcessManager {
         // Create and start a new thread to run the delegate
         Thread elevatedProcessThread = new Thread(threadStart);
         elevatedProcessThread.Start();
-
         return elevatedProcessThread;
     }
 

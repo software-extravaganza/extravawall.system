@@ -1,6 +1,6 @@
 using System;
 
-namespace ExtravaCore.Tests.Drivers
+namespace ExtravaCore.Test.Drivers
 {
     public class Driver
     {
