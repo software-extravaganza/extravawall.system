@@ -3,7 +3,7 @@ using System.Text;
 
 namespace ExtravaCore;
 
-public interface IElevator {
+public interface IElevator : IDisposable {
     ProcessStartInfo GetElevatedProcessStartInfo(bool exactParentCommand = false);
     void RestartAndRunElevated(Action? exitDelegate = null);
 }
@@ -21,6 +21,10 @@ public class Elevator : IElevator {
             return false;
 #endif
         }
+    }
+
+    public void Dispose() {
+        _processManager.Dispose();
     }
 
     public ProcessStartInfo GetElevatedProcessStartInfo(bool exactParentCommand = false) {

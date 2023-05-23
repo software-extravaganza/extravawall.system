@@ -8,7 +8,7 @@ using System.Threading;
 namespace ExtravaWallSetup.Test.Steps;
 
 [Binding]
-public class ProcessManagerSteps {
+public class ProcessManagerSteps : IDisposable {
     private readonly ScenarioContext _scenarioContext;
     private IProcessManager _processManager;
     private int? _processId;
@@ -157,6 +157,7 @@ public class ProcessManagerSteps {
         _curentExecutingAssemblyFilePath.Should().Be(assemblyToCheckFor);
     }
 
-
-
+    public void Dispose() {
+        _processManager.Dispose();
+    }
 }

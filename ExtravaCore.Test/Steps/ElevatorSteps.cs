@@ -8,7 +8,7 @@ using TechTalk.SpecFlow;
 namespace ExtravaWallSetup.Test.Steps;
 
 [Binding]
-public class ElevatorSteps {
+public class ElevatorSteps : IDisposable {
     private readonly IElevator _elevator;
     private readonly IProcessManager _processManager;
     private ExtravaServiceProviderCore _services;
@@ -45,4 +45,8 @@ public class ElevatorSteps {
 
     }
 
+    public void Dispose() {
+        _elevator.Dispose();
+        _processManager.Dispose();
+    }
 }

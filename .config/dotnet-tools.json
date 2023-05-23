@@ -7,6 +7,12 @@
       "commands": [
         "nuke"
       ]
+    },
+    "dotnet-reportgenerator-globaltool": {
+      "version": "5.1.21",
+      "commands": [
+        "reportgenerator"
+      ]
     }
   }
 }

@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace ExtravaCore;
 
-public interface IProcessManager {
+public interface IProcessManager : IDisposable {
     Thread CreateAndStartThread(ThreadStart threadStart);
     string GetCurrentExecutionLocation();
     int GetCurrentProcessId();
@@ -12,6 +12,9 @@ public interface IProcessManager {
 }
 
 public class ProcessManager : IProcessManager {
+    private List<WeakReference<Thread>> _threads = new();
+    private List<WeakReference<Process>> _processes = new();
+
     public int GetParentProcessId(int processId) {
         // Open the /proc/[pid]/stat file for the current process
         using (FileStream fs = File.OpenRead($"/proc/{processId}/stat"))
@@ -49,6 +52,7 @@ public class ProcessManager : IProcessManager {
 
             try {
                 process.Start();
+                _processes.Add(new WeakReference<Process>(process));
                 cancellationToken.Register(() => process?.Close());
                 process?.WaitForExit();
                 var exitCode = process?.ExitCode ?? 0;
@@ -65,10 +69,39 @@ public class ProcessManager : IProcessManager {
         // Create and start a new thread to run the delegate
         Thread elevatedProcessThread = new Thread(threadStart);
         elevatedProcessThread.Start();
+        _threads.Add(new WeakReference<Thread>(elevatedProcessThread));
         return elevatedProcessThread;
     }
 
     public int GetCurrentProcessId() => Environment.ProcessId;
     public string GetCurrentExecutionLocation() => System.Reflection.Assembly.GetExecutingAssembly().Location;
 
+    public void Dispose() {
+        foreach (var thread in _threads) {
+            try {
+                if (thread.TryGetTarget(out var target) && target?.IsAlive == true) {
+                    target?.Interrupt();
+                }
+            } catch (ThreadInterruptedException) {
+
+            } finally {
+                thread.SetTarget(null);
+            }
+        }
+
+        foreach (var process in _processes) {
+            try {
+                if (process.TryGetTarget(out var target) && target?.HasExited == false) {
+                    target?.Close();
+                }
+            } catch (InvalidOperationException) {
+
+            } finally {
+                process.SetTarget(null);
+            }
+        }
+
+        _threads.RemoveAll(t => !t.TryGetTarget(out var target) || target == null);
+        _processes.RemoveAll(p => !p.TryGetTarget(out var target) || target == null);
+    }
 }
