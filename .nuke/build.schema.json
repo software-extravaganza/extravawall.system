@@ -73,6 +73,7 @@
             "enum": [
               "Clean",
               "Compile",
+              "Docs",
               "Test"
             ]
           }
@@ -85,6 +86,7 @@
             "enum": [
               "Clean",
               "Compile",
+              "Docs",
               "Test"
             ]
           }

@@ -5,3 +5,8 @@ Feature: Elevator
         Given I have a an Elevator
         When I request elevated ProcessStartInfo
         Then I should get ProcessStartInfo that will elevate it's process
+
+    Scenario: Get elevated ProcessStartInfo that can be disposed
+        Given I have a an Elevator
+        When I attempt to dispose it
+        Then it should properly dispose

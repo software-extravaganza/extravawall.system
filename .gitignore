@@ -351,5 +351,6 @@ MigrationBackup/
 *.feature.cs
 artifacts/
 coverage.xml
+coverage.xml*
 Cobertura.xml
 lcov.info

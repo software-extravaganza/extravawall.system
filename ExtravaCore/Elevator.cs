@@ -8,26 +8,20 @@ public interface IElevator : IDisposable {
     void RestartAndRunElevated(Action? exitDelegate = null);
 }
 
-public class Elevator : IElevator {
+public partial class Elevator : IElevator {
+    private bool isDisposed;
     private readonly IProcessManager _processManager;
     public Elevator(IProcessManager processManager) {
         _processManager = processManager;
     }
-    public static bool IsDebug {
-        get {
-#if DEBUG
-            return true;
-#else
-            return false;
-#endif
-        }
-    }
 
     public void Dispose() {
         _processManager.Dispose();
+        isDisposed = true;
     }
 
     public ProcessStartInfo GetElevatedProcessStartInfo(bool exactParentCommand = false) {
+        throwIfDisposed();
         var commandBuilder = new StringBuilder();
         if (exactParentCommand) {
             // Get the process ID of the current process
@@ -56,11 +50,18 @@ public class Elevator : IElevator {
     }
 
     public void RestartAndRunElevated(Action? exitDelegate = null) {
+        throwIfDisposed();
         Console.WriteLine("Executing with elevated permissions...");
         var startElevatedProcess = _processManager.GetThreadStartFor(GetElevatedProcessStartInfo(), () => {
             exitDelegate?.Invoke();
         });
 
         _processManager.CreateAndStartThread(startElevatedProcess);
+    }
+
+    private void throwIfDisposed() {
+        if (isDisposed) {
+            throw new ObjectDisposedException(nameof(Elevator));
+        }
     }
 }

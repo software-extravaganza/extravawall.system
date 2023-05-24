@@ -22,7 +22,6 @@ public class ElevatorSteps : IDisposable {
 
     [Given(@"I have a an Elevator")]
     public void GivenIhaveaanElevator() {
-
         _elevator.Should().NotBeNull();
     }
 
@@ -43,6 +42,18 @@ public class ElevatorSteps : IDisposable {
         commandBuilder.Append(currentExePath);
         _startProcessInfo.Arguments.Should().Be(commandBuilder.ToString());
 
+    }
+
+    [When(@"I attempt to dispose it")]
+    public void WhenIattempttodisposeit() {
+        _elevator.Dispose();
+        GC.Collect();
+    }
+
+    [Then(@"it should properly dispose")]
+    public void Thenitshouldproperlydispose() {
+        _elevator.Invoking(e => e.GetElevatedProcessStartInfo())
+        .Should().Throw<ObjectDisposedException>();
     }
 
     public void Dispose() {
