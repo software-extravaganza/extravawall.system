@@ -15,21 +15,21 @@ public abstract class CommandBase<T> : ICommand
             new ReadOnlyDictionary<string, string?>(
                     new Dictionary<string, string?> { { "DEBIAN_FRONTEND", "noninteractive" } }
             );
-    private CommandOptions _options;
+    private readonly CommandOptions _options;
 
-    protected ICommandView? _commandView { get; set; }
-    protected CommandOutputType? _overriddenOutputType { get; set; }
+    protected ICommandView? CommandView { get; set; }
+    protected CommandOutputType? OverriddenOutputType { get; set; }
 
     protected CommandBase(CommandOptions options) => _options = options;
 
     private void commandStandardOutput(string output) {
         _standardOutput.AppendLine(output);
-        switch (_overriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                _commandView.WriteStandardLine(output);
+                CommandView.WriteStandardLine(output);
                 break;
         }
             ;
@@ -37,12 +37,12 @@ public abstract class CommandBase<T> : ICommand
 
     private void commandErrorOutput(string output) {
         _errorOutput.AppendLine(output);
-        switch (_overriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                _commandView.WriteErrorLine(output);
+                CommandView.WriteErrorLine(output);
                 break;
         }
             ;
@@ -50,12 +50,12 @@ public abstract class CommandBase<T> : ICommand
 
     private void commandExceptionOutput(string output) {
         _exceptionOutput.AppendLine(output);
-        switch (_overriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                _commandView.WriteExceptionLine(output);
+                CommandView.WriteExceptionLine(output);
                 break;
         }
             ;
@@ -131,10 +131,10 @@ public abstract class CommandBase<T> : ICommand
     }
 
     public void SetCommandView(ICommandView view) {
-        _commandView = view;
+        CommandView = view;
     }
 
     public void SetOutput(CommandOutputType? overriddenOutputType) {
-        _overriddenOutputType = overriddenOutputType;
+        OverriddenOutputType = overriddenOutputType;
     }
 }

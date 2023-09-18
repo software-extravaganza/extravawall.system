@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CliWrap" Version="3.6.0" />
+    <PackageReference Include="CliWrap" Version="3.6.4" />
     <PackageReference Include="Jab" Version="0.8.6" />
-    <PackageReference Include="semver" Version="2.2.0" />
+    <PackageReference Include="semver" Version="2.3.0" />
     <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
   </ItemGroup>
 </Project>

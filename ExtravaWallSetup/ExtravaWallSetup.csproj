@@ -7,11 +7,18 @@
     <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <PublishTrimmed>true</PublishTrimmed>
+    <!-- <PublishSingleFile>true</PublishSingleFile> -->
+    <SelfContained>true</SelfContained>
+    <!-- <StripSymbols>false</StripSymbols> -->
     <!--<PublishAot>true</PublishAot>-->
-    <!--<StaticICULinking>true</StaticICULinking>
+    <!-- <StaticICULinking>true</StaticICULinking>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
 		<IlcDisableReflection>true</IlcDisableReflection>
-		<IlcOptimizationPreference>Size</IlcOptimizationPreference>-->
+		<IlcOptimizationPreference>Size</IlcOptimizationPreference> -->
     <!-- <CodeAnalysisRuleSet>..\roslynator.ruleset</CodeAnalysisRuleSet>  -->
   </PropertyGroup>
   <ItemGroup>
@@ -66,13 +73,13 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../PrivilegedActionHelper/bin/Debug/net7.0/PrivilegedActionHelper" LogicalName="PrivilegedActionHelper" />
+    <EmbeddedResource Include="../PrivilegedActionHelper/bin/Debug/net7.0/PrivilegedActionHelper.dll" LogicalName="PrivilegedActionHelper" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CliWrap" Version="3.6.0" />
+    <PackageReference Include="CliWrap" Version="3.6.4" />
     <PackageReference Include="Figgle" Version="0.5.1" />
     <PackageReference Include="Figgle.Generator" Version="0.5.1" />
-    <PackageReference Include="Hardware.Info" Version="10.1.1" />
+    <PackageReference Include="Hardware.Info" Version="100.0.0" />
     <PackageReference Include="Humanizer.Core" Version="2.14.1" />
     <PackageReference Include="Jab" Version="0.8.6" />
     <PackageReference Include="Microsoft.DotNet.ILCompiler; runtime.win-x64.Microsoft.DotNet.ILCompiler; runtime.linux-x64.Microsoft.DotNet.ILCompiler" Version="8.0.0-alpha.1.23077.2" />
@@ -81,18 +88,18 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="ReactiveUI" Version="18.4.1" />
-    <PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
-    <PackageReference Include="Roslynator.Analyzers" Version="4.3.0">
+    <PackageReference Include="ReactiveUI" Version="19.4.1" />
+    <PackageReference Include="ReactiveUI.Fody" Version="19.4.1" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.5.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="semver" Version="2.2.0" />
+    <PackageReference Include="semver" Version="2.3.0" />
     <PackageReference Include="Spectre.Console" Version="0.46.0" />
     <PackageReference Include="StrongInject" Version="1.4.4" />
     <PackageReference Include="System.Composition.AttributedModel" Version="7.0.0" />
-    <PackageReference Include="Terminal.Gui" Version="1.10.1" />
-    <PackageReference Include="Tmds.DBus" Version="0.14.0" />
+    <PackageReference Include="Terminal.Gui" Version="1.14.0" />
+    <PackageReference Include="Tmds.DBus" Version="0.15.0" />
     <PackageReference Include="Tomlyn" Version="0.16.2" />
   </ItemGroup>
   <ItemGroup>

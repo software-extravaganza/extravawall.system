@@ -80,7 +80,7 @@ namespace ExtravaCore.Commands {
             }
 
             public bool IsFailed { get; private set; }
-            public PackageCommandUpdate LastUpdate { get; private set; }
+            public PackageCommandUpdate? LastUpdate { get; private set; }
 
             public void SendUpdate(PackageCommandUpdate update) {
                 OnReport(update);

@@ -8,6 +8,12 @@
         "nuke"
       ]
     },
+    "altcover.global": {
+      "version": "8.6.68",
+      "commands": [
+        "altcover"
+      ]
+    },
     "dotnet-reportgenerator-globaltool": {
       "version": "5.1.21",
       "commands": [
