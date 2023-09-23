@@ -18,7 +18,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 using static Nuke.Common.Tools.ReportGenerator.ReportGeneratorTasks;
 
 class Build : NukeBuild {
-    public static int Main() => Execute<Build>(x => x.Test);
+    public static int Main() => Execute<Build>(x => x.Docs);
 
     [Parameter]
     readonly string Configuration = "Debug";
@@ -202,6 +202,8 @@ class Build : NukeBuild {
         .AssuredAfterFailure()
         .DependsOn(Test)
         .Executes(async () => {
+            var livingDocsOutput = ArtifactsDirectory / "tests/docs/living.html";
+            var coverageDocsOutput = ArtifactsDirectory / "coverage/html/index.html";
             var livingDocInstall = await Cli.Wrap("dotnet")
                 .WithArguments(
                     new[] { "tool", "install", "--global", "SpecFlow.Plus.LivingDoc.CLI" }
@@ -225,12 +227,13 @@ class Build : NukeBuild {
                     $"Could not install Pickles.CommandLine global dotnet tool in {nameof(Docs)} target."
                 );
             }
+
             var livingDocArgs = new List<string>
             {
                 "feature-folder",
                 RootDirectory,
                 "--output",
-                ArtifactsDirectory / "tests/docs/living.html",
+                livingDocsOutput,
                 "--title",
                 RootDirectory.Name
             };
@@ -279,8 +282,22 @@ class Build : NukeBuild {
             Console.WriteLine(
                 $"Pickles doc status for {RootDirectory}: {(picklesGenerate.ExitCode == 0 ? "success" : "fail")}"
             );
+
+            string TerminalURL(string caption, string url) => $"\u001B]8;;{url}\a{caption}\u001B]8;;\a";
+            var docsURL = TerminalURL("Docs", $"file://{livingDocsOutput}");
+            var coverageURL = TerminalURL("Coverage", $"file://{coverageDocsOutput}");
+
             Console.WriteLine($"\tcommand: {picklesGenerateCommand}");
             Console.WriteLine();
             Console.WriteLine();
+            Console.WriteLine("\x1B[31mReports\x1B[0m");
+            Console.WriteLine("##########################################################################");
+            Console.WriteLine($"{docsURL} generated at: file://{livingDocsOutput}");
+            Console.WriteLine($"{coverageURL} generated at: file://{coverageDocsOutput}");
+            Console.WriteLine("##########################################################################");
+            Console.WriteLine();
+            Console.WriteLine();
+            //string output = $"Docs generated at: {escapeSequenceStart}file://{livingDocsOutput}\aThis is a link{escapeSequenceEnd}";
+            //System.IO.File.WriteAllText("output.txt", output);
         });
 }
