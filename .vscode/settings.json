@@ -1,7 +1,7 @@
 {
     "terminal.integrated.defaultProfile.linux": "bash",
     "[csharp]": {
-        "editor.defaultFormatter": "csharpier.csharpier-vscode",
+        "editor.defaultFormatter": "ms-dotnettools.csharp",
         "editor.formatOnPaste": true,
         "editor.formatOnSave": true,
         "files.eol": "\n"

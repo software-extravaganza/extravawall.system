@@ -126,7 +126,7 @@ roslynator_refactorings.enabled = true
 #roslynator_infinite_loop_style = for|while
 # Applicable to: rcs1252
 
-#roslynator_max_line_length = <NUM>
+roslynator_max_line_length = 300
 # Default: 140
 # Applicable to: rcs0056
 
@@ -1173,18 +1173,18 @@ dotnet_diagnostic.rcs0044.severity = none
 #roslynator_refactoring.use_readonly_field_instead_of_constant.enabled = true
 #roslynator_refactoring.use_string_empty_instead_of_empty_string_literal.enabled = false
 #roslynator_refactoring.use_stringbuilder_instead_of_concatenation.enabled = true
-#roslynator_refactoring.wrap_arguments.enabled = true
-#roslynator_refactoring.wrap_binary_expression.enabled = true
-#roslynator_refactoring.wrap_call_chain.enabled = true
-#roslynator_refactoring.wrap_conditional_expression.enabled = true
-#roslynator_refactoring.wrap_constraint_clauses.enabled = true
-#roslynator_refactoring.wrap_initializer_expressions.enabled = true
-#roslynator_refactoring.wrap_lines_in_preprocessor_directive.enabled = true
-#roslynator_refactoring.wrap_lines_in_region.enabled = true
-#roslynator_refactoring.wrap_lines_in_try_catch.enabled = true
-#roslynator_refactoring.wrap_parameters.enabled = true
-#roslynator_refactoring.wrap_statements_in_condition.enabled = true
-#roslynator_refactoring.wrap_statements_in_using_statement.enabled = true
+#roslynator_refactoring.wrap_arguments.enabled = false
+#roslynator_refactoring.wrap_binary_expression.enabled = false
+#roslynator_refactoring.wrap_call_chain.enabled = false
+#roslynator_refactoring.wrap_conditional_expression.enabled = false
+#roslynator_refactoring.wrap_constraint_clauses.enabled = false
+#roslynator_refactoring.wrap_initializer_expressions.enabled = false
+#roslynator_refactoring.wrap_lines_in_preprocessor_directive.enabled = false
+#roslynator_refactoring.wrap_lines_in_region.enabled = false
+#roslynator_refactoring.wrap_lines_in_try_catch.enabled = false
+#roslynator_refactoring.wrap_parameters.enabled = false
+#roslynator_refactoring.wrap_statements_in_condition.enabled = false
+#roslynator_refactoring.wrap_statements_in_using_statement.enabled = false
 
 # Compiler diagnostic fixes
 
