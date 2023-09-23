@@ -1,0 +1,6 @@
+{
+    "livingDocGenerator": {
+      "enabled": true,
+      "filePath": "{CurrentDirectory}/artifacts/TestResults.json"
+    }
+  }
