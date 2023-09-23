@@ -1,3 +1,4 @@
+@all
 Feature: ProcessManager
 Title: Process Manager
 

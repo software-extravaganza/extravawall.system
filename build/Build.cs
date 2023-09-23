@@ -64,6 +64,13 @@ class Build : NukeBuild {
             //File.Create(testResultsFile).Close();
             Exception? testException = null;
             try {
+                var os = Environment.OSVersion.Platform switch {
+                    PlatformID.Unix => "linux",
+                    PlatformID.MacOSX => "osx",
+                    PlatformID.Win32NT => "win",
+                    _ => throw new Exception("Unknown OS")
+                };
+
                 DotNetTest(s =>
                         s.SetProjectFile(RootDirectory / "ExtravaWall.sln")
                         .EnableNoBuild()
@@ -75,6 +82,7 @@ class Build : NukeBuild {
                             }
                         )
                         .SetVerbosity(DotNetVerbosity.Normal)
+                        .SetFilter($"Category=all | Category={os}")
                         .SetProcessArgumentConfigurator(arguments => arguments
                             .Add("/p:AltCover={0}", "true")
                             .Add("/p:AltCoverForce={0}", "true")
