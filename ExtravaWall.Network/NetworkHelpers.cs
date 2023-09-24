@@ -17,8 +17,8 @@ public static class NetworkHelpers {
                 txBytes += (ulong)networkInterface.GetIPv4Statistics().BytesSent;
                 rxBytes += (ulong)networkInterface.GetIPv4Statistics().BytesReceived;
             }
-        } catch (Exception ex) {
-
+        } catch (Exception) {
+            //todo: handle exception
         }
 
         return (txBytes, rxBytes);
@@ -44,11 +44,14 @@ public static class NetworkHelpers {
 }
 
 public class IPAddressInfo {
-    public IPAddress IPAddress { get; private set; }
+    public IPAddress IPAddress { get; private init; }
     public int PrefixLength { get; private set; }
     public IPAddress GateWayIPAddress { get; private set; }
 
     public IPAddressInfo(uint[] dbusIpAddressInfo) {
+        if (dbusIpAddressInfo == null) throw new ArgumentNullException(nameof(dbusIpAddressInfo));
+        if (dbusIpAddressInfo.Length == 0) throw new ArgumentException("Value cannot be an empty collection.", nameof(dbusIpAddressInfo));
+
         if (dbusIpAddressInfo.Length >= 1) {
             IPAddress = NetworkHelpers.ConvertUintToIpAddress(dbusIpAddressInfo[0]);
         }

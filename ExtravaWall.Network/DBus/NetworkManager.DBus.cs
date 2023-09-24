@@ -6,10 +6,8 @@ using ExtravaWall.Network;
 using Tmds.DBus;
 
 [assembly: InternalsVisibleTo(Tmds.DBus.Connection.DynamicAssemblyName)]
-namespace NetworkManager.DBus
-{
-    public enum DeviceState : uint
-    {
+namespace NetworkManager.DBus {
+    public enum DeviceState : uint {
         [Description("Unknown")]
         Unknown = 0,
         [Description("Unmanaged")]
@@ -37,18 +35,16 @@ namespace NetworkManager.DBus
         [Description("Failed")]
         Failed = 120
     }
-    
+
     [DBusInterface("org.freedesktop.DBus.ObjectManager")]
-    public interface IObjectManager : IDBusObject
-    {
+    public interface IObjectManager : IDBusObject {
         Task<IDictionary<ObjectPath, IDictionary<string, IDictionary<string, object>>>> GetManagedObjectsAsync();
-        Task<IDisposable> WatchInterfacesAddedAsync(Action<(ObjectPath objectPath, IDictionary<string, IDictionary<string, object>> interfacesAndProperties)> handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchInterfacesRemovedAsync(Action<(ObjectPath objectPath, string[] interfaces)> handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchInterfacesAddedAsync(Action<(ObjectPath objectPath, IDictionary<string, IDictionary<string, object>> interfacesAndProperties)> handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchInterfacesRemovedAsync(Action<(ObjectPath objectPath, string[] interfaces)> handler, Action<Exception>? onError = null);
     }
 
     [DBusInterface("org.freedesktop.NetworkManager")]
-    public interface INetworkManager : IDBusObject
-    {
+    public interface INetworkManager : IDBusObject {
         Task ReloadAsync(uint Flags);
         Task<ObjectPath[]> GetDevicesAsync();
         Task<ObjectPath[]> GetAllDevicesAsync();
@@ -68,10 +64,10 @@ namespace NetworkManager.DBus
         Task CheckpointDestroyAsync(ObjectPath Checkpoint);
         Task<IDictionary<string, uint>> CheckpointRollbackAsync(ObjectPath Checkpoint);
         Task CheckpointAdjustRollbackTimeoutAsync(ObjectPath Checkpoint, uint AddTimeout);
-        Task<IDisposable> WatchCheckPermissionsAsync(Action handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchStateChangedAsync(Action<uint> handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchDeviceAddedAsync(Action<ObjectPath> handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchDeviceRemovedAsync(Action<ObjectPath> handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchCheckPermissionsAsync(Action handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchStateChangedAsync(Action<uint> handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchDeviceAddedAsync(Action<ObjectPath> handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchDeviceRemovedAsync(Action<ObjectPath> handler, Action<Exception>? onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<NetworkManagerProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -79,361 +75,284 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class NetworkManagerProperties
-    {
-        private ObjectPath[] _devices = default(ObjectPath[]);
-        public ObjectPath[] Devices
-        {
-            get
-            {
+    public class NetworkManagerProperties {
+        private ObjectPath[]? _devices = default;
+        public ObjectPath[]? Devices {
+            get {
                 return _devices;
             }
 
-            set
-            {
+            set {
                 _devices = (value);
             }
         }
 
-        private ObjectPath[] _allDevices = default(ObjectPath[]);
-        public ObjectPath[] AllDevices
-        {
-            get
-            {
+        private ObjectPath[]? _allDevices = default;
+        public ObjectPath[]? AllDevices {
+            get {
                 return _allDevices;
             }
 
-            set
-            {
+            set {
                 _allDevices = (value);
             }
         }
 
-        private ObjectPath[] _checkpoints = default(ObjectPath[]);
-        public ObjectPath[] Checkpoints
-        {
-            get
-            {
+        private ObjectPath[]? _checkpoints = default;
+        public ObjectPath[]? Checkpoints {
+            get {
                 return _checkpoints;
             }
 
-            set
-            {
+            set {
                 _checkpoints = (value);
             }
         }
 
         private bool _networkingEnabled = default(bool);
-        public bool NetworkingEnabled
-        {
-            get
-            {
+        public bool NetworkingEnabled {
+            get {
                 return _networkingEnabled;
             }
 
-            set
-            {
+            set {
                 _networkingEnabled = (value);
             }
         }
 
         private bool _wirelessEnabled = default(bool);
-        public bool WirelessEnabled
-        {
-            get
-            {
+        public bool WirelessEnabled {
+            get {
                 return _wirelessEnabled;
             }
 
-            set
-            {
+            set {
                 _wirelessEnabled = (value);
             }
         }
 
         private bool _wirelessHardwareEnabled = default(bool);
-        public bool WirelessHardwareEnabled
-        {
-            get
-            {
+        public bool WirelessHardwareEnabled {
+            get {
                 return _wirelessHardwareEnabled;
             }
 
-            set
-            {
+            set {
                 _wirelessHardwareEnabled = (value);
             }
         }
 
         private bool _wwanEnabled = default(bool);
-        public bool WwanEnabled
-        {
-            get
-            {
+        public bool WwanEnabled {
+            get {
                 return _wwanEnabled;
             }
 
-            set
-            {
+            set {
                 _wwanEnabled = (value);
             }
         }
 
         private bool _wwanHardwareEnabled = default(bool);
-        public bool WwanHardwareEnabled
-        {
-            get
-            {
+        public bool WwanHardwareEnabled {
+            get {
                 return _wwanHardwareEnabled;
             }
 
-            set
-            {
+            set {
                 _wwanHardwareEnabled = (value);
             }
         }
 
         private bool _wimaxEnabled = default(bool);
-        public bool WimaxEnabled
-        {
-            get
-            {
+        public bool WimaxEnabled {
+            get {
                 return _wimaxEnabled;
             }
 
-            set
-            {
+            set {
                 _wimaxEnabled = (value);
             }
         }
 
         private bool _wimaxHardwareEnabled = default(bool);
-        public bool WimaxHardwareEnabled
-        {
-            get
-            {
+        public bool WimaxHardwareEnabled {
+            get {
                 return _wimaxHardwareEnabled;
             }
 
-            set
-            {
+            set {
                 _wimaxHardwareEnabled = (value);
             }
         }
 
         private uint _radioFlags = default(uint);
-        public uint RadioFlags
-        {
-            get
-            {
+        public uint RadioFlags {
+            get {
                 return _radioFlags;
             }
 
-            set
-            {
+            set {
                 _radioFlags = (value);
             }
         }
 
-        private ObjectPath[] _activeConnections = default(ObjectPath[]);
-        public ObjectPath[] ActiveConnections
-        {
-            get
-            {
+        private ObjectPath[]? _activeConnections = default;
+        public ObjectPath[]? ActiveConnections {
+            get {
                 return _activeConnections;
             }
 
-            set
-            {
+            set {
                 _activeConnections = (value);
             }
         }
 
         private ObjectPath _primaryConnection = default(ObjectPath);
-        public ObjectPath PrimaryConnection
-        {
-            get
-            {
+        public ObjectPath PrimaryConnection {
+            get {
                 return _primaryConnection;
             }
 
-            set
-            {
+            set {
                 _primaryConnection = (value);
             }
         }
 
-        private string _primaryConnectionType = default(string);
-        public string PrimaryConnectionType
-        {
-            get
-            {
+        private string? _primaryConnectionType = default;
+        public string? PrimaryConnectionType {
+            get {
                 return _primaryConnectionType;
             }
 
-            set
-            {
+            set {
                 _primaryConnectionType = (value);
             }
         }
 
         private uint _metered = default(uint);
-        public uint Metered
-        {
-            get
-            {
+        public uint Metered {
+            get {
                 return _metered;
             }
 
-            set
-            {
+            set {
                 _metered = (value);
             }
         }
 
         private ObjectPath _activatingConnection = default(ObjectPath);
-        public ObjectPath ActivatingConnection
-        {
-            get
-            {
+        public ObjectPath ActivatingConnection {
+            get {
                 return _activatingConnection;
             }
 
-            set
-            {
+            set {
                 _activatingConnection = (value);
             }
         }
 
         private bool _startup = default(bool);
-        public bool Startup
-        {
-            get
-            {
+        public bool Startup {
+            get {
                 return _startup;
             }
 
-            set
-            {
+            set {
                 _startup = (value);
             }
         }
 
-        private string _version = default(string);
-        public string Version
-        {
-            get
-            {
+        private string? _version = default;
+        public string? Version {
+            get {
                 return _version;
             }
 
-            set
-            {
+            set {
                 _version = (value);
             }
         }
 
-        private uint[] _capabilities = default(uint[]);
-        public uint[] Capabilities
-        {
-            get
-            {
+        private uint[]? _capabilities = default;
+        public uint[]? Capabilities {
+            get {
                 return _capabilities;
             }
 
-            set
-            {
+            set {
                 _capabilities = (value);
             }
         }
 
         private uint _state = default(uint);
-        public uint State
-        {
-            get
-            {
+        public uint State {
+            get {
                 return _state;
             }
 
-            set
-            {
+            set {
                 _state = (value);
             }
         }
 
         private uint _connectivity = default(uint);
-        public uint Connectivity
-        {
-            get
-            {
+        public uint Connectivity {
+            get {
                 return _connectivity;
             }
 
-            set
-            {
+            set {
                 _connectivity = (value);
             }
         }
 
         private bool _connectivityCheckAvailable = default(bool);
-        public bool ConnectivityCheckAvailable
-        {
-            get
-            {
+        public bool ConnectivityCheckAvailable {
+            get {
                 return _connectivityCheckAvailable;
             }
 
-            set
-            {
+            set {
                 _connectivityCheckAvailable = (value);
             }
         }
 
         private bool _connectivityCheckEnabled = default(bool);
-        public bool ConnectivityCheckEnabled
-        {
-            get
-            {
+        public bool ConnectivityCheckEnabled {
+            get {
                 return _connectivityCheckEnabled;
             }
 
-            set
-            {
+            set {
                 _connectivityCheckEnabled = (value);
             }
         }
 
-        private string _connectivityCheckUri = default(string);
-        public string ConnectivityCheckUri
-        {
-            get
-            {
+        private string? _connectivityCheckUri = default;
+        public string? ConnectivityCheckUri {
+            get {
                 return _connectivityCheckUri;
             }
 
-            set
-            {
+            set {
                 _connectivityCheckUri = (value);
             }
         }
 
-        private IDictionary<string, object> _globalDnsConfiguration = default(IDictionary<string, object>);
-        public IDictionary<string, object> GlobalDnsConfiguration
-        {
-            get
-            {
+        private IDictionary<string, object>? _globalDnsConfiguration = default;
+        public IDictionary<string, object>? GlobalDnsConfiguration {
+            get {
                 return _globalDnsConfiguration;
             }
 
-            set
-            {
+            set {
                 _globalDnsConfiguration = (value);
             }
         }
     }
 
-    public static class NetworkManagerExtensions
-    {
+    public static class NetworkManagerExtensions {
         public static Task<ObjectPath[]> GetDevicesAsync(this INetworkManager o) => o.GetAsync<ObjectPath[]>("Devices");
         public static Task<ObjectPath[]> GetAllDevicesAsync(this INetworkManager o) => o.GetAsync<ObjectPath[]>("AllDevices");
         public static Task<ObjectPath[]> GetCheckpointsAsync(this INetworkManager o) => o.GetAsync<ObjectPath[]>("Checkpoints");
@@ -467,8 +386,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.DHCP4Config")]
-    public interface IDHCP4Config : IDBusObject
-    {
+    public interface IDHCP4Config : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<DHCP4ConfigProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -476,31 +394,25 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class DHCP4ConfigProperties
-    {
-        private IDictionary<string, object> _options = default(IDictionary<string, object>);
-        public IDictionary<string, object> Options
-        {
-            get
-            {
+    public class DHCP4ConfigProperties {
+        private IDictionary<string, object>? _options = default;
+        public IDictionary<string, object>? Options {
+            get {
                 return _options;
             }
 
-            set
-            {
+            set {
                 _options = (value);
             }
         }
     }
 
-    public static class DHCP4ConfigExtensions
-    {
+    public static class DHCP4ConfigExtensions {
         public static Task<IDictionary<string, object>> GetOptionsAsync(this IDHCP4Config o) => o.GetAsync<IDictionary<string, object>>("Options");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.IP4Config")]
-    public interface IIP4Config : IDBusObject
-    {
+    public interface IIP4Config : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<IP4ConfigProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -508,193 +420,152 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class IP4ConfigProperties
-    {
-        private uint[][] _addresses = default(uint[][]);
-        public uint[][] Addresses
-        {
-            get
-            {
+    public class IP4ConfigProperties {
+        private uint[][]? _addresses = default;
+        public uint[][]? Addresses {
+            get {
                 return _addresses;
             }
 
-            set
-            {
+            set {
                 _addresses = (value);
             }
         }
 
-        private IDictionary<string, object>[] _addressData = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] AddressData
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _addressData = default;
+        public IDictionary<string, object>[]? AddressData {
+            get {
                 return _addressData;
             }
 
-            set
-            {
+            set {
                 _addressData = (value);
             }
         }
 
-        private string _gateway = default(string);
-        public string Gateway
-        {
-            get
-            {
+        private string? _gateway = default;
+        public string? Gateway {
+            get {
                 return _gateway;
             }
 
-            set
-            {
+            set {
                 _gateway = (value);
             }
         }
 
-        private uint[][] _routes = default(uint[][]);
-        public uint[][] Routes
-        {
-            get
-            {
+        private uint[][]? _routes = default;
+        public uint[][]? Routes {
+            get {
                 return _routes;
             }
 
-            set
-            {
+            set {
                 _routes = (value);
             }
         }
 
-        private IDictionary<string, object>[] _routeData = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] RouteData
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _routeData = default;
+        public IDictionary<string, object>[]? RouteData {
+            get {
                 return _routeData;
             }
 
-            set
-            {
+            set {
                 _routeData = (value);
             }
         }
 
-        private IDictionary<string, object>[] _nameserverData = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] NameserverData
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _nameserverData = default;
+        public IDictionary<string, object>[]? NameserverData {
+            get {
                 return _nameserverData;
             }
 
-            set
-            {
+            set {
                 _nameserverData = (value);
             }
         }
 
-        private uint[] _nameservers = default(uint[]);
-        public uint[] Nameservers
-        {
-            get
-            {
+        private uint[]? _nameservers = default;
+        public uint[]? Nameservers {
+            get {
                 return _nameservers;
             }
 
-            set
-            {
+            set {
                 _nameservers = (value);
             }
         }
 
-        private string[] _domains = default(string[]);
-        public string[] Domains
-        {
-            get
-            {
+        private string[]? _domains = default;
+        public string[]? Domains {
+            get {
                 return _domains;
             }
 
-            set
-            {
+            set {
                 _domains = (value);
             }
         }
 
-        private string[] _searches = default(string[]);
-        public string[] Searches
-        {
-            get
-            {
+        private string[]? _searches = default;
+        public string[]? Searches {
+            get {
                 return _searches;
             }
 
-            set
-            {
+            set {
                 _searches = (value);
             }
         }
 
-        private string[] _dnsOptions = default(string[]);
-        public string[] DnsOptions
-        {
-            get
-            {
+        private string[]? _dnsOptions = default;
+        public string[]? DnsOptions {
+            get {
                 return _dnsOptions;
             }
 
-            set
-            {
+            set {
                 _dnsOptions = (value);
             }
         }
 
         private int _dnsPriority = default(int);
-        public int DnsPriority
-        {
-            get
-            {
+        public int DnsPriority {
+            get {
                 return _dnsPriority;
             }
 
-            set
-            {
+            set {
                 _dnsPriority = (value);
             }
         }
 
-        private string[] _winsServerData = default(string[]);
-        public string[] WinsServerData
-        {
-            get
-            {
+        private string[]? _winsServerData = default;
+        public string[]? WinsServerData {
+            get {
                 return _winsServerData;
             }
 
-            set
-            {
+            set {
                 _winsServerData = (value);
             }
         }
 
-        private uint[] _winsServers = default(uint[]);
-        public uint[] WinsServers
-        {
-            get
-            {
+        private uint[]? _winsServers = default;
+        public uint[]? WinsServers {
+            get {
                 return _winsServers;
             }
 
-            set
-            {
+            set {
                 _winsServers = (value);
             }
         }
     }
 
-    public static class IP4ConfigExtensions
-    {
+    public static class IP4ConfigExtensions {
         public static Task<uint[][]> GetAddressesAsync(this IIP4Config o) => o.GetAsync<uint[][]>("Addresses");
         public static Task<IDictionary<string, object>[]> GetAddressDataAsync(this IIP4Config o) => o.GetAsync<IDictionary<string, object>[]>("AddressData");
         public static Task<string> GetGatewayAsync(this IIP4Config o) => o.GetAsync<string>("Gateway");
@@ -711,9 +582,8 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Connection.Active")]
-    public interface IActive : IDBusObject
-    {
-        Task<IDisposable> WatchStateChangedAsync(Action<(uint state, uint reason)> handler, Action<Exception> onError = null);
+    public interface IActive : IDBusObject {
+        Task<IDisposable> WatchStateChangedAsync(Action<(uint state, uint reason)> handler, Action<Exception>? onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<ActiveProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -721,235 +591,185 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class ActiveProperties
-    {
+    public class ActiveProperties {
         private ObjectPath _connection = default(ObjectPath);
-        public ObjectPath Connection
-        {
-            get
-            {
+        public ObjectPath Connection {
+            get {
                 return _connection;
             }
 
-            set
-            {
+            set {
                 _connection = (value);
             }
         }
 
         private ObjectPath _specificObject = default(ObjectPath);
-        public ObjectPath SpecificObject
-        {
-            get
-            {
+        public ObjectPath SpecificObject {
+            get {
                 return _specificObject;
             }
 
-            set
-            {
+            set {
                 _specificObject = (value);
             }
         }
 
-        private string _id = default(string);
-        public string Id
-        {
-            get
-            {
+        private string? _id = default;
+        public string? Id {
+            get {
                 return _id;
             }
 
-            set
-            {
+            set {
                 _id = (value);
             }
         }
 
-        private string _uuid = default(string);
-        public string Uuid
-        {
-            get
-            {
+        private string? _uuid = default;
+        public string? Uuid {
+            get {
                 return _uuid;
             }
 
-            set
-            {
+            set {
                 _uuid = (value);
             }
         }
 
-        private string _type;
-        public string Type
-        {
-            get
-            {
+        private string? _type;
+        public string? Type {
+            get {
                 return _type;
             }
 
-            set
-            {
+            set {
                 _type = (value);
             }
         }
 
-        private ObjectPath[] _devices = default(ObjectPath[]);
-        public ObjectPath[] Devices
-        {
-            get
-            {
+        private ObjectPath[]? _devices = default;
+        public ObjectPath[]? Devices {
+            get {
                 return _devices;
             }
 
-            set
-            {
+            set {
                 _devices = (value);
             }
         }
 
         private uint _state = default(uint);
-        public uint State
-        {
-            get
-            {
+        public uint State {
+            get {
                 return _state;
             }
 
-            set
-            {
+            set {
                 _state = (value);
             }
         }
 
         private uint _stateFlags = default(uint);
-        public uint StateFlags
-        {
-            get
-            {
+        public uint StateFlags {
+            get {
                 return _stateFlags;
             }
 
-            set
-            {
+            set {
                 _stateFlags = (value);
             }
         }
 
         private bool _default = default(bool);
-        public bool Default
-        {
-            get
-            {
+        public bool Default {
+            get {
                 return _default;
             }
 
-            set
-            {
+            set {
                 _default = (value);
             }
         }
 
         private ObjectPath _ip4Config = default(ObjectPath);
-        public ObjectPath Ip4Config
-        {
-            get
-            {
+        public ObjectPath Ip4Config {
+            get {
                 return _ip4Config;
             }
 
-            set
-            {
+            set {
                 _ip4Config = (value);
             }
         }
 
         private ObjectPath _dhcp4Config = default(ObjectPath);
-        public ObjectPath Dhcp4Config
-        {
-            get
-            {
+        public ObjectPath Dhcp4Config {
+            get {
                 return _dhcp4Config;
             }
 
-            set
-            {
+            set {
                 _dhcp4Config = (value);
             }
         }
 
         private bool _default6 = default(bool);
-        public bool Default6
-        {
-            get
-            {
+        public bool Default6 {
+            get {
                 return _default6;
             }
 
-            set
-            {
+            set {
                 _default6 = (value);
             }
         }
 
         private ObjectPath _ip6Config = default(ObjectPath);
-        public ObjectPath Ip6Config
-        {
-            get
-            {
+        public ObjectPath Ip6Config {
+            get {
                 return _ip6Config;
             }
 
-            set
-            {
+            set {
                 _ip6Config = (value);
             }
         }
 
         private ObjectPath _dhcp6Config = default(ObjectPath);
-        public ObjectPath Dhcp6Config
-        {
-            get
-            {
+        public ObjectPath Dhcp6Config {
+            get {
                 return _dhcp6Config;
             }
 
-            set
-            {
+            set {
                 _dhcp6Config = (value);
             }
         }
 
         private bool _vpn = default(bool);
-        public bool Vpn
-        {
-            get
-            {
+        public bool Vpn {
+            get {
                 return _vpn;
             }
 
-            set
-            {
+            set {
                 _vpn = (value);
             }
         }
 
         private ObjectPath _master = default(ObjectPath);
-        public ObjectPath Master
-        {
-            get
-            {
+        public ObjectPath Master {
+            get {
                 return _master;
             }
 
-            set
-            {
+            set {
                 _master = (value);
             }
         }
     }
 
-    public static class ActiveExtensions
-    {
+    public static class ActiveExtensions {
         public static Task<ObjectPath> GetConnectionAsync(this IActive o) => o.GetAsync<ObjectPath>("Connection");
         public static Task<ObjectPath> GetSpecificObjectAsync(this IActive o) => o.GetAsync<ObjectPath>("SpecificObject");
         public static Task<string> GetIdAsync(this IActive o) => o.GetAsync<string>("Id");
@@ -969,8 +789,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Statistics")]
-    public interface IStatistics : IDBusObject
-    {
+    public interface IStatistics : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<StatisticsProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -978,53 +797,42 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class StatisticsProperties
-    {
+    public class StatisticsProperties {
         private uint _refreshRateMs = default(uint);
-        public uint RefreshRateMs
-        {
-            get
-            {
+        public uint RefreshRateMs {
+            get {
                 return _refreshRateMs;
             }
 
-            set
-            {
+            set {
                 _refreshRateMs = (value);
             }
         }
 
         private ulong _txBytes = default(ulong);
-        public ulong TxBytes
-        {
-            get
-            {
+        public ulong TxBytes {
+            get {
                 return _txBytes;
             }
 
-            set
-            {
+            set {
                 _txBytes = (value);
             }
         }
 
         private ulong _rxBytes = default(ulong);
-        public ulong RxBytes
-        {
-            get
-            {
+        public ulong RxBytes {
+            get {
                 return _rxBytes;
             }
 
-            set
-            {
+            set {
                 _rxBytes = (value);
             }
         }
     }
 
-    public static class StatisticsExtensions
-    {
+    public static class StatisticsExtensions {
         public static Task<uint> GetRefreshRateMsAsync(this IStatistics o) => o.GetAsync<uint>("RefreshRateMs");
         public static Task<ulong> GetTxBytesAsync(this IStatistics o) => o.GetAsync<ulong>("TxBytes");
         public static Task<ulong> GetRxBytesAsync(this IStatistics o) => o.GetAsync<ulong>("RxBytes");
@@ -1032,13 +840,12 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device")]
-    public interface IDevice : IDBusObject
-    {
+    public interface IDevice : IDBusObject {
         Task ReapplyAsync(IDictionary<string, IDictionary<string, object>> Connection, ulong VersionId, uint Flags);
         Task<(IDictionary<string, IDictionary<string, object>> connection, ulong versionId)> GetAppliedConnectionAsync(uint Flags);
         Task DisconnectAsync();
         Task DeleteAsync();
-        Task<IDisposable> WatchStateChangedAsync(Action<(DeviceState newState, DeviceState oldState, uint reason)> handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchStateChangedAsync(Action<(DeviceState newState, DeviceState oldState, uint reason)> handler, Action<Exception>? onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<DeviceProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1046,459 +853,361 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class DeviceProperties
-    {
-        private string _udi = default(string);
-        public string Udi
-        {
-            get
-            {
+    public class DeviceProperties {
+        private string? _udi = default;
+        public string? Udi {
+            get {
                 return _udi;
             }
 
-            set
-            {
+            set {
                 _udi = (value);
             }
         }
 
-        private string _path = default(string);
-        public string Path
-        {
-            get
-            {
+        private string? _path = default;
+        public string? Path {
+            get {
                 return _path;
             }
 
-            set
-            {
+            set {
                 _path = (value);
             }
         }
 
-        private string _interface = default(string);
-        public string Interface
-        {
-            get
-            {
+        private string? _interface = default;
+        public string? Interface {
+            get {
                 return _interface;
             }
 
-            set
-            {
+            set {
                 _interface = (value);
             }
         }
 
-        private string _ipInterface = default(string);
-        public string IpInterface
-        {
-            get
-            {
+        private string? _ipInterface = default;
+        public string? IpInterface {
+            get {
                 return _ipInterface;
             }
 
-            set
-            {
+            set {
                 _ipInterface = (value);
             }
         }
 
-        private string _driver = default(string);
-        public string Driver
-        {
-            get
-            {
+        private string? _driver = default;
+        public string? Driver {
+            get {
                 return _driver;
             }
 
-            set
-            {
+            set {
                 _driver = (value);
             }
         }
 
-        private string _driverVersion = default(string);
-        public string DriverVersion
-        {
-            get
-            {
+        private string? _driverVersion = default;
+        public string? DriverVersion {
+            get {
                 return _driverVersion;
             }
 
-            set
-            {
+            set {
                 _driverVersion = (value);
             }
         }
 
-        private string _firmwareVersion = default(string);
-        public string FirmwareVersion
-        {
-            get
-            {
+        private string? _firmwareVersion = default;
+        public string? FirmwareVersion {
+            get {
                 return _firmwareVersion;
             }
 
-            set
-            {
+            set {
                 _firmwareVersion = (value);
             }
         }
 
         private uint _capabilities = default(uint);
-        public uint Capabilities
-        {
-            get
-            {
+        public uint Capabilities {
+            get {
                 return _capabilities;
             }
 
-            set
-            {
+            set {
                 _capabilities = (value);
             }
         }
 
-        private uint _ip4Address = default(uint);
-        public uint Ip4Address
-        {
-            get
-            {
+        private uint _ip4Address = default;
+        public uint Ip4Address {
+            get {
                 return _ip4Address;
             }
 
-            set
-            {
-                _ip4Address = (value);
+            set {
+                _ip4Address = value;
             }
         }
 
-        private uint _state = default(uint);
-        public uint State
-        {
-            get
-            {
+        private uint _state = default;
+        public uint State {
+            get {
                 return _state;
             }
 
-            set
-            {
-                _state = (value);
+            set {
+                _state = value;
             }
         }
 
-        private (uint, uint) _stateReason = default((uint, uint));
-        public (uint, uint) StateReason
-        {
-            get
-            {
+        private (uint, uint) _stateReason = default;
+        public (uint, uint) StateReason {
+            get {
                 return _stateReason;
             }
 
-            set
-            {
-                _stateReason = (value);
+            set {
+                _stateReason = value;
             }
         }
 
-        private ObjectPath _activeConnection = default(ObjectPath);
-        public ObjectPath ActiveConnection
-        {
-            get
-            {
+        private ObjectPath _activeConnection = default;
+        public ObjectPath ActiveConnection {
+            get {
                 return _activeConnection;
             }
 
-            set
-            {
-                _activeConnection = (value);
+            set {
+                _activeConnection = value;
             }
         }
 
-        private ObjectPath _ip4Config = default(ObjectPath);
-        public ObjectPath Ip4Config
-        {
-            get
-            {
+        private ObjectPath _ip4Config = default;
+        public ObjectPath Ip4Config {
+            get {
                 return _ip4Config;
             }
 
-            set
-            {
-                _ip4Config = (value);
+            set {
+                _ip4Config = value;
             }
         }
 
-        private ObjectPath _dhcp4Config = default(ObjectPath);
-        public ObjectPath Dhcp4Config
-        {
-            get
-            {
+        private ObjectPath _dhcp4Config = default;
+        public ObjectPath Dhcp4Config {
+            get {
                 return _dhcp4Config;
             }
 
-            set
-            {
-                _dhcp4Config = (value);
+            set {
+                _dhcp4Config = value;
             }
         }
 
-        private ObjectPath _ip6Config = default(ObjectPath);
-        public ObjectPath Ip6Config
-        {
-            get
-            {
+        private ObjectPath _ip6Config = default;
+        public ObjectPath Ip6Config {
+            get {
                 return _ip6Config;
             }
 
-            set
-            {
-                _ip6Config = (value);
+            set {
+                _ip6Config = value;
             }
         }
 
-        private ObjectPath _dhcp6Config = default(ObjectPath);
-        public ObjectPath Dhcp6Config
-        {
-            get
-            {
+        private ObjectPath _dhcp6Config = default;
+        public ObjectPath Dhcp6Config {
+            get {
                 return _dhcp6Config;
             }
 
-            set
-            {
-                _dhcp6Config = (value);
+            set {
+                _dhcp6Config = value;
             }
         }
 
-        private bool _managed = default(bool);
-        public bool Managed
-        {
-            get
-            {
+        private bool _managed = default;
+        public bool Managed {
+            get {
                 return _managed;
             }
 
-            set
-            {
-                _managed = (value);
+            set {
+                _managed = value;
             }
         }
 
         private bool _autoconnect = default(bool);
-        public bool Autoconnect
-        {
-            get
-            {
+        public bool Autoconnect {
+            get {
                 return _autoconnect;
             }
 
-            set
-            {
-                _autoconnect = (value);
+            set {
+                _autoconnect = value;
             }
         }
 
-        private bool _firmwareMissing = default(bool);
-        public bool FirmwareMissing
-        {
-            get
-            {
+        private bool _firmwareMissing = default;
+        public bool FirmwareMissing {
+            get {
                 return _firmwareMissing;
             }
 
-            set
-            {
-                _firmwareMissing = (value);
+            set {
+                _firmwareMissing = value;
             }
         }
 
-        private bool _nmPluginMissing = default(bool);
-        public bool NmPluginMissing
-        {
-            get
-            {
+        private bool _nmPluginMissing = default;
+        public bool NmPluginMissing {
+            get {
                 return _nmPluginMissing;
             }
 
-            set
-            {
-                _nmPluginMissing = (value);
+            set {
+                _nmPluginMissing = value;
             }
         }
 
-        private uint _deviceType = default(uint);
-        public uint DeviceType
-        {
-            get
-            {
+        private uint _deviceType = default;
+        public uint DeviceType {
+            get {
                 return _deviceType;
             }
 
-            set
-            {
-                _deviceType = (value);
+            set {
+                _deviceType = value;
             }
         }
 
-        private ObjectPath[] _availableConnections = default(ObjectPath[]);
-        public ObjectPath[] AvailableConnections
-        {
-            get
-            {
+        private ObjectPath[]? _availableConnections = default;
+        public ObjectPath[]? AvailableConnections {
+            get {
                 return _availableConnections;
             }
 
-            set
-            {
-                _availableConnections = (value);
+            set {
+                _availableConnections = value;
             }
         }
 
-        private string _physicalPortId = default(string);
-        public string PhysicalPortId
-        {
-            get
-            {
+        private string? _physicalPortId = default;
+        public string? PhysicalPortId {
+            get {
                 return _physicalPortId;
             }
 
-            set
-            {
-                _physicalPortId = (value);
+            set {
+                _physicalPortId = value;
             }
         }
 
-        private uint _mtu = default(uint);
-        public uint Mtu
-        {
-            get
-            {
+        private uint _mtu = default;
+        public uint Mtu {
+            get {
                 return _mtu;
             }
 
-            set
-            {
-                _mtu = (value);
+            set {
+                _mtu = value;
             }
         }
 
-        private uint _metered = default(uint);
-        public uint Metered
-        {
-            get
-            {
+        private uint _metered = default;
+        public uint Metered {
+            get {
                 return _metered;
             }
 
-            set
-            {
-                _metered = (value);
+            set {
+                _metered = value;
             }
         }
 
-        private IDictionary<string, object>[] _lldpNeighbors = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] LldpNeighbors
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _lldpNeighbors = default;
+        public IDictionary<string, object>[]? LldpNeighbors {
+            get {
                 return _lldpNeighbors;
             }
 
-            set
-            {
+            set {
                 _lldpNeighbors = (value);
             }
         }
 
-        private bool _real = default(bool);
-        public bool Real
-        {
-            get
-            {
+        private bool _real = default;
+        public bool Real {
+            get {
                 return _real;
             }
 
-            set
-            {
+            set {
                 _real = (value);
             }
         }
 
-        private uint _ip4Connectivity = default(uint);
-        public uint Ip4Connectivity
-        {
-            get
-            {
+        private uint _ip4Connectivity = default;
+        public uint Ip4Connectivity {
+            get {
                 return _ip4Connectivity;
             }
 
-            set
-            {
+            set {
                 _ip4Connectivity = (value);
             }
         }
 
-        private uint _ip6Connectivity = default(uint);
-        public uint Ip6Connectivity
-        {
-            get
-            {
+        private uint _ip6Connectivity = default;
+        public uint Ip6Connectivity {
+            get {
                 return _ip6Connectivity;
             }
 
-            set
-            {
+            set {
                 _ip6Connectivity = (value);
             }
         }
 
-        private uint _interfaceFlags = default(uint);
-        public uint InterfaceFlags
-        {
-            get
-            {
+        private uint _interfaceFlags = default;
+        public uint InterfaceFlags {
+            get {
                 return _interfaceFlags;
             }
 
-            set
-            {
+            set {
                 _interfaceFlags = (value);
             }
         }
 
-        private string _hwAddress = default(string);
-        public string HwAddress
-        {
-            get
-            {
+        private string? _hwAddress = default;
+        public string? HwAddress {
+            get {
                 return _hwAddress;
             }
 
-            set
-            {
+            set {
                 _hwAddress = (value);
             }
         }
 
-        private ObjectPath[] _ports = default(ObjectPath[]);
-        public ObjectPath[] Ports
-        {
-            get
-            {
+        private ObjectPath[]? _ports = default;
+        public ObjectPath[]? Ports {
+            get {
                 return _ports;
             }
 
-            set
-            {
+            set {
                 _ports = (value);
             }
         }
     }
 
-    public static class DeviceExtensions
-    {
+    public static class DeviceExtensions {
         public static Task<string> GetUdiAsync(this IDevice o) => o.GetAsync<string>("Udi");
         public static Task<string> GetPathAsync(this IDevice o) => o.GetAsync<string>("Path");
         public static Task<string> GetInterfaceAsync(this IDevice o) => o.GetAsync<string>("Interface");
@@ -1536,8 +1245,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Wired")]
-    public interface IWired : IDBusObject
-    {
+    public interface IWired : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<WiredProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1545,81 +1253,64 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class WiredProperties
-    {
-        private string _hwAddress = default(string);
-        public string HwAddress
-        {
-            get
-            {
+    public class WiredProperties {
+        private string? _hwAddress = default;
+        public string? HwAddress {
+            get {
                 return _hwAddress;
             }
 
-            set
-            {
+            set {
                 _hwAddress = (value);
             }
         }
 
-        private string _permHwAddress = default(string);
-        public string PermHwAddress
-        {
-            get
-            {
+        private string? _permHwAddress = default;
+        public string? PermHwAddress {
+            get {
                 return _permHwAddress;
             }
 
-            set
-            {
+            set {
                 _permHwAddress = (value);
             }
         }
 
         private uint _speed = default(uint);
-        public uint Speed
-        {
-            get
-            {
+        public uint Speed {
+            get {
                 return _speed;
             }
 
-            set
-            {
+            set {
                 _speed = (value);
             }
         }
 
-        private string[] _s390Subchannels = default(string[]);
-        public string[] S390Subchannels
-        {
-            get
-            {
+        private string[]? _s390Subchannels = default;
+        public string[]? S390Subchannels {
+            get {
                 return _s390Subchannels;
             }
 
-            set
-            {
+            set {
                 _s390Subchannels = (value);
             }
         }
 
         private bool _carrier = default(bool);
-        public bool Carrier
-        {
-            get
-            {
+        public bool Carrier {
+            get {
                 return _carrier;
             }
 
-            set
-            {
+            set {
                 _carrier = (value);
             }
         }
     }
 
-    public static class WiredExtensions
-    {
+    public static class WiredExtensions {
         public static Task<string> GetHwAddressAsync(this IWired o) => o.GetAsync<string>("HwAddress");
         public static Task<string> GetPermHwAddressAsync(this IWired o) => o.GetAsync<string>("PermHwAddress");
         public static Task<uint> GetSpeedAsync(this IWired o) => o.GetAsync<uint>("Speed");
@@ -1628,8 +1319,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Bridge")]
-    public interface IBridge : IDBusObject
-    {
+    public interface IBridge : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<BridgeProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1637,61 +1327,49 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class BridgeProperties
-    {
-        private string _hwAddress = default(string);
-        public string HwAddress
-        {
-            get
-            {
+    public class BridgeProperties {
+        private string? _hwAddress = default;
+        public string? HwAddress {
+            get {
                 return _hwAddress;
             }
 
-            set
-            {
+            set {
                 _hwAddress = (value);
             }
         }
 
         private bool _carrier = default(bool);
-        public bool Carrier
-        {
-            get
-            {
+        public bool Carrier {
+            get {
                 return _carrier;
             }
 
-            set
-            {
+            set {
                 _carrier = (value);
             }
         }
 
-        private ObjectPath[] _slaves = default(ObjectPath[]);
-        public ObjectPath[] Slaves
-        {
-            get
-            {
+        private ObjectPath[]? _slaves = default;
+        public ObjectPath[]? Slaves {
+            get {
                 return _slaves;
             }
 
-            set
-            {
+            set {
                 _slaves = (value);
             }
         }
     }
 
-    public static class BridgeExtensions
-    {
+    public static class BridgeExtensions {
         public static Task<string> GetHwAddressAsync(this IBridge o) => o.GetAsync<string>("HwAddress");
         public static Task<bool> GetCarrierAsync(this IBridge o) => o.GetAsync<bool>("Carrier");
         public static Task<ObjectPath[]> GetSlavesAsync(this IBridge o) => o.GetAsync<ObjectPath[]>("Slaves");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Device.Generic")]
-    public interface IGeneric : IDBusObject
-    {
+    public interface IGeneric : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<GenericProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1699,54 +1377,44 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class GenericProperties
-    {
-        private string _hwAddress = default(string);
-        public string HwAddress
-        {
-            get
-            {
+    public class GenericProperties {
+        private string? _hwAddress = default;
+        public string? HwAddress {
+            get {
                 return _hwAddress;
             }
 
-            set
-            {
+            set {
                 _hwAddress = (value);
             }
         }
 
-        private string _typeDescription = default(string);
-        public string TypeDescription
-        {
-            get
-            {
+        private string? _typeDescription = default;
+        public string? TypeDescription {
+            get {
                 return _typeDescription;
             }
 
-            set
-            {
+            set {
                 _typeDescription = (value);
             }
         }
     }
 
-    public static class GenericExtensions
-    {
+    public static class GenericExtensions {
         public static Task<string> GetHwAddressAsync(this IGeneric o) => o.GetAsync<string>("HwAddress");
         public static Task<string> GetTypeDescriptionAsync(this IGeneric o) => o.GetAsync<string>("TypeDescription");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.AgentManager")]
-    public interface IAgentManager : IDBusObject
-    {
+    public interface IAgentManager : IDBusObject {
         Task RegisterAsync(string Identifier);
         Task RegisterWithCapabilitiesAsync(string Identifier, uint Capabilities);
         Task UnregisterAsync();
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.DnsManager")]
-    public interface IDnsManager : IDBusObject
-    {
+    public interface IDnsManager : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<DnsManagerProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1754,61 +1422,49 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class DnsManagerProperties
-    {
-        private string _mode = default(string);
-        public string Mode
-        {
-            get
-            {
+    public class DnsManagerProperties {
+        private string? _mode = default;
+        public string? Mode {
+            get {
                 return _mode;
             }
 
-            set
-            {
+            set {
                 _mode = (value);
             }
         }
 
-        private string _rcManager = default(string);
-        public string RcManager
-        {
-            get
-            {
+        private string? _rcManager = default;
+        public string? RcManager {
+            get {
                 return _rcManager;
             }
 
-            set
-            {
+            set {
                 _rcManager = (value);
             }
         }
 
-        private IDictionary<string, object>[] _configuration = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] Configuration
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _configuration = default;
+        public IDictionary<string, object>[]? Configuration {
+            get {
                 return _configuration;
             }
 
-            set
-            {
+            set {
                 _configuration = (value);
             }
         }
     }
 
-    public static class DnsManagerExtensions
-    {
+    public static class DnsManagerExtensions {
         public static Task<string> GetModeAsync(this IDnsManager o) => o.GetAsync<string>("Mode");
         public static Task<string> GetRcManagerAsync(this IDnsManager o) => o.GetAsync<string>("RcManager");
         public static Task<IDictionary<string, object>[]> GetConfigurationAsync(this IDnsManager o) => o.GetAsync<IDictionary<string, object>[]>("Configuration");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.IP6Config")]
-    public interface IIP6Config : IDBusObject
-    {
+    public interface IIP6Config : IDBusObject {
         Task<T> GetAsync<T>(string prop);
         Task<IP6ConfigProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1816,151 +1472,119 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class IP6ConfigProperties
-    {
-        private (byte[], uint, byte[])[] _addresses = default((byte[], uint, byte[])[]);
-        public (byte[], uint, byte[])[] Addresses
-        {
-            get
-            {
+    public class IP6ConfigProperties {
+        private (byte[], uint, byte[])[]? _addresses = default;
+        public (byte[], uint, byte[])[]? Addresses {
+            get {
                 return _addresses;
             }
 
-            set
-            {
+            set {
                 _addresses = (value);
             }
         }
 
-        private IDictionary<string, object>[] _addressData = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] AddressData
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _addressData = default;
+        public IDictionary<string, object>[]? AddressData {
+            get {
                 return _addressData;
             }
 
-            set
-            {
+            set {
                 _addressData = (value);
             }
         }
 
-        private string _gateway = default(string);
-        public string Gateway
-        {
-            get
-            {
+        private string? _gateway = default;
+        public string? Gateway {
+            get {
                 return _gateway;
             }
 
-            set
-            {
+            set {
                 _gateway = (value);
             }
         }
 
-        private (byte[], uint, byte[], uint)[] _routes = default((byte[], uint, byte[], uint)[]);
-        public (byte[], uint, byte[], uint)[] Routes
-        {
-            get
-            {
+        private (byte[], uint, byte[], uint)[]? _routes = default;
+        public (byte[], uint, byte[], uint)[]? Routes {
+            get {
                 return _routes;
             }
 
-            set
-            {
+            set {
                 _routes = (value);
             }
         }
 
-        private IDictionary<string, object>[] _routeData = default(IDictionary<string, object>[]);
-        public IDictionary<string, object>[] RouteData
-        {
-            get
-            {
+        private IDictionary<string, object>[]? _routeData = default;
+        public IDictionary<string, object>[]? RouteData {
+            get {
                 return _routeData;
             }
 
-            set
-            {
+            set {
                 _routeData = (value);
             }
         }
 
-        private byte[][] _nameservers = default(byte[][]);
-        public byte[][] Nameservers
-        {
-            get
-            {
+        private byte[][]? _nameservers = default;
+        public byte[][]? Nameservers {
+            get {
                 return _nameservers;
             }
 
-            set
-            {
+            set {
                 _nameservers = (value);
             }
         }
 
-        private string[] _domains = default(string[]);
-        public string[] Domains
-        {
-            get
-            {
+        private string[]? _domains = default;
+        public string[]? Domains {
+            get {
                 return _domains;
             }
 
-            set
-            {
+            set {
                 _domains = (value);
             }
         }
 
-        private string[] _searches = default(string[]);
-        public string[] Searches
-        {
-            get
-            {
+        private string[]? _searches = default;
+        public string[]? Searches {
+            get {
                 return _searches;
             }
 
-            set
-            {
+            set {
                 _searches = (value);
             }
         }
 
-        private string[] _dnsOptions = default(string[]);
-        public string[] DnsOptions
-        {
-            get
-            {
+        private string[]? _dnsOptions = default;
+        public string[]? DnsOptions {
+            get {
                 return _dnsOptions;
             }
 
-            set
-            {
+            set {
                 _dnsOptions = (value);
             }
         }
 
-        private int _dnsPriority = default(int);
-        public int DnsPriority
-        {
-            get
-            {
+        private int _dnsPriority = default;
+        public int DnsPriority {
+            get {
                 return _dnsPriority;
             }
 
-            set
-            {
+            set {
                 _dnsPriority = (value);
             }
         }
     }
 
-    public static class IP6ConfigExtensions
-    {
+    public static class IP6ConfigExtensions {
         public static Task<(byte[], uint, byte[])[]> GetAddressesAsync(this IIP6Config o) => o.GetAsync<(byte[], uint, byte[])[]>("Addresses");
         public static Task<IDictionary<string, object>[]> GetAddressDataAsync(this IIP6Config o) => o.GetAsync<IDictionary<string, object>[]>("AddressData");
         public static Task<string> GetGatewayAsync(this IIP6Config o) => o.GetAsync<string>("Gateway");
@@ -1974,8 +1598,7 @@ namespace NetworkManager.DBus
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Settings")]
-    public interface ISettings : IDBusObject
-    {
+    public interface ISettings : IDBusObject {
         Task<ObjectPath[]> ListConnectionsAsync();
         Task<ObjectPath> GetConnectionByUuidAsync(string Uuid);
         Task<ObjectPath> AddConnectionAsync(IDictionary<string, IDictionary<string, object>> Connection);
@@ -1984,8 +1607,8 @@ namespace NetworkManager.DBus
         Task<(bool status, string[] failures)> LoadConnectionsAsync(string[] Filenames);
         Task<bool> ReloadConnectionsAsync();
         Task SaveHostnameAsync(string Hostname);
-        Task<IDisposable> WatchNewConnectionAsync(Action<ObjectPath> handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchConnectionRemovedAsync(Action<ObjectPath> handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchNewConnectionAsync(Action<ObjectPath> handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchConnectionRemovedAsync(Action<ObjectPath> handler, Action<Exception>? onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<SettingsProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -1993,61 +1616,49 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class SettingsProperties
-    {
-        private ObjectPath[] _connections = default(ObjectPath[]);
-        public ObjectPath[] Connections
-        {
-            get
-            {
+    public class SettingsProperties {
+        private ObjectPath[]? _connections = default;
+        public ObjectPath[]? Connections {
+            get {
                 return _connections;
             }
 
-            set
-            {
+            set {
                 _connections = (value);
             }
         }
 
-        private string _hostname = default(string);
-        public string Hostname
-        {
-            get
-            {
+        private string? _hostname = default;
+        public string? Hostname {
+            get {
                 return _hostname;
             }
 
-            set
-            {
+            set {
                 _hostname = (value);
             }
         }
 
         private bool _canModify = default(bool);
-        public bool CanModify
-        {
-            get
-            {
+        public bool CanModify {
+            get {
                 return _canModify;
             }
 
-            set
-            {
+            set {
                 _canModify = (value);
             }
         }
     }
 
-    public static class SettingsExtensions
-    {
+    public static class SettingsExtensions {
         public static Task<ObjectPath[]> GetConnectionsAsync(this ISettings o) => o.GetAsync<ObjectPath[]>("Connections");
         public static Task<string> GetHostnameAsync(this ISettings o) => o.GetAsync<string>("Hostname");
         public static Task<bool> GetCanModifyAsync(this ISettings o) => o.GetAsync<bool>("CanModify");
     }
 
     [DBusInterface("org.freedesktop.NetworkManager.Settings.Connection")]
-    public interface IConnection : IDBusObject
-    {
+    public interface IConnection : IDBusObject {
         Task UpdateAsync(IDictionary<string, IDictionary<string, object>> Properties);
         Task UpdateUnsavedAsync(IDictionary<string, IDictionary<string, object>> Properties);
         Task DeleteAsync();
@@ -2056,8 +1667,8 @@ namespace NetworkManager.DBus
         Task ClearSecretsAsync();
         Task SaveAsync();
         Task<IDictionary<string, object>> Update2Async(IDictionary<string, IDictionary<string, object>> Settings, uint Flags, IDictionary<string, object> Args);
-        Task<IDisposable> WatchUpdatedAsync(Action handler, Action<Exception> onError = null);
-        Task<IDisposable> WatchRemovedAsync(Action handler, Action<Exception> onError = null);
+        Task<IDisposable> WatchUpdatedAsync(Action handler, Action<Exception>? onError = null);
+        Task<IDisposable> WatchRemovedAsync(Action handler, Action<Exception>? onError = null);
         Task<T> GetAsync<T>(string prop);
         Task<ConnectionProperties> GetAllAsync();
         Task SetAsync(string prop, object val);
@@ -2065,53 +1676,42 @@ namespace NetworkManager.DBus
     }
 
     [Dictionary]
-    public class ConnectionProperties
-    {
+    public class ConnectionProperties {
         private bool _unsaved = default(bool);
-        public bool Unsaved
-        {
-            get
-            {
+        public bool Unsaved {
+            get {
                 return _unsaved;
             }
 
-            set
-            {
+            set {
                 _unsaved = (value);
             }
         }
 
         private uint _flags = default(uint);
-        public uint Flags
-        {
-            get
-            {
+        public uint Flags {
+            get {
                 return _flags;
             }
 
-            set
-            {
+            set {
                 _flags = (value);
             }
         }
 
-        private string _filename = default(string);
-        public string Filename
-        {
-            get
-            {
+        private string? _filename = default;
+        public string? Filename {
+            get {
                 return _filename;
             }
 
-            set
-            {
-                _filename = (value);
+            set {
+                _filename = value;
             }
         }
     }
 
-    public static class ConnectionExtensions
-    {
+    public static class ConnectionExtensions {
         public static Task<bool> GetUnsavedAsync(this IConnection o) => o.GetAsync<bool>("Unsaved");
         public static Task<uint> GetFlagsAsync(this IConnection o) => o.GetAsync<uint>("Flags");
         public static Task<string> GetFilenameAsync(this IConnection o) => o.GetAsync<string>("Filename");
