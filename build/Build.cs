@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CliWrap;
 using Nuke.Common;
 using Nuke.Common.IO;
@@ -18,10 +19,23 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 using static Nuke.Common.Tools.ReportGenerator.ReportGeneratorTasks;
 
 class Build : NukeBuild {
-    public static int Main() => Execute<Build>(x => x.Docs);
+    public static int Main(string[] args) {
+        _args = args;
+        if (args is not null && args.Any(a => a == "abs")) {
+            _useAbsolutePaths = true;
+        }
+
+        Verbosity = Verbosity.Minimal;
+
+        return Execute<Build>(x => x.Docs);
+    }
+
+    private static string[]? _args;
+    private static bool _useAbsolutePaths;
 
     [Parameter]
     readonly string Configuration = "Debug";
+
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
 
     Target Clean => _ => _
@@ -55,14 +69,14 @@ class Build : NukeBuild {
     readonly bool? Cover = true;
 
     [Parameter("Coverage threshold. Default is 80%")]
-    readonly int Threshold = 0;
+    readonly int Threshold = 80;
 
     Target Test => _ => _
         .DependsOn(Compile).Executes(() => {
             var testResultsFile = ArtifactsDirectory / "tests/TestResults.trx";
             AbsolutePath.Create(testResultsFile.Parent);
             //File.Create(testResultsFile).Close();
-            Exception? testException = null;
+                    Exception? testException = null;
             try {
                 var os = Environment.OSVersion.Platform switch {
                     PlatformID.Unix => "linux",
@@ -81,7 +95,6 @@ class Build : NukeBuild {
                                 $"\"trx;LogFileName=tests/TestResults.trx\""
                             }
                         )
-                        .SetVerbosity(DotNetVerbosity.Normal)
                         .SetFilter($"Category=all | Category={os}")
                         .SetProcessArgumentConfigurator(arguments => arguments
                             .Add("/p:AltCover={0}", "true")
@@ -185,20 +198,23 @@ class Build : NukeBuild {
 
                 var newFileName = $"{projectDirectory.Name}.TestResults.json";
                 var destinationName = ArtifactsDirectory / "tests" / newFileName;
-                var destinantionFolder = destinationName.Parent;
-                AbsolutePath.Create(destinantionFolder);
+                var destinationFolder = destinationName.Parent;
+                AbsolutePath.Create(destinationFolder);
                 CopyFile(testExecutionFile, destinationName, FileExistsPolicy.Overwrite);
 
                 var featuresFolder = projectDirectory / "Features";
-                var featuresFolderRelative = RootDirectory.GetRelativePathTo(
-                    featuresFolder
-                );
+                var featuresFolderPath = _useAbsolutePaths
+                                                ? featuresFolder.ToString()
+                                                : RootDirectory.GetRelativePathTo(featuresFolder).ToString();
                 var fileContent = File.ReadAllText(destinationName);
-                fileContent = fileContent.Replace(
-                    "\"FeatureFolderPath\":\"Features\"",
-                    $"\"FeatureFolderPath\":\"{featuresFolderRelative}\""
-                );
-                File.WriteAllText(destinationName, fileContent);
+                string pattern = """
+                "FeatureFolderPath"\s*:\s*"([^"]|\\")*"
+                """;
+                string replacement = $"""
+                "FeatureFolderPath":"{featuresFolderPath}"
+                """;
+                string result = Regex.Replace(fileContent, pattern, replacement, RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace | RegexOptions.Multiline);
+                File.WriteAllText(destinationName, result);
             }
 
             if (testException is not null) {
@@ -298,11 +314,11 @@ class Build : NukeBuild {
             Console.WriteLine($"\tcommand: {picklesGenerateCommand}");
             Console.WriteLine();
             Console.WriteLine();
-            Console.WriteLine("\x1B[31mReports\x1B[0m");
-            Console.WriteLine("##########################################################################");
+            Console.WriteLine("\x1b[36mReports\x1B[0m");
+            Console.WriteLine("\x1b[46m##########################################################################");
             Console.WriteLine($"{docsURL} generated at: file://{livingDocsOutput}");
             Console.WriteLine($"{coverageURL} generated at: file://{coverageDocsOutput}");
-            Console.WriteLine("##########################################################################");
+            Console.WriteLine("##########################################################################\x1B[0m");
             Console.WriteLine();
             Console.WriteLine();
             //string output = $"Docs generated at: {escapeSequenceStart}file://{livingDocsOutput}\aThis is a link{escapeSequenceEnd}";
