@@ -1,6 +1,6 @@
 using System.Reflection.PortableExecutable;
 using Jab;
-namespace ExtravaCore.Commands;
+namespace ExtravaCore.Commands.Framework;
 
 [ServiceProvider]
 [Singleton<CommandServiceProvider>(Factory = nameof(CommandServiceProviderFactory))]
