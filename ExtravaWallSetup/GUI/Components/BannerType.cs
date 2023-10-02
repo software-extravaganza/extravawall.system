@@ -6,7 +6,7 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     public enum BannerType {
         Welcome,
         ExitSuccess,

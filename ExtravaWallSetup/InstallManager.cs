@@ -21,6 +21,7 @@ using NetworkManager.DBus;
 using Terminal.Gui;
 
 using Tmds.DBus;
+using ExtravaWallSetup.GUI.Components;
 
 namespace ExtravaWallSetup;
 
@@ -28,36 +29,51 @@ namespace ExtravaWallSetup;
 public class InstallManager : IDisposable {
     public static InstallManager Instance { get; private set; } = null!;
     public static bool ShouldRun { get; set; }
-    public VirtualConsoleManager Console { get; private set; }
+    public VirtualConsoleManager Console { get; private set; } = null!;
 
-    private StageManager _stageManager;
+    private StageManager _stageManager = null!;
 
     private readonly IDictionary<string, System.Data.DataRow> _systemInfo = new Dictionary<string, System.Data.DataRow>();
 
-    private MainLoop _mainLoop;
+    private MainLoop? _mainLoop;
 
     private readonly ExtravaServiceProvider _serviceProvider;
+    public DefaultScreen DefaultScreen { get; private set; } = null!;
 
-    public INetworkManager NetworkManager { get; private set; }
+    public INetworkManager NetworkManager { get; private set; } = null!;
     public Connection DbusSystem => Connection.System;
-    public event Action OnExiting;
-    public event Action OnExited;
+    public event Action? OnExiting;
+    public event Action? OnExited;
 
     public InstallManager(ExtravaServiceProvider serviceProvider) {
         Instance = this;
         _serviceProvider = serviceProvider;
 
-        NetworkManager = DbusSystem.CreateProxy<INetworkManager>(
-            "org.freedesktop.NetworkManager",
-            "/org/freedesktop/NetworkManager"
-        );
+
     }
 
     public View CreateDefaultScreen() {
+        NetworkManager = DbusSystem.CreateProxy<INetworkManager>(
+                    "org.freedesktop.NetworkManager",
+                    "/org/freedesktop/NetworkManager"
+                );
+
         DefaultScreen = _serviceProvider.GetService<DefaultScreen>();
+        if (DefaultScreen is null) {
+            throw new Exception($"{nameof(DefaultScreen)} is null. GetService for {nameof(DefaultScreen)} failed.");
+        }
+
         Console = _serviceProvider.GetService<VirtualConsoleManager>();
+        if (Console is null) {
+            throw new Exception($"{nameof(Console)} is null. GetService for {nameof(VirtualConsoleManager)} failed.");
+        }
+
         _stageManager = _serviceProvider.GetService<StageManager>();
-        _ = DefaultScreen?.LayoutInitialized
+        if (_stageManager is null) {
+            throw new Exception($"{nameof(_stageManager)} is null. GetService for {nameof(StageManager)} failed.");
+        }
+
+        _ = DefaultScreen.LayoutInitialized
                     .ToObservable()
                     .Subscribe(async unit => await OnConsoleLayoutInitializedAsync(unit));
         return DefaultScreen ?? new View();
@@ -65,7 +81,7 @@ public class InstallManager : IDisposable {
 
     private async Task OnConsoleLayoutInitializedAsync(Unit unit) {
         _mainLoop = Application.MainLoop;
-        _stageManager.Initialize();
+        _stageManager?.Initialize();
         await InitializeAsync();
     }
 
@@ -86,7 +102,7 @@ public class InstallManager : IDisposable {
         _ = await Connection.System.ConnectAsync();
         _mainLoop?.Invoke(async () => {
             DefaultScreen?.Initialize();
-            if (_stageManager.CurrentStage == StageType.Initialize) {
+            if (_stageManager?.CurrentStage == StageType.Initialize) {
                 await _stageManager.AdvanceToStage(StageType.Menu);
             }
         });
@@ -126,27 +142,33 @@ public class InstallManager : IDisposable {
     }
 
     public void RequestEndOnNextStep(string reason) {
+        if (_stageManager is null) {
+            return;
+        }
+
         _stageManager.RequestEndOnNextStep(reason);
     }
 
-    public DefaultScreen? DefaultScreen { get; private set; }
+
 
     public void AddOrUpdateSystemInfo(string property, string value) {
         _mainLoop?.Invoke(() => {
             if (_systemInfo.TryGetValue(property, out var matchRow)) {
                 matchRow.ItemArray = new object[] { property, value };
-                DefaultScreen.InfoTable.SetNeedsDisplay();
+                DefaultScreen?.InfoTable.SetNeedsDisplay();
                 return;
             }
 
             var rowData = new List<object>() { property, value };
-            var resultRow = DefaultScreen.InfoTable.Table.Rows.Add(rowData.ToArray());
-            _systemInfo.Add(property, resultRow);
+            var resultRow = DefaultScreen?.InfoTable.Table.Rows.Add(rowData.ToArray());
+            if (resultRow is not null) {
+                _systemInfo.Add(property, resultRow);
+            }
         });
     }
 
     public void RemoveSystemInfo(string property) {
-        _mainLoop.Invoke(() => _systemInfo.RemoveIfContained(property));
+        _mainLoop?.Invoke(() => _systemInfo.RemoveIfContained(property));
     }
 
     public void RemoveSystemInfoByPattern(string pattern) {
@@ -154,11 +176,11 @@ public class InstallManager : IDisposable {
     }
 
     public void RemoveSystemInfoByPattern(Regex pattern) {
-        _mainLoop.Invoke(() => {
+        _mainLoop?.Invoke(() => {
             foreach (var info in _systemInfo.ToArray()) {
                 var match = pattern.Match(info.Key);
                 if (match.Success) {
-                    DefaultScreen.InfoTable.Table.Rows.Remove(info.Value);
+                    DefaultScreen?.InfoTable.Table.Rows.Remove(info.Value);
                     _ = _systemInfo.RemoveIfContained(info.Key);
                 }
             }
@@ -168,6 +190,6 @@ public class InstallManager : IDisposable {
 
 
     void IDisposable.Dispose() {
-        DefaultScreen.Dispose();
+        DefaultScreen?.Dispose();
     }
 }

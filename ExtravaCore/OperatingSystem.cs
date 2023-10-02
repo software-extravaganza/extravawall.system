@@ -1,12 +1,17 @@
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using CliWrap;
 using ExtravaCore.Commands;
 using Semver;
 
 namespace ExtravaCore;
 
 public class OperatingSystem : IOperatingSystem {
-    public OperatingSystem(ICommandDriver commandDriver) {
+    public string Name { get; private init; }
+    public SemVersion Version { get; private init; }
+    public Func<ICommandDriver> CommandDriverFactory { get; private init; }
+
+    public OperatingSystem(CommandSettings commandSettings, CommandServiceProvider commandServiceProvider) {
         var runtimeIdentifier = RuntimeInformation.RuntimeIdentifier;
         const string pattern =
             @"(?<name>[^\.]+)\.(?<version>[^-]*)-?(?<architecture>[^-]*)-?(?<qualifiers>.*)";
@@ -30,16 +35,17 @@ public class OperatingSystem : IOperatingSystem {
             }
         }
 
-        Commands = commandDriver;
+        Func<ICommandDriver> commandDriverFactory = (osName, osVersion) switch {
+            ("debian", { Major: > 10 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
+            ("ubuntu", { Major: > 20 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
+            ("fedora", { Major: > 37 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
+            _ => throw new Exception("Unsupported OS")
+        };
+
+        CommandDriverFactory = commandDriverFactory;
         Name = osName;
         Version = osVersion;
-
     }
-
-    public string Name { get; private set; }
-    public SemVersion Version { get; private set; }
-    public ICommandDriver Commands { get; private set; }
-
 
     // /// <summary>
     // /// Checks for a supported OS to install ExtravaWall on.
@@ -57,4 +63,7 @@ public class OperatingSystem : IOperatingSystem {
 
     //     return isSupported;
     // }
+}
+
+public class CommandDriverFactory {
 }

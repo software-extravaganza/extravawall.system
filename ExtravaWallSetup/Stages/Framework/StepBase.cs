@@ -9,7 +9,7 @@ namespace ExtravaWallSetup.Stages.Framework {
     public abstract class StepBase : IStep {
         protected InstallManager Install { get; private set; }
         private TaskCompletionSource _taskCompletionSource = new TaskCompletionSource();
-        protected VirtualConsoleManager Console => Install.Console;
+        protected VirtualConsoleManager Console => Install.Console!;
         public abstract string Name { get; }
         public abstract StageType Stage { get; }
         public abstract short StepOrder { get; }
@@ -24,8 +24,8 @@ namespace ExtravaWallSetup.Stages.Framework {
                 IsExecuting = true;
                 Install.AddOrUpdateSystemInfo("Install Stage", Name);
                 await Execute();
-            } catch (Exception ex) {
-
+            } catch {
+                //todo: handle exception
             } finally {
                 if (AutoComplete) {
                     NotifyThatStepIsComplete();
@@ -42,8 +42,8 @@ namespace ExtravaWallSetup.Stages.Framework {
                 await Complete();
                 IsExecuting = false;
                 IsComplete = true;
-            } catch (Exception ex) {
-
+            } catch {
+                //todo: handle exception
             }
 
         }

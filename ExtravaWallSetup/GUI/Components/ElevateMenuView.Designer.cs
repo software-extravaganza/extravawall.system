@@ -8,19 +8,19 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class ElevateMenuView : Terminal.Gui.View {
-        
+
         private Terminal.Gui.ColorScheme greenOnBlack;
-        
+
         private ExtravaLabel menuTitleLabel;
-        
+
         private Terminal.Gui.ListView listView;
-        
+
         private void InitializeComponent() {
             this.listView = new Terminal.Gui.ListView();
             this.menuTitleLabel = new ExtravaLabel();

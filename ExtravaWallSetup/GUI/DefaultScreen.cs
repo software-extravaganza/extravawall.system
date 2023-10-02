@@ -39,10 +39,6 @@ namespace ExtravaWallSetup.GUI {
         private List<Bar> _networkBars;
         private float _memPercentage;
         private float _cpuPercentage;
-        private DataRow _cpuRow;
-        private DataRow _memRow;
-        private float _cpuGraphOffset;
-        private float _memGraphOffset;
         private ColorScheme _defaultInfoTableColorScheme;
         private ColorScheme _defaultInfoTableColumnColorScheme;
         public ExtravaScrollView VirtualConsoleView => consoleScrollView;
@@ -82,9 +78,6 @@ namespace ExtravaWallSetup.GUI {
             memGraph.Series.Add(_memSeries);
             cpuGraph.Series.Add(_cpuSeries);
             networkGraph.Series.Add(_networkSeries);
-            _cpuGraphOffset = 0f;
-            _memGraphOffset = 0f;
-            _networkGraphOffset = 0f;
             memGraph.AutoSize = true;
             cpuGraph.AutoSize = true;
             networkGraph.AutoSize = true;
@@ -114,7 +107,7 @@ namespace ExtravaWallSetup.GUI {
             }
         }
 
-        bool good = false;
+
         private (ulong tx, ulong rx) _networkInfo;
         private DateTime _networkInfoTimestamp;
         private (ulong tx, ulong rx) _previousNetworkInfo;
@@ -123,7 +116,7 @@ namespace ExtravaWallSetup.GUI {
         private double _networkDownSpeed;
         private readonly object _chartDataLock = new object();
         private readonly DiscoBarSeries _networkSeries;
-        private readonly float _networkGraphOffset;
+
         private readonly ScatterSeries _networkPoints;
 
 
@@ -174,11 +167,13 @@ namespace ExtravaWallSetup.GUI {
                         _networkBars.RemoveAt(0);
                     }
                 }
-            } catch (ArgumentOutOfRangeException aoorEx) {
+            } catch (ArgumentOutOfRangeException) {
+                // todo: log?
                 // swallow
             }
             //memGraph.ScrollOffset = new PointF(_memGraphOffset, 0);
             //cpuGraph.ScrollOffset = new PointF(_cpuGraphOffset, 0);
+            await Task.CompletedTask;
         }
 
         private void drawGraphs() {

@@ -1,16 +1,18 @@
 using Jab;
 using ExtravaCore;
+using ExtravaCore.Commands;
 
 namespace ExtravaWallSetup;
 
 [ServiceProvider]
+[Import<IExtravaServiceProviderCoreModule>]
 [Singleton<ExtravaServiceProvider>(Factory = nameof(ExtravaServiceProviderFactory))]
 [Singleton<InstallBooter>]
 [Singleton<Program>]
 [Singleton<InstallManager>]
 [Singleton<Stages.Framework.StageManager>]
 [Singleton<GUI.DefaultScreen>]
-[Scoped<TaskCompletionSource>]
+[Transient<TaskCompletionSource>]
 [Singleton<GUI.Framework.VirtualConsoleManager>]
 [Singleton<Stages.Framework.EmptyStep>]
 [Singleton<Stages.EndStage>]
@@ -18,8 +20,10 @@ namespace ExtravaWallSetup;
 [Singleton<Stages.Initialization.MenuStageStep>]
 [Singleton<Stages.Install.InstallBeginStep>]
 [Singleton<Stages.InstallCheckSystem.InstallCheckSystemStep>]
-[Scoped<IElevator, Elevator>]
-[Scoped<IProcessManager, ProcessManager>]
-public partial class ExtravaServiceProvider {
+[Transient<IElevator, Elevator>]
+[Transient<IProcessManager, ProcessManager>]
+public partial class ExtravaServiceProvider : IExtravaServiceProviderCoreModule {
     public ExtravaServiceProvider ExtravaServiceProviderFactory() => this;
+
+
 }

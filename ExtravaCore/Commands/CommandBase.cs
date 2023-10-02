@@ -1,10 +1,106 @@
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using System.Text;
 using CliWrap;
 
 namespace ExtravaCore.Commands;
-public abstract class CommandBase<T> : ICommand
-        where T : CommandBase<T> {
+public interface ICommandWrapperBase<TCommand, out TResult>
+    where TCommand : ICommandWrapperBase<TCommand, TResult> { }
+
+public abstract partial class CommandBase : ICommand {
+    private ICommandDriver? _driver;
+    private OperatingSystem? _os;
+    public OperatingSystem OS {
+        get { return _os ?? throw new InvalidOperationException("Operating System not set."); }
+        set {
+            _driver = value.CommandDriverFactory();
+            _os = value;
+        }
+    }
+
+    public ICommandDriver Driver {
+        get { return _driver ?? throw new InvalidOperationException("Operating System not set."); }
+    }
+
+    public void SetCommandView(ICommandView view) {
+        Driver.SetCommandView(view);
+    }
+
+    public void SetOutput(CommandOutputType? overriddenOutputType) {
+        Driver.SetOutput(overriddenOutputType);
+    }
+}
+
+public abstract class CommandWrapperBase<TCommand, TResult>
+    : CommandBase, ICommandWrapperBase<TCommand, TResult>
+    where TCommand : CommandWrapperBase<TCommand, TResult> {
+
+    protected ICommandView? CommandView { get; set; }
+    protected CommandOutputType? OverriddenOutputType { get; set; }
+
+
+    protected async Task<ICommandResult<TCustomResult>> runCustomAsync<TCustomResult>(Command command, Func<string, TCustomResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+        return await Driver.RunAsync(command, conversionDelegate, customStandardOutput, customErrorOutput);
+    }
+
+    protected async Task<ICommandResult<TResult>> runAsync(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+        return await Driver.RunAsync(command, convertResult, customStandardOutput, customErrorOutput);
+    }
+
+    protected abstract TResult convertResult(string result);
+}
+
+public interface ICommandWrapperWithOptions<TCommand, TOptions, TResult> : ICommandWrapperBase<TCommand, TResult>
+    where TCommand : ICommandWrapperWithOptions<TCommand, TOptions, TResult>
+    where TOptions : new() {
+    Task<ICommandResult<TResult>> RunAsync(TOptions? options);
+}
+
+public abstract class CommandWrapperWithOptions<TCommand, TOptions, TResult> : CommandWrapperBase<TCommand, TResult>, ICommandWrapperWithOptions<TCommand, TOptions, TResult>
+    where TCommand : CommandWrapperWithOptions<TCommand, TOptions, TResult>
+    where TOptions : new() {
+
+    public virtual async Task<ICommandResult<TResult>> RunAsync(TOptions? options) {
+        options ??= new TOptions();
+        var command = commandGenerator(options);
+        return await runAsync(command);
+    }
+
+    protected abstract Command commandGenerator(TOptions result);
+}
+
+public abstract class CommandWrapperWithStringInput<TCommand, TResult> : CommandWrapperBase<TCommand, TResult>
+    where TCommand : CommandWrapperWithStringInput<TCommand, TResult> {
+
+
+    public virtual async Task<ICommandResult<TResult>> RunAsync(string input) {
+        input ??= string.Empty;
+        var command = commandGenerator(input);
+        return await runAsync(command);
+    }
+
+    protected abstract Command commandGenerator(string input);
+}
+
+public interface ICommandWrapperWithNoInputResult<TCommand, TResult> : ICommandWrapperBase<TCommand, TResult>
+    where TCommand : ICommandWrapperWithNoInputResult<TCommand, TResult> {
+    Task<ICommandResult<TResult>> RunAsync();
+}
+
+public abstract class CommandWrapperWithNoInput<TCommand, TResult> : CommandWrapperBase<TCommand, TResult>, ICommandWrapperWithNoInputResult<TCommand, TResult>
+    where TCommand : CommandWrapperWithNoInput<TCommand, TResult> {
+
+    public virtual async Task<ICommandResult<TResult>> RunAsync() {
+        var command = commandGenerator();
+        return await runAsync(command);
+    }
+
+    protected abstract Command commandGenerator();
+}
+
+
+public abstract class CommandDriverBase<TCommand> : ICommandDriver
+        where TCommand : CommandDriverBase<TCommand> {
     //public static T Instance => _instance;
 
     //private static readonly T _instance = new T();
@@ -15,21 +111,21 @@ public abstract class CommandBase<T> : ICommand
             new ReadOnlyDictionary<string, string?>(
                     new Dictionary<string, string?> { { "DEBIAN_FRONTEND", "noninteractive" } }
             );
-    private readonly CommandOptions _options;
+    public CommandSettings Settings { get; private init; }
 
     protected ICommandView? CommandView { get; set; }
     protected CommandOutputType? OverriddenOutputType { get; set; }
 
-    protected CommandBase(CommandOptions options) => _options = options;
+    protected CommandDriverBase(CommandSettings settings) => Settings = settings;
 
     private void commandStandardOutput(string output) {
         _standardOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                CommandView.WriteStandardLine(output);
+                CommandView?.WriteStandardLine(output);
                 break;
         }
             ;
@@ -37,12 +133,12 @@ public abstract class CommandBase<T> : ICommand
 
     private void commandErrorOutput(string output) {
         _errorOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                CommandView.WriteErrorLine(output);
+                CommandView?.WriteErrorLine(output);
                 break;
         }
             ;
@@ -50,22 +146,17 @@ public abstract class CommandBase<T> : ICommand
 
     private void commandExceptionOutput(string output) {
         _exceptionOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? _options.Settings.OutputToVirtualConsole) {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
             case CommandOutputType.VirtualConsole:
-                CommandView.WriteExceptionLine(output);
+                CommandView?.WriteExceptionLine(output);
                 break;
         }
-            ;
     }
 
-    protected async Task<CommandResultPlus> RunRawAsync(
-            Command command,
-            Action<string>? customStandardOutput = null,
-            Action<string>? customErrorOutput = null
-    ) {
+    public virtual async Task<ICommandResultRaw> RunRawAsync(Command command, Action<string>? customStandardOutput, Action<string>? customErrorOutput) {
         var standardOutputDelegate = (string o) => {
             commandStandardOutput(o);
             customStandardOutput?.Invoke(o);
@@ -76,65 +167,69 @@ public abstract class CommandBase<T> : ICommand
             customErrorOutput?.Invoke(o);
         };
 
-        var finalCommand =
-                prepareCommand(command) | (standardOutputDelegate, errorOutputDelegate);
+        var finalCommand = prepareCommand(command) | (standardOutputDelegate, errorOutputDelegate);
         var startTime = DateTimeOffset.Now;
-        CommandResult? commandResult;
+        CommandResult? commandResult = null;
+        int exitCode = -1;
         try {
-            commandResult = await finalCommand.ExecuteAsync();
+            var result = await finalCommand.ExecuteAsync();
+            exitCode = result.ExitCode;
+            commandResult = (CommandResult?)result;
         } catch (Exception ex) {
-            commandResult = new CommandResult(126, startTime, DateTimeOffset.Now);
+            exitCode = 126;
             commandExceptionOutput(ex.Message);
+        } finally {
+            commandResult ??= new CommandResult(exitCode, startTime, DateTimeOffset.Now);
         }
 
-        return new CommandResultPlus(
-                commandResult,
-                _standardOutput.ToString(),
-                _errorOutput.ToString(),
-                _exceptionOutput.ToString()
-        );
+        return new CommandResultRaw(
+                        ExitCode: commandResult.ExitCode,
+                        Result: _standardOutput.ToString(),
+                        StartTime: commandResult.StartTime,
+                        ExitTime: commandResult.ExitTime,
+                        RunTime: commandResult.RunTime,
+                        StandardOutput: _standardOutput.ToString(),
+                        ErrorOutput: _errorOutput.ToString());
+
     }
 
     private Command prepareCommand(Command command) {
         return command.WithEnvironmentVariables(_debianEnvironmentVariables);
     }
 
-    protected async Task<(bool success, string result)> RunAsync(
-            Command command,
-            Action<string>? customStandardOutput = null,
-            Action<string>? customErrorOutput = null
-    ) {
-        return await RunAsync<string>(command, customStandardOutput, customErrorOutput);
+    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+        var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
+        var success = rawResult.ExitCode == 0;
+        conversionDelegate ??= (string s) => (TResult)Convert.ChangeType(s, typeof(TResult));
+
+        var convertedResult = conversionDelegate.Invoke(rawResult.StandardOutput);
+        var conversionTypeName = (
+                Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult)
+        ).Name;
+
+        return new CommandResult<TResult>(rawResult.ExitCode, convertedResult, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
     }
 
-    protected async Task<(bool success, TReturn result)> RunAsync<TReturn>(
-            Command command,
-            Action<string>? customStandardOutput = null,
-            Action<string>? customErrorOutput = null
-    ) {
+    public virtual async Task<ICommandResult<string>> RunAsyncStdOut(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
-        var success = rawResult.Result.ExitCode == 0;
+        var success = rawResult.ExitCode == 0;
         var resultString = success
                 ? rawResult.StandardOutput
                 : rawResult.ExceptionOutput.Length > 0
                         ? rawResult.ExceptionOutput
                         : rawResult.ErrorOutput;
-        var conversionTypeName = (
-                Nullable.GetUnderlyingType(typeof(TReturn)) ?? typeof(TReturn)
-        ).Name;
-        object result = conversionTypeName switch {
-            nameof(String) => resultString,
-            nameof(Int32) => int.TryParse(resultString, out int x) ? x : -1,
-            _ => throw new NoCommandResultConversionToTypeException(conversionTypeName)
-        };
-        return (success, (TReturn)result);
+
+
+        return new CommandResult<string>(rawResult.ExitCode, resultString, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
     }
 
-    public void SetCommandView(ICommandView view) {
+    public virtual void SetCommandView(ICommandView view) {
         CommandView = view;
     }
 
-    public void SetOutput(CommandOutputType? overriddenOutputType) {
+    public virtual void SetOutput(CommandOutputType? overriddenOutputType) {
         OverriddenOutputType = overriddenOutputType;
     }
+
+    public abstract Task<ICommandResult<DirectoryInfo>> GetProgramLocationAsync(string program);
 }

@@ -8,13 +8,13 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class CommandView : Terminal.Gui.View {
-         
+
         private ExtravaLabel commandResult;
 
         private void InitializeComponent() {

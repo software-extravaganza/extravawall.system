@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="ArraySizeErrorMessage" xml:space="preserve">
+    <value>Array only contains {0} values, there must be {1} values.</value>
+    </data>
+</root>

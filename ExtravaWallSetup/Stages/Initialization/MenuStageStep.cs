@@ -1,4 +1,5 @@
 ﻿using ExtravaWallSetup.GUI;
+using ExtravaWallSetup.GUI.Components;
 using ExtravaWallSetup.Stages.Framework;
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using Terminal.Gui;
 
 namespace ExtravaWallSetup.Stages.Initialization {
     public class MenuStageStep : StepBase {
-        private StartMenuView _view;
+        private StartMenuView? _view;
 
         public MenuStageStep(InstallManager installManager) : base(installManager) {
         }
@@ -21,14 +22,16 @@ namespace ExtravaWallSetup.Stages.Initialization {
         public override short StepOrder => 0;
 
         protected override async Task Complete() {
-            _view.Enabled = false;
+            if (_view != null) {
+                _view.Enabled = false;
+            }
 
             await Task.CompletedTask;
         }
 
         protected override async Task Execute() {
             _view = new StartMenuView(Install);
-            Console.Add(_view);
+            Console?.Add(_view);
 
             await Task.CompletedTask;
         }

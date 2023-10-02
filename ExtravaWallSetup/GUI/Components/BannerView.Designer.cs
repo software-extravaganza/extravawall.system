@@ -8,18 +8,18 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class BannerView : Terminal.Gui.View {
-        
+
         private Terminal.Gui.ColorScheme greenOnBlack;
-        
+
         private ExtravaLabel bannerText;
-        
-        
+
+
         private void InitializeComponent() {
             this.bannerText = new ExtravaLabel();
             this.greenOnBlack = new Terminal.Gui.ColorScheme();
@@ -42,7 +42,7 @@ namespace ExtravaWallSetup.GUI {
             this.bannerText.TextAlignment = Terminal.Gui.TextAlignment.Left;
             this.bannerText.CanFocus = false;
             this.Add(this.bannerText);
-            
+
         }
     }
 }

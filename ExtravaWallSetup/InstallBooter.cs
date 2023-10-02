@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reactive.Concurrency;
 using ExtravaCore;
+using ExtravaCore.Commands;
 using ExtravaWallSetup.GUI.Framework;
 using ReactiveUI;
 
@@ -8,17 +9,18 @@ namespace ExtravaWallSetup;
 
 public class InstallBooter {
     private Program _program;
+    private ICommandRunner _commandRunner;
     private IElevator _elevator;
     private ExtravaServiceProvider _serviceProvider;
 
-    public InstallBooter(Program program, IElevator elevator, ExtravaServiceProvider serviceProvider) {
+    public InstallBooter(Program program, ICommandRunner commandRunner, IElevator elevator, ExtravaServiceProvider serviceProvider) {
         _program = program;
+        _commandRunner = commandRunner;
         _elevator = elevator;
         _serviceProvider = serviceProvider;
     }
 
-    public void Run(string[] args) {
-        string? tempFile = null;
+    public async Task Run(string[] args) {
         bool _noRoot = false;
 
         for (int i = 0; i < args.Length; i++) {
@@ -37,6 +39,11 @@ public class InstallBooter {
             return;
         }
 
+        var result = await _commandRunner.For<CommandMachineName>().RunAsync();
+        var result2 = await _commandRunner.For<CommandMachineOs>().RunAsync();
+        var result3 = await _commandRunner.For<CommandMachineOs>().RunAsync();
+
+        Console.WriteLine(result.Result);
         // var elevator = new Elevator();
         // elevator.RestartAndRunElevated(() => {
         //     _program.Run(this, args);
@@ -85,3 +92,4 @@ public class InstallBooter {
         action();
     }
 }
+

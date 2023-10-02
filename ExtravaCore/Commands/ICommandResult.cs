@@ -1,7 +1,9 @@
+using System;
 namespace ExtravaCore.Commands;
-public interface ICommandResult {
+public interface ICommandResult : ICommandResult<string> { }
+public interface ICommandResult<out T> {
     bool Success { get => ExitCode == 0; }
-    string? Result { get; }
+    T? Result { get; }
     int ExitCode { get; }
     //
     // Summary:
@@ -17,48 +19,28 @@ public interface ICommandResult {
     TimeSpan RunTime { get; }
 }
 
-public class CommandResult : ICommandResult {
+public record CommandResult(int ExitCode, string? Result, DateTimeOffset StartTime, DateTimeOffset ExitTime, TimeSpan RunTime) : CommandResult<string>(ExitCode, Result, StartTime, ExitTime, RunTime) {
+    public CommandResult(int exitCode, string? result, DateTimeOffset startTime, DateTimeOffset exitTime) : this(exitCode, result, startTime, exitTime, exitTime - startTime) { }
 
-    public bool Success { get; }
-    public string? Result { get; }
+    public CommandResult(int exitCode, DateTimeOffset startTime, DateTimeOffset exitTime) : this(exitCode, default, startTime, exitTime, exitTime - startTime) { }
 
-    public int ExitCode { get; }
-    public DateTimeOffset StartTime { get; }
+    public CommandResult(int exitCode, TimeSpan runTime, DateTimeOffset exitTime) : this(exitCode, default, exitTime - runTime, exitTime, runTime) { }
 
-    public DateTimeOffset ExitTime { get; }
+    public CommandResult(int exitCode, string? result, DateTimeOffset startTime, TimeSpan runTime) : this(exitCode, result, startTime, startTime + runTime, runTime) { }
 
-    public TimeSpan RunTime { get; }
+    public static implicit operator CommandResult(CliWrap.CommandResult result) => new(result.ExitCode, result.StartTime, result.ExitTime);
+}
 
-    public CommandResult(int exitCode, string? result, DateTimeOffset startTime, DateTimeOffset exitTime) {
-        this.ExitTime = exitTime;
-        this.StartTime = startTime;
-        this.RunTime = exitTime - startTime;
-        ExitCode = exitCode;
-        Result = result;
-    }
+public record CommandResult<T>(int ExitCode, T? Result, DateTimeOffset StartTime, DateTimeOffset ExitTime, TimeSpan RunTime) : ICommandResult<T> {
+    public bool Success => ExitCode == 0;
 
-    public CommandResult(int exitCode, DateTimeOffset startTime, DateTimeOffset exitTime) {
-        this.ExitTime = exitTime;
-        this.StartTime = startTime;
-        this.RunTime = exitTime - startTime;
-        ExitCode = exitCode;
-    }
+    public CommandResult(int exitCode, T? result, DateTimeOffset startTime, DateTimeOffset exitTime) : this(exitCode, result, startTime, exitTime, exitTime - startTime) { }
 
-    public CommandResult(int exitCode, DateTimeOffset exitTime, TimeSpan runTime) {
-        this.ExitCode = exitCode;
-        this.ExitTime = exitTime;
-        this.RunTime = runTime;
-    }
+    public CommandResult(int exitCode, DateTimeOffset startTime, DateTimeOffset exitTime) : this(exitCode, default, startTime, exitTime, exitTime - startTime) { }
 
-    public CommandResult(int exitCode, string? result, DateTimeOffset startTime, TimeSpan runTime) {
-        this.RunTime = runTime;
-        this.StartTime = startTime;
-        this.ExitTime = startTime + runTime;
-        ExitCode = exitCode;
-        Result = result;
-    }
+    public CommandResult(int exitCode, TimeSpan runTime, DateTimeOffset exitTime) : this(exitCode, default, exitTime - runTime, exitTime, runTime) { }
 
-    public static implicit operator CommandResult(CliWrap.CommandResult result) {
-        return new CommandResult(result.ExitCode, result.StartTime, result.ExitTime);
-    }
+    public CommandResult(int exitCode, T? result, DateTimeOffset startTime, TimeSpan runTime) : this(exitCode, result, startTime, startTime + runTime, runTime) { }
+
+    public static implicit operator CommandResult<T>(CliWrap.CommandResult result) => new(result.ExitCode, result.StartTime, result.ExitTime);
 }

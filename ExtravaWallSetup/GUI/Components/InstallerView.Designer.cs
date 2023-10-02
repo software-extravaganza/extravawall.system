@@ -8,27 +8,27 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class InstallerView : Terminal.Gui.View {
-        
+
         private Terminal.Gui.ColorScheme redOnBlack;
-        
+
         private Terminal.Gui.ColorScheme greyOnBlack;
-        
+
         private Terminal.Gui.ColorScheme greenOnBlack;
-        
+
         private Terminal.Gui.ColorScheme blackOnGreen;
-        
+
         private Terminal.Gui.ColorScheme tgDefault;
-        
+
         private Terminal.Gui.Wizard wizard;
-        
+
         private Terminal.Gui.ProgressBar progressBar;
-        
+
         private void InitializeComponent() {
             this.progressBar = new Terminal.Gui.ProgressBar();
             this.wizard = new Terminal.Gui.Wizard();

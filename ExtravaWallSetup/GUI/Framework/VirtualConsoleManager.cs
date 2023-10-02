@@ -1,4 +1,5 @@
 ﻿using ExtravaCore.Commands;
+using ExtravaWallSetup.GUI.Components;
 using Terminal.Gui;
 using static Terminal.Gui.View;
 
@@ -142,7 +143,7 @@ public class VirtualConsoleManager {
     private readonly object _lockScrollViewRefresh = new();
 
     [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
-    private string DebuggerDisplay => ToString();
+    private string? DebuggerDisplay => ToString();
 
     private void resetConsoleScroll(View? viewRefresh = null, Size? size = null) {
         Application.MainLoop.Invoke(() => {

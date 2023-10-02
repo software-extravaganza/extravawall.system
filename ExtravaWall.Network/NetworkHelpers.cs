@@ -46,23 +46,17 @@ public static class NetworkHelpers {
 public class IPAddressInfo {
     public IPAddress IPAddress { get; private init; }
     public int PrefixLength { get; private set; }
+
+
     public IPAddress GateWayIPAddress { get; private set; }
 
     public IPAddressInfo(uint[] dbusIpAddressInfo) {
         if (dbusIpAddressInfo == null) throw new ArgumentNullException(nameof(dbusIpAddressInfo));
         if (dbusIpAddressInfo.Length == 0) throw new ArgumentException("Value cannot be an empty collection.", nameof(dbusIpAddressInfo));
-
-        if (dbusIpAddressInfo.Length >= 1) {
-            IPAddress = NetworkHelpers.ConvertUintToIpAddress(dbusIpAddressInfo[0]);
-        }
-
-        if (dbusIpAddressInfo.Length >= 2) {
-            PrefixLength = (int)dbusIpAddressInfo[1];
-        }
-
-        if (dbusIpAddressInfo.Length >= 3) {
-            GateWayIPAddress = NetworkHelpers.ConvertUintToIpAddress(dbusIpAddressInfo[2]);
-        }
+        if (dbusIpAddressInfo.Length < 3) throw new ArgumentException(string.Format(Resources.ArraySizeErrorMessage, dbusIpAddressInfo.Length, 3), nameof(dbusIpAddressInfo));
+        IPAddress = NetworkHelpers.ConvertUintToIpAddress(dbusIpAddressInfo[0]);
+        PrefixLength = (int)dbusIpAddressInfo[1];
+        GateWayIPAddress = NetworkHelpers.ConvertUintToIpAddress(dbusIpAddressInfo[2]);
     }
 
     public override string ToString() {

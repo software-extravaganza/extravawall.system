@@ -30,7 +30,9 @@ namespace ExtravaWallSetup.Stages.Framework {
         public StageManager(ExtravaServiceProvider serviceProvider, DefaultScreen defaultScreen) {
             _serviceProvider = serviceProvider;
             _defaultScreen = defaultScreen;
-            _remainingStages = ((StageType[])Enum.GetValues(typeof(StageType))).OrderBy(x => x).ToList();
+            _remainingStages = Enum.GetValues<StageType>().OrderBy(x => x).ToList();
+            _endStage = _serviceProvider.GetService<EndStage>();
+            CurrentStep = _serviceProvider.GetService<EmptyStep>();
         }
 
         public void Initialize() {
@@ -123,7 +125,10 @@ namespace ExtravaWallSetup.Stages.Framework {
             }
 
             if (!_stageEnumerators.ContainsKey(currentStage.Value)) {
-                _stageEnumerators.Add(currentStage.Value, stageEnumerator(currentStage.Value));
+                var enumeratorFound = stageEnumerator(currentStage.Value);
+                if (enumeratorFound != null) {
+                    _stageEnumerators.Add(currentStage.Value, enumeratorFound!);
+                }
             }
 
             var enumerator = _stageEnumerators[currentStage.Value];

@@ -7,8 +7,7 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI
-{
+namespace ExtravaWallSetup.GUI.Components {
     using System.Diagnostics;
     using ExtravaWallSetup.GUI.Framework;
     using Terminal.Gui;

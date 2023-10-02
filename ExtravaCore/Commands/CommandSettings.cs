@@ -1,4 +1,4 @@
 ﻿namespace ExtravaCore.Commands;
 public class CommandSettings {
-    public CommandOutputType OutputToVirtualConsole { get; set; }
+    public CommandOutputType OutputToVirtualConsole { get; set; } = CommandOutputType.VirtualConsole;
 }

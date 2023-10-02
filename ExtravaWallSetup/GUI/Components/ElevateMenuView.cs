@@ -7,8 +7,7 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI
-{
+namespace ExtravaWallSetup.GUI.Components {
     using System.Diagnostics;
     using ExtravaWallSetup.GUI.Framework;
     using Terminal.Gui;
@@ -22,7 +21,7 @@ namespace ExtravaWallSetup.GUI
         public Task ChoiceMade => _choiceTask.Task;
         public ElevateMenuView(InstallManager installManager, ITextOutput writer = null) {
             _installManager = installManager;
-            _writer = writer; 
+            _writer = writer;
             InitializeComponent();
             this.listView.MouseClick += ListView_MouseClick;
             this.listView.KeyPress += ListView_KeyPress;
@@ -58,7 +57,7 @@ namespace ExtravaWallSetup.GUI
                     //     _installManager.Dispose();
                     //     _choiceTask.SetResult(selectedItem);
                     // });
-                    
+
                     break;
                 case 1:
                     _installManager.RequestEndOnNextStep("Installation requires an ELEVATED execution (sudo make me a sandwich).");
@@ -66,7 +65,7 @@ namespace ExtravaWallSetup.GUI
                     break;
 
             }
-            
+            await Task.CompletedTask;
         }
     }
 }

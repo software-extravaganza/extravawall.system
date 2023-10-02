@@ -17,7 +17,7 @@ using static System.Net.Mime.MediaTypeNames;
 using ReactiveUI;
 using System.Reactive.Concurrency;
 using ExtravaWallSetup.GUI.Framework;
-new ExtravaServiceProvider().GetService<InstallBooter>().Run(args);
+await new ExtravaServiceProvider().GetService<InstallBooter>().Run(args);
 
 public partial class Program {
 
@@ -59,9 +59,9 @@ public partial class Program {
 
                     return true;
                 });
-            } catch (Exception ex) {
+            } catch {
 
-
+                //todo: handle exception
             }
 
             Terminal.Gui.Application.Shutdown();
@@ -121,10 +121,10 @@ public partial class Program {
             // AnsiConsole.WriteLine($"I agree. {fruit} is tasty!");
 
 
-            const string SHELL_COMMAND_CAT = "cat";
-            const string COMMAND_SHELL = "/bin/sh";
-            const string SHELL_ARG_INTERPRET = "-c";
-            const string SHELL_COMMAND_LS_ARG_SYS_INFO = "ls /etc/*-release";
+            // const string SHELL_COMMAND_CAT = "cat";
+            // const string COMMAND_SHELL = "/bin/sh";
+            // const string SHELL_ARG_INTERPRET = "-c";
+            // const string SHELL_COMMAND_LS_ARG_SYS_INFO = "ls /etc/*-release";
 
             ////var files = new DirectoryInfo(AppContext.BaseDirectory).GetFiles();
             ////foreach (var file in files) {
@@ -207,108 +207,108 @@ public partial class Program {
 
             //}
 
-            async Task<string> getOsReleaseFile(bool debug = false) {
-                var response = string.Empty;
-                var sysInfo = (string result) => {
-                    response = result ?? string.Empty;
-                    if (debug) {
-                        Console.WriteLine($"Release file found: {result}");
-                    }
-                };
+            // async Task<string> getOsReleaseFile(bool debug = false) {
+            //     var response = string.Empty;
+            //     var sysInfo = (string result) => {
+            //         response = result ?? string.Empty;
+            //         if (debug) {
+            //             Console.WriteLine($"Release file found: {result}");
+            //         }
+            //     };
 
-                var sysInfoFailed = (string result) => {
-                    Console.WriteLine($"Locating release file failed ({result})");
-                };
+            //     var sysInfoFailed = (string result) => {
+            //         Console.WriteLine($"Locating release file failed ({result})");
+            //     };
 
-                var syscmd =
-                    Cli.Wrap(COMMAND_SHELL)
-                        .WithArguments(new[] { SHELL_ARG_INTERPRET, SHELL_COMMAND_LS_ARG_SYS_INFO })
-                    | (sysInfo, sysInfoFailed);
+            //     var syscmd =
+            //         Cli.Wrap(COMMAND_SHELL)
+            //             .WithArguments(new[] { SHELL_ARG_INTERPRET, SHELL_COMMAND_LS_ARG_SYS_INFO })
+            //         | (sysInfo, sysInfoFailed);
 
-                try {
-                    await syscmd.ExecuteAsync();
-                    return response;
-                } catch (Exception ex) {
-                    sysInfoFailed(ex.Message);
-                }
+            //     try {
+            //         await syscmd.ExecuteAsync();
+            //         return response;
+            //     } catch (Exception ex) {
+            //         sysInfoFailed(ex.Message);
+            //     }
 
-                return string.Empty;
-            }
+            //     return string.Empty;
+            // }
 
-            async Task<SystemInfoModel> getOsInfo(string releaseFile, bool debug = false) {
-                var model = new SystemInfoModel();
-                var response = new StringBuilder();
-                var sysInfo = (string result) => {
-                    response.AppendLine(result ?? string.Empty);
-                    if (debug) {
-                        Console.WriteLine($"Extracted os info: {result}");
-                    }
-                };
+            // async Task<SystemInfoModel> getOsInfo(string releaseFile, bool debug = false) {
+            //     var model = new SystemInfoModel();
+            //     var response = new StringBuilder();
+            //     var sysInfo = (string result) => {
+            //         response.AppendLine(result ?? string.Empty);
+            //         if (debug) {
+            //             Console.WriteLine($"Extracted os info: {result}");
+            //         }
+            //     };
 
-                var sysInfoFailed = (string result) => {
-                    Console.WriteLine($"Extracting os info failed ({result})");
-                };
+            //     var sysInfoFailed = (string result) => {
+            //         Console.WriteLine($"Extracting os info failed ({result})");
+            //     };
 
-                var syscmd =
-                    Cli.Wrap(COMMAND_SHELL)
-                        .WithArguments(new[] { SHELL_ARG_INTERPRET, $"{SHELL_COMMAND_CAT} {releaseFile}" })
-                    | (sysInfo, sysInfoFailed);
+            //     var syscmd =
+            //         Cli.Wrap(COMMAND_SHELL)
+            //             .WithArguments(new[] { SHELL_ARG_INTERPRET, $"{SHELL_COMMAND_CAT} {releaseFile}" })
+            //         | (sysInfo, sysInfoFailed);
 
-                try {
-                    await syscmd.ExecuteAsync();
-                    string pattern = @"^(?<key>[^=]+)=""?(?<value>[^""]*)""?$";
-                    Regex regex = new Regex(pattern, RegexOptions.Multiline);
-                    string targetString = response.ToString();
+            //     try {
+            //         await syscmd.ExecuteAsync();
+            //         string pattern = @"^(?<key>[^=]+)=""?(?<value>[^""]*)""?$";
+            //         Regex regex = new Regex(pattern, RegexOptions.Multiline);
+            //         string targetString = response.ToString();
 
-                    foreach (var match in regex.Matches(targetString).Cast<Match>()) {
-                        if (match.Success) {
-                            var keyLookup = match.Groups["key"].Value.ToLower().Replace("_", string.Empty);
-                            var value = match.Groups["value"].Value;
-                            if (nameof(model.ID).ToLower().CompareTo(keyLookup) == 0) {
-                                model.ID = value;
-                            } else if (nameof(model.Name).ToLower().CompareTo(keyLookup) == 0) {
-                                model.Name = value;
-                            } else if (nameof(model.VersionCodeName).ToLower().CompareTo(keyLookup) == 0) {
-                                model.VersionCodeName = value;
-                            } else if (nameof(model.SupportUrl).ToLower().CompareTo(keyLookup) == 0) {
-                                model.SupportUrl = new Uri(value);
-                            } else if (nameof(model.BugReportUrl).ToLower().CompareTo(keyLookup) == 0) {
-                                model.BugReportUrl = new Uri(value);
-                            } else if (nameof(model.HomeUrl).ToLower().CompareTo(keyLookup) == 0) {
-                                model.HomeUrl = new Uri(value);
-                            } else if (nameof(model.PrettyName).ToLower().CompareTo(keyLookup) == 0) {
-                                model.PrettyName = value;
-                            } else if (nameof(model.VersionId).ToLower().CompareTo(keyLookup) == 0) {
-                                model.VersionId = value;
-                            }
-                        }
-                    }
+            //         foreach (var match in regex.Matches(targetString).Cast<Match>()) {
+            //             if (match.Success) {
+            //                 var keyLookup = match.Groups["key"].Value.ToLower().Replace("_", string.Empty);
+            //                 var value = match.Groups["value"].Value;
+            //                 if (nameof(model.ID).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.ID = value;
+            //                 } else if (nameof(model.Name).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.Name = value;
+            //                 } else if (nameof(model.VersionCodeName).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.VersionCodeName = value;
+            //                 } else if (nameof(model.SupportUrl).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.SupportUrl = new Uri(value);
+            //                 } else if (nameof(model.BugReportUrl).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.BugReportUrl = new Uri(value);
+            //                 } else if (nameof(model.HomeUrl).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.HomeUrl = new Uri(value);
+            //                 } else if (nameof(model.PrettyName).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.PrettyName = value;
+            //                 } else if (nameof(model.VersionId).ToLower().CompareTo(keyLookup) == 0) {
+            //                     model.VersionId = value;
+            //                 }
+            //             }
+            //         }
 
-                    return model;
-                } catch (Exception ex) {
-                    sysInfoFailed(ex.Message);
-                }
+            //         return model;
+            //     } catch (Exception ex) {
+            //         sysInfoFailed(ex.Message);
+            //     }
 
-                return model;
-            }
+            //     return model;
+            // }
 
-            async Task DiscoverDistro(bool debug = false) {
-                var sysInfoFailed = (string result) =>
-                    Console.WriteLine($"Details system info not located using method #1 ({result})");
+            // async Task DiscoverDistro(bool debug = false) {
+            //     var sysInfoFailed = (string result) =>
+            //         Console.WriteLine($"Details system info not located using method #1 ({result})");
 
-                try {
-                    var releaseFile = await getOsReleaseFile();
-                    if (string.IsNullOrWhiteSpace(releaseFile)) {
-                        sysInfoFailed("Release file is not found");
-                        return;
-                    }
+            //     try {
+            //         var releaseFile = await getOsReleaseFile();
+            //         if (string.IsNullOrWhiteSpace(releaseFile)) {
+            //             sysInfoFailed("Release file is not found");
+            //             return;
+            //         }
 
-                    var systemInfo = await getOsInfo(releaseFile);
-                    Console.WriteLine($"Got it: {systemInfo.PrettyName} 😉");
-                } catch (Exception ex) {
-                    sysInfoFailed(ex.Message);
-                }
-            }
+            //         var systemInfo = await getOsInfo(releaseFile);
+            //         Console.WriteLine($"Got it: {systemInfo.PrettyName} 😉");
+            //     } catch (Exception ex) {
+            //         sysInfoFailed(ex.Message);
+            //     }
+            // }
         } catch (Exception ex) {
             Console.Error.WriteLine($"General failure: {ex.Message} :: {ex}");
         } finally {

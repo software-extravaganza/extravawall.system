@@ -7,12 +7,12 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using Terminal.Gui;
-    
-    
+
+
     public partial class InstallerView {
-        
+
         public InstallerView(InstallManager install) {
             InitializeComponent();
             this.wizard.ColorScheme = this.blackOnGreen;

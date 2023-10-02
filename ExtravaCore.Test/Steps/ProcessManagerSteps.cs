@@ -6,94 +6,82 @@ using FluentAssertions;
 using ExtravaCore;
 using System.Threading;
 using TechTalk.SpecFlow.Assist;
+using ExtravaCore.Test.TestExtensions;
 
 namespace ExtravaCore.Test.Steps;
 
 [Binding]
-public class ProcessManagerSteps : IDisposable
-{
+public class ProcessManagerSteps : IDisposable {
     private readonly ScenarioContext _scenarioContext;
     private IProcessManager _processManager;
     private int? _processId;
     private int? _parentProcessId;
-    private string _commandString;
-    private string _resultCommandString;
-    private ThreadStart _threadStart;
-    private Thread _thread;
+    private string? _commandString;
+    private string? _resultCommandString;
+    private ThreadStart? _threadStart;
+    private Thread? _thread;
     private bool _actionExecuted;
-    private CancellationTokenSource _threadCancellationTokenSource;
-    private string _curentExecutingAssemblyFilePath;
+    private CancellationTokenSource? _threadCancellationTokenSource;
+    private string? _curentExecutingAssemblyFilePath;
 
-    public ProcessManagerSteps(IProcessManager processManager, ScenarioContext scenarioContext)
-    {
+    public ProcessManagerSteps(IProcessManager processManager, ScenarioContext scenarioContext) {
         _processManager = processManager;
         _scenarioContext = scenarioContext;
     }
 
     [Given(@"I have a process manager")]
-    public void Given_IHaveAProcessManagerSteps()
-    {
+    public void Given_IHaveAProcessManagerSteps() {
         _processManager.Should().NotBeNull();
     }
 
     [When(@"I request the parent process id")]
-    public void When_IGetTheParentProcessId()
-    {
+    public void When_IGetTheParentProcessId() {
         _processId = _processManager.GetCurrentProcessId();
         _parentProcessId = _processManager.GetParentProcessId(_processId.Value);
     }
 
     [Then(@"I get the parent's process id")]
-    public void ThenIgettheparentprocessid()
-    {
+    public void ThenIgettheparentprocessid() {
         _parentProcessId.Should().NotBeNull();
         _parentProcessId.Should().NotBe(0);
     }
 
     [Given(@"I have a process id")]
     [When(@"I request the process id")]
-    public void WhenIgettheprocessid()
-    {
+    public void WhenIgettheprocessid() {
         _processId = _processManager.GetCurrentProcessId();
     }
 
     [Then(@"I get the process id")]
-    public void ThenIgettheprocessid()
-    {
+    public void ThenIgettheprocessid() {
         _processId.Should().NotBeNull();
         _processId.Should().NotBe(0);
         _processId.Should().Be(Environment.ProcessId);
     }
 
     [When(@"I request the process command line")]
-    public void WhenIgettheprocesscommandline()
-    {
+    public void WhenIgettheprocesscommandline() {
         var exeToUse = "sleep";
         var argsToUse = "3";
         _commandString = $"{exeToUse} {argsToUse}";
         _resultCommandString = string.Empty;
         var newProcess = new Process() { StartInfo = new ProcessStartInfo(exeToUse, argsToUse) };
 
-        try
-        {
+        try {
             newProcess.Start();
             _resultCommandString = _processManager.ReadProcessCommandline(newProcess.Id);
-        }
-        finally
-        {
+        } finally {
             newProcess.Kill();
         }
     }
 
     [Then(@"I get the process command line")]
-    public void ThenIgettheprocesscommandline()
-    {
+    public void ThenIgettheprocesscommandline() {
         _resultCommandString.Should().Be(_commandString);
     }
 
     [When(@"I request a threadstart for ProcessStartInfo")]
-    public void WhenIgetrequestathreadstartforProcessStartInfo()
-    {
+    public void WhenIgetrequestathreadstartforProcessStartInfo() {
         _actionExecuted = false;
         _threadCancellationTokenSource = new CancellationTokenSource();
         _threadStart = _processManager.GetThreadStartFor(
@@ -103,8 +91,7 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [When(@"I request a threadstart for ProcessStartInfo with a post action")]
-    public void WhenIgetrequestathreadstartforProcessStartInfowithapostaction()
-    {
+    public void WhenIgetrequestathreadstartforProcessStartInfowithapostaction() {
         _actionExecuted = false;
         _threadCancellationTokenSource = new CancellationTokenSource();
         _threadStart = _processManager.GetThreadStartFor(
@@ -115,16 +102,16 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [Then(@"I get a threadstart")]
-    public void ThenIgetathreadstart()
-    {
-        _threadStart.Should().NotBeNull();
+    public void ThenIgetathreadstart() {
+        _threadStart.ShouldNotBeNull();
+        _threadCancellationTokenSource.ShouldNotBeNull();
         _threadCancellationTokenSource.Cancel(true);
     }
 
     [Then(@"I get a threadstart that runs and stops")]
-    public void ThenIgetathreadstartthatrunsandstops()
-    {
-        _threadStart.Should().NotBeNull();
+    public void ThenIgetathreadstartthatrunsandstops() {
+        _threadStart.ShouldNotBeNull();
+        _threadCancellationTokenSource.ShouldNotBeNull();
         _thread = _processManager.CreateAndStartThread(_threadStart);
         _thread.IsAlive.Should().BeTrue();
         var endedSuccesfully = _thread.Join(10000);
@@ -135,9 +122,9 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [Then(@"I get a threadstart that runs and stops and post action is called")]
-    public void ThenIgetathreadstartthatrunsandstopsandpostactioniscalled()
-    {
-        _threadStart.Should().NotBeNull();
+    public void ThenIgetathreadstartthatrunsandstopsandpostactioniscalled() {
+        _threadStart.ShouldNotBeNull();
+        _threadCancellationTokenSource.ShouldNotBeNull();
         _thread = _processManager.CreateAndStartThread(_threadStart);
         _thread.IsAlive.Should().BeTrue();
         var endedSuccesfully = _thread.Join(10000);
@@ -149,8 +136,7 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [When(@"I create and start a thread with a ThreadStart")]
-    public void WhenIcreateandstartathreadwithaThreadStart()
-    {
+    public void WhenIcreateandstartathreadwithaThreadStart() {
         _thread = null;
         _threadCancellationTokenSource = new CancellationTokenSource();
         _threadStart = _processManager.GetThreadStartFor(
@@ -161,9 +147,9 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [Then(@"I get a thread")]
-    public void ThenIgetathread()
-    {
-        _thread.Should().NotBeNull();
+    public void ThenIgetathread() {
+        _thread.ShouldNotBeNull();
+        _threadCancellationTokenSource.ShouldNotBeNull();
         _thread.IsAlive.Should().BeTrue();
         _threadCancellationTokenSource.Cancel(true);
         var endedSuccessfully = _thread.Join(10000);
@@ -172,14 +158,12 @@ public class ProcessManagerSteps : IDisposable
     }
 
     [When(@"I request the current executing assembly file path")]
-    public void WhenIrequestthecurrentexecutingassemblyfilepath()
-    {
+    public void WhenIrequestthecurrentexecutingassemblyfilepath() {
         _curentExecutingAssemblyFilePath = _processManager.GetCurrentExecutionLocation();
     }
 
     [Then(@"I get the current executing assembly file path")]
-    public void ThenIgetthecurrentexecutingassemblyfilepath()
-    {
+    public void ThenIgetthecurrentexecutingassemblyfilepath() {
         _curentExecutingAssemblyFilePath.Should().NotBeNull();
         var assemblyToCheckFor = System.Reflection.Assembly
             .GetExecutingAssembly()
@@ -187,8 +171,7 @@ public class ProcessManagerSteps : IDisposable
         _curentExecutingAssemblyFilePath.Should().Be(assemblyToCheckFor);
     }
 
-    public void Dispose()
-    {
+    public void Dispose() {
         _processManager.Dispose();
     }
 }

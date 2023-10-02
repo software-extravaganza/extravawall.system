@@ -1,3 +1,4 @@
+using System;
 
 //------------------------------------------------------------------------------
 
@@ -7,7 +8,7 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using CliWrap;
     using ExtravaWallSetup.GUI.Framework;
     using NStack;
@@ -21,7 +22,7 @@ namespace ExtravaWallSetup.GUI {
             UpdateProgress(initialProgress, text);
         }
 
-        public void Failed(string message) {
+        public void Failed(string? message) {
             progressMessage.Text = message;
             progressMessage.ColorScheme = this.redOnBlack;
 

@@ -7,7 +7,7 @@
 //      You can make changes to this file and they will not be overwritten when saving.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using NStack;
     using Terminal.Gui;
 
@@ -24,14 +24,14 @@ namespace ExtravaWallSetup.GUI {
             this.contentLabel.Enabled = true;
             exitButton.Clicked += ExitButton_Clicked;
             copyButton.Clicked += CopyButtonOnClicked;
-            exitButton.Enter+= ButtonOnEnter;
-            copyButton.Enter+= ButtonOnEnter;
+            exitButton.Enter += ButtonOnEnter;
+            copyButton.Enter += ButtonOnEnter;
             contentLabel.Enter += ButtonOnEnter;
-            
+
             if (!Clipboard.IsSupported) {
                 copyButton.Text = "Select text";
             }
-            
+
             if (isSuccess) {
                 this.ColorScheme = blackOnGreenCustom;
                 this.titleLabel.ColorScheme = greenOnBlackCustom;
@@ -59,8 +59,7 @@ namespace ExtravaWallSetup.GUI {
             if (Clipboard.IsSupported && !Clipboard.TrySetClipboardData(clipboardData)) {
                 var errorWriter = InstallManager.Instance.Console.GetNewWriter(Color.Red, Color.Black);
                 errorWriter.WriteLine("Could not copy to clipboard");
-            }
-            else if (!Clipboard.IsSupported) {
+            } else if (!Clipboard.IsSupported) {
                 contentLabel.SelectAll();
             }
         }

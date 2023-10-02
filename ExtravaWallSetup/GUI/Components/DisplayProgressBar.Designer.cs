@@ -8,18 +8,18 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class DisplayProgressBar : Terminal.Gui.View {
-        
+
         private Terminal.Gui.ColorScheme greenOnBlack;
         private Terminal.Gui.ColorScheme redOnBlack;
 
         private ExtravaLabel progressMessage;
-        
+
         private ExtravaProgressBar progressBar;
 
         private void InitializeComponent() {

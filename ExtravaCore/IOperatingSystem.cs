@@ -10,5 +10,5 @@ namespace ExtravaCore;
 public interface IOperatingSystem {
     string Name { get; }
     SemVersion Version { get; }
-    ICommandDriver Commands { get; }
+    Func<ICommandDriver> CommandDriverFactory { get; }
 }

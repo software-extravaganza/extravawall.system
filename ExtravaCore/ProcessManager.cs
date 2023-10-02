@@ -7,7 +7,7 @@ public interface IProcessManager : IDisposable {
     string GetCurrentExecutionLocation();
     int GetCurrentProcessId();
     int GetParentProcessId(int processId);
-    ThreadStart GetThreadStartFor(ProcessStartInfo startInfo, Action postDelegate = null, CancellationToken cancellationToken = default);
+    ThreadStart GetThreadStartFor(ProcessStartInfo startInfo, Action? postDelegate = null, CancellationToken cancellationToken = default);
     string ReadProcessCommandline(int processId);
 }
 
@@ -17,14 +17,13 @@ public class ProcessManager : IProcessManager {
 
     public int GetParentProcessId(int processId) {
         // Open the /proc/[pid]/stat file for the current process
-        using (FileStream fs = File.OpenRead($"/proc/{processId}/stat"))
-        using (StreamReader reader = new StreamReader(fs)) {
-            // Read the process ID, command name, and parent process ID from the file
-            string line = reader.ReadLine();
-            string[] fields = line.Split(' ');
-            int parentProcessId = int.Parse(fields[3]);
-            return parentProcessId;
-        }
+        using FileStream fs = File.OpenRead($"/proc/{processId}/stat");
+        using StreamReader reader = new(fs);
+        // Read the process ID, command name, and parent process ID from the file
+        string line = reader.ReadLine()!;
+        string[] fields = line.Split(' ');
+        int parentProcessId = int.Parse(fields[3]);
+        return parentProcessId;
     }
     public string ReadProcessCommandline(int processId) {
         // Read the command line used to launch the process from the /proc/[pid]/cmdline file
@@ -85,7 +84,7 @@ public class ProcessManager : IProcessManager {
             } catch (ThreadInterruptedException) {
 
             } finally {
-                thread.SetTarget(null);
+                thread.SetTarget(null!);
             }
         }
 
@@ -97,7 +96,7 @@ public class ProcessManager : IProcessManager {
             } catch (InvalidOperationException) {
 
             } finally {
-                process.SetTarget(null);
+                process.SetTarget(null!);
             }
         }
 

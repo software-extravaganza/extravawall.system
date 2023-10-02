@@ -8,32 +8,32 @@
 //      the code is regenerated.
 //  </auto-generated>
 // -----------------------------------------------------------------------------
-namespace ExtravaWallSetup.GUI {
+namespace ExtravaWallSetup.GUI.Components {
     using System;
     using Terminal.Gui;
-    
-    
+
+
     public partial class ExitView : Terminal.Gui.View {
-        
+
         private Terminal.Gui.ColorScheme redOnBlackCustom;
-        
+
         private Terminal.Gui.ColorScheme redOnBlackButtonCustom;
-        
+
         private Terminal.Gui.ColorScheme blackOnRedCustom;
-        
+
         private Terminal.Gui.ColorScheme greenOnBlackCustom;
-        
+
         private Terminal.Gui.ColorScheme greenOnBlackButtonCustom;
-        
+
         private Terminal.Gui.ColorScheme blackOnGreenCustom;
 
         private ExtravaLabel titleLabel;
-        
+
         private ExtravaTextView contentLabel;
-        
+
         private Terminal.Gui.Button exitButton;
         private Terminal.Gui.Button copyButton;
-        
+
         private void InitializeComponent() {
             this.exitButton = new Terminal.Gui.Button();
             this.copyButton = new Terminal.Gui.Button();

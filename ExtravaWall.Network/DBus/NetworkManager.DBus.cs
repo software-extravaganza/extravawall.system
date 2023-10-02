@@ -1,38 +1,42 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using ExtravaWall.Network;
 using Tmds.DBus;
+using EnumFastToStringGenerated;
 
 [assembly: InternalsVisibleTo(Tmds.DBus.Connection.DynamicAssemblyName)]
 namespace NetworkManager.DBus {
+
+    [EnumGenerator]
     public enum DeviceState : uint {
-        [Description("Unknown")]
+        [Display(Name = "Unknown")]
         Unknown = 0,
-        [Description("Unmanaged")]
+        [Display(Name = "Unmanaged")]
         Unmanaged = 10,
-        [Description("Unavailable")]
+        [Display(Name = "Unavailable")]
         Unavailable = 20,
-        [Description("Disconnected")]
+        [Display(Name = "Disconnected")]
         Disconnected = 30,
-        [Description("Prepare")]
+        [Display(Name = "Prepare")]
         Prepare = 40,
-        [Description("Config")]
+        [Display(Name = "Config")]
         Config = 50,
-        [Description("NeedAuth")]
+        [Display(Name = "NeedAuth")]
         NeedAuth = 60,
-        [Description("IpConfig")]
+        [Display(Name = "IpConfig")]
         IpConfig = 70,
-        [Description("IpCheck")]
+        [Display(Name = "IpCheck")]
         IpCheck = 80,
-        [Description("Secondaries")]
+        [Display(Name = "Secondaries")]
         Secondaries = 90,
-        [Description("Activated")]
+        [Display(Name = "Activated")]
         Activated = 100,
-        [Description("Deactivating")]
+        [Display(Name = "Deactivating")]
         Deactivating = 110,
-        [Description("Failed")]
+        [Display(Name = "Failed")]
         Failed = 120
     }
 
