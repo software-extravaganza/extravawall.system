@@ -1,10 +1,89 @@
+
+
+
+
+using System.Text.RegularExpressions;
+using CliWrap;
+using ExtravaCore.Commands.Framework;
+using Semver;
+public record CommandPackageOptions() {
+    public string? Package { get; set; } = null;
+}
+
+public record OsPackage(string Name, SemVersion Version);
+
+public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackagesInstalled, CommandPackageOptions, IList<OsPackage>> {
+    protected override Command commandGenerator(CommandPackageOptions options) {
+        if (OS.Name.ToLower() == "debian" || OS.Name.ToLower() == "ubuntu") {
+            return debianCommandGenerator(options);
+        } else if (OS.Name.ToLower() == "centos" || OS.Name.ToLower() == "rhel" || OS.Name.ToLower() == "fedora") {
+            return rpmCommandGenerator(options);
+        } else {
+            throw new Exception($"OS {OS.Name} is not supported.");
+        }
+    }
+
+    private Command rpmCommandGenerator(CommandPackageOptions options) {
+        var args = new List<string> { CommandStrings.RPM_ARG_LIST, CommandStrings.RPM_ARG_QUERY_FORMAT, CommandStrings.RPM_ARG_QUERY_FORMAT_STRING };
+        if (!string.IsNullOrWhiteSpace(options.Package)) {
+            args.Add("-q");
+            args.Add(options.Package);
+        }
+
+        return Cli.Wrap(CommandStrings.COMMAND_RPM).WithArguments(args);
+    }
+
+    private Command debianCommandGenerator(CommandPackageOptions options) {
+        var args = new List<string> { CommandStrings.DPKG_ARG_NO_PAGER, CommandStrings.DPKG_ARG_SHOW_FORMAT, CommandStrings.DPKG_ARG_SHOW_PACKAGE };
+        if (!string.IsNullOrWhiteSpace(options.Package)) {
+            args.Add(options.Package);
+        }
+
+        return Cli.Wrap(CommandStrings.COMMAND_DPKG_QUERY).WithArguments(args);
+    }
+
+    protected override IList<OsPackage> convertResult(bool success, string result) {
+        var packages = new List<OsPackage>();
+        if (success && !string.IsNullOrWhiteSpace(result)) {
+            var packageLines = result.Split('\n');
+            foreach (var line in packageLines.Where(l => !string.IsNullOrWhiteSpace(l))) {
+                var packageAttributes = line.Split('\t').ToArray();
+                if (packageAttributes.Length >= 2) {
+                    var versionString = string.IsNullOrWhiteSpace(packageAttributes[1]) ? "0" : packageAttributes[1];
+                    string pattern = @"^([^:\s]*:)?(?<version>([^\s\.~\+a-zA-Z]+)(\.[^\s\.~\+\-a-zA-Z]+){1,2})(?<meta>.*)";
+                    // Regex tests
+                    // 1.6.0-1
+                    // 1:8.11 + urwcyr1.0.7~pre44 - 4.5
+                    // 8:6.9.11.60 + dfsg - 1.3
+                    // 9.53.3~dfsg - 7 + deb11u2
+                    // 1:6.0.1r16 - 1.1
+                    // 7.74.0-1.3+deb11u5
+                    // 1.11.0-1
+                    // 1.0.0.errata1-3
+                    var regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    var replaceString = @"${version}";
+                    versionString = regex.Replace(versionString, replaceString);
+                    versionString = versionString.Trim();
+                    versionString = versionString.Last().CompareTo('+') == 0 ? versionString.Substring(0, versionString.Length - 1) : versionString;
+                    SemVersion.TryParse(versionString, SemVersionStyles.Any, out var version);
+                    var osPackage = new OsPackage(packageAttributes[0], version ?? new SemVersion(0));
+                    packages.Add(osPackage);
+                }
+
+            }
+        }
+        return packages;
+    }
+}
+
+
 //todo: bring back
 // using CliWrap;
 // using Semver;
 // using System.Text.RegularExpressions;
 
 // namespace ExtravaCore.Commands {
-//     public record OsPackage(string Name, SemVersion Version);
+//    
 //     public class GetPackages : CommandWrapper<GetPackages, List<OsPackage>> {
 //         protected override List<OsPackage> ConvertResult(string result) {
 
@@ -13,18 +92,7 @@
 
 //     public class PackageCommands : CommandWrapper<PackageCommands> {
 //         //dpkg-query --no-pager --showformat='${Package}\t${Version}\n' -W PACKAGE
-//         const string COMMAND_APTGET = "apt-get";
-//         const string COMMAND_APTCACHE = "apt-cache";
-//         const string COMMAND_DPKG_QUERY = "dpkg-query";
-//         const string DPKG_ARG_NO_PAGER = "--no-pager";
-//         const string DPKG_ARG_SHOW_FORMAT = "--showformat=${Package}\t${Version}";
-//         const string DPKG_ARG_SHOW_PACKAGE = "-W";  // Add package name as a following argument
-//         const string APTGET_ARG_INSTALL = "install";//
-//         const string APTGET_ARG_ASSUME_YES = "--assume-yes";
-//         const string APTGET_ARG_SHOW_PROGRESS = "--show-progress";
-//         const string APTGET_ARG_LIST = "list";
-//         const string APTGET_ARG_VERY_QUIET = "-qq";
-//         const string APTCACHE_ARG_SEARCH = "search";
+
 
 //         public PackageCommands(OperatingSystem os) : base(os) {
 //         }

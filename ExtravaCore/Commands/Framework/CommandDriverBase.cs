@@ -102,12 +102,12 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
         return command.WithEnvironmentVariables(_debianEnvironmentVariables);
     }
 
-    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<bool, string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
         var success = rawResult.ExitCode == 0;
-        conversionDelegate ??= (string s) => (TResult)Convert.ChangeType(s, typeof(TResult));
+        conversionDelegate ??= (bool success, string result) => (TResult)Convert.ChangeType(result, typeof(TResult));
 
-        var convertedResult = conversionDelegate.Invoke(rawResult.StandardOutput);
+        var convertedResult = conversionDelegate.Invoke(success, rawResult.StandardOutput);
         var conversionTypeName = (
                 Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult)
         ).Name;

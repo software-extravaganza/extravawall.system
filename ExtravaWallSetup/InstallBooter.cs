@@ -42,7 +42,9 @@ public class InstallBooter {
 
         var result = await _commandRunner.For<CommandMachineName>().RunAsync();
         var result2 = await _commandRunner.For<CommandMachineOs>().RunAsync();
-        var result3 = await _commandRunner.For<CommandMachineOs>().RunAsync();
+        var result3 = await _commandRunner.For<CommandMachineArchitecture>().RunAsync();
+        var result4 = await _commandRunner.For<CommandMachineAll>().RunAsync();
+        var result5 = await _commandRunner.For<CommandPackagesInstalled>().Options(o => o.Package = "neofetch").RunAsync();
 
         Console.WriteLine(result.Result);
         // var elevator = new Elevator();
