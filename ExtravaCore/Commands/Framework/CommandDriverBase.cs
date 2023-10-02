@@ -1,8 +1,11 @@
 
+using System.Collections.ObjectModel;
+using System.Text;
+using CliWrap;
+
 namespace ExtravaCore.Commands.Framework;
 public abstract class CommandDriverBase<TCommand> : ICommandDriver
-        where TCommand : CommandDriverBase<TCommand>
-{
+        where TCommand : CommandDriverBase<TCommand> {
     //public static T Instance => _instance;
 
     //private static readonly T _instance = new T();
@@ -20,11 +23,9 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
 
     protected CommandDriverBase(CommandSettings settings) => Settings = settings;
 
-    private void commandStandardOutput(string output)
-    {
+    private void commandStandardOutput(string output) {
         _standardOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole)
-        {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.WriteLine(output);
                 break;
@@ -35,11 +36,9 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
             ;
     }
 
-    private void commandErrorOutput(string output)
-    {
+    private void commandErrorOutput(string output) {
         _errorOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole)
-        {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
@@ -50,11 +49,9 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
             ;
     }
 
-    private void commandExceptionOutput(string output)
-    {
+    private void commandExceptionOutput(string output) {
         _exceptionOutput.AppendLine(output);
-        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole)
-        {
+        switch (OverriddenOutputType ?? Settings.OutputToVirtualConsole) {
             case CommandOutputType.Console:
                 Console.Error.WriteLine(output);
                 break;
@@ -64,16 +61,13 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
         }
     }
 
-    public virtual async Task<ICommandResultRaw> RunRawAsync(Command command, Action<string>? customStandardOutput, Action<string>? customErrorOutput)
-    {
-        var standardOutputDelegate = (string o) =>
-        {
+    public virtual async Task<ICommandResultRaw> RunRawAsync(Command command, Action<string>? customStandardOutput, Action<string>? customErrorOutput) {
+        var standardOutputDelegate = (string o) => {
             commandStandardOutput(o);
             customStandardOutput?.Invoke(o);
         };
 
-        var errorOutputDelegate = (string o) =>
-        {
+        var errorOutputDelegate = (string o) => {
             commandErrorOutput(o);
             customErrorOutput?.Invoke(o);
         };
@@ -82,19 +76,14 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
         var startTime = DateTimeOffset.Now;
         CommandResult? commandResult = null;
         int exitCode = -1;
-        try
-        {
+        try {
             var result = await finalCommand.ExecuteAsync();
             exitCode = result.ExitCode;
             commandResult = (CommandResult?)result;
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             exitCode = 126;
             commandExceptionOutput(ex.Message);
-        }
-        finally
-        {
+        } finally {
             commandResult ??= new CommandResult(exitCode, startTime, DateTimeOffset.Now);
         }
 
@@ -109,13 +98,11 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
 
     }
 
-    private Command prepareCommand(Command command)
-    {
+    private Command prepareCommand(Command command) {
         return command.WithEnvironmentVariables(_debianEnvironmentVariables);
     }
 
-    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null)
-    {
+    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
         var success = rawResult.ExitCode == 0;
         conversionDelegate ??= (string s) => (TResult)Convert.ChangeType(s, typeof(TResult));
@@ -128,8 +115,7 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
         return new CommandResult<TResult>(rawResult.ExitCode, convertedResult, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
     }
 
-    public virtual async Task<ICommandResult<string>> RunAsyncStdOut(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null)
-    {
+    public virtual async Task<ICommandResult<string>> RunAsyncStdOut(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
         var success = rawResult.ExitCode == 0;
         var resultString = success
@@ -142,13 +128,11 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
         return new CommandResult<string>(rawResult.ExitCode, resultString, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
     }
 
-    public virtual void SetCommandView(ICommandView view)
-    {
+    public virtual void SetCommandView(ICommandView view) {
         CommandView = view;
     }
 
-    public virtual void SetOutput(CommandOutputType? overriddenOutputType)
-    {
+    public virtual void SetOutput(CommandOutputType? overriddenOutputType) {
         OverriddenOutputType = overriddenOutputType;
     }
 

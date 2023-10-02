@@ -1,4 +1,4 @@
-﻿using ExtravaCore.Commands;
+﻿using ExtravaCore.Commands.Framework;
 using ExtravaWallSetup.GUI.Components;
 using Terminal.Gui;
 using static Terminal.Gui.View;

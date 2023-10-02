@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reactive.Concurrency;
 using ExtravaCore;
 using ExtravaCore.Commands;
+using ExtravaCore.Commands.Framework;
 using ExtravaWallSetup.GUI.Framework;
 using ReactiveUI;
 

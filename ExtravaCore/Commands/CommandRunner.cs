@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CliWrap;
+using ExtravaCore.Commands;
+using ExtravaCore.Commands.Framework;
 
 namespace ExtravaCore.Commands;
-public interface ICommandRunner {
-    TCommand For<TCommand>() where TCommand : ICommand;
-}
 
 public class CommandRunner : ICommandRunner {
     private CommandServiceProvider _commandProvider;

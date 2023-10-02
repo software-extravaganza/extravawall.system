@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using CliWrap;
 using ExtravaCore.Commands;
+using ExtravaCore.Commands.Framework;
 using Semver;
 
 namespace ExtravaCore;
