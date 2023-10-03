@@ -41,8 +41,8 @@ public class CommandRunner : ICommandRunner {
         return new ForCommandWithNoInput<TCommand>(_commandProvider);
     }
 
-    public IForCommandWithOptions<TCommand, TOptions> For2<TCommand, TOptions>(Action<TOptions> setOptions) where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new() {
-        return new ForCommandWithOptions<TCommand, TOptions>(_commandProvider);
+    public IForCommandWithOptions<TCommand> For2<TCommand>() where TCommand : ICommand {
+        return new ForCommandWithOptions<TCommand>(_commandProvider);
     }
 
     private class ForCommandWithNoInput<TCommand> : IForCommandWithNoInput<TCommand> where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
@@ -62,7 +62,7 @@ public class CommandRunner : ICommandRunner {
         }
     }
 
-    private class ForCommandWithOptions<TCommand, TOptions> : IForCommandWithOptions<TCommand, TOptions> where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new() {
+    private class ForCommandWithOptions<TCommand> : IForCommandWithOptions<TCommand> where TCommand : ICommandWithOptions {
         private CommandServiceProvider _commandProvider;
 
         public ForCommandWithOptions(CommandServiceProvider commandProvider) {

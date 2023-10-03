@@ -6,8 +6,11 @@ using System.Text.RegularExpressions;
 using CliWrap;
 using ExtravaCore.Commands.Framework;
 using Semver;
-public record CommandPackageOptions() {
+public record CommandPackageOptions() : ICommandOptions {
     public string? Package { get; set; } = null;
+}
+
+public interface ICommandOptions {
 }
 
 public record OsPackage(string Name, SemVersion Version);
