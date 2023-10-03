@@ -74,45 +74,44 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
 
         var finalCommand = prepareCommand(command) | (standardOutputDelegate, errorOutputDelegate);
         var startTime = DateTimeOffset.Now;
-        CommandResult? commandResult = null;
+        ICommandResultRaw? commandResult = null;
         int exitCode = -1;
         try {
-            var result = await finalCommand.ExecuteAsync();
+            var result = await finalCommand.WithValidation(CommandResultValidation.None).ExecuteAsync();
             exitCode = result.ExitCode;
-            commandResult = (CommandResult?)result;
+            commandResult = result.ToCommandResultRaw(finalCommand.ToString(), _standardOutput, _errorOutput);
+
         } catch (Exception ex) {
             exitCode = 126;
             commandExceptionOutput(ex.Message);
         } finally {
-            commandResult ??= new CommandResult(exitCode, startTime, DateTimeOffset.Now);
+            if (commandResult == null) {
+                commandResult = new CommandResultRaw(finalCommand.ToString(), exitCode, exitCode == 0, startTime, DateTimeOffset.Now, DateTimeOffset.Now - startTime, _standardOutput.ToString(), _errorOutput.ToString(), _exceptionOutput.ToString());
+            }
+
+            commandResult.ExitCode = exitCode;
+            commandResult.IsSuccess = exitCode == 0;
+            commandResult.CommandString = finalCommand.ToString();
         }
 
-        return new CommandResultRaw(
-                        ExitCode: commandResult.ExitCode,
-                        Result: _standardOutput.ToString(),
-                        StartTime: commandResult.StartTime,
-                        ExitTime: commandResult.ExitTime,
-                        RunTime: commandResult.RunTime,
-                        StandardOutput: _standardOutput.ToString(),
-                        ErrorOutput: _errorOutput.ToString());
-
+        return commandResult;
     }
 
     private Command prepareCommand(Command command) {
         return command.WithEnvironmentVariables(_debianEnvironmentVariables);
     }
 
-    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<bool, string, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+    public virtual async Task<ICommandResult<TResult>> RunAsync<TResult>(Command command, Func<ICommandResultRaw, TResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         var rawResult = await RunRawAsync(command, customStandardOutput, customErrorOutput);
         var success = rawResult.ExitCode == 0;
-        conversionDelegate ??= (bool success, string result) => (TResult)Convert.ChangeType(result, typeof(TResult));
+        conversionDelegate ??= (rawResult) => (TResult)Convert.ChangeType(rawResult.StandardOutput, typeof(TResult));
 
-        var convertedResult = conversionDelegate.Invoke(success, rawResult.StandardOutput);
+        var convertedResult = conversionDelegate.Invoke(rawResult);
         var conversionTypeName = (
                 Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult)
         ).Name;
 
-        return new CommandResult<TResult>(rawResult.ExitCode, convertedResult, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
+        return rawResult.ToNewCommandResultWithValue(convertedResult);
     }
 
     public virtual async Task<ICommandResult<string>> RunAsyncStdOut(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
@@ -124,8 +123,7 @@ public abstract class CommandDriverBase<TCommand> : ICommandDriver
                         ? rawResult.ExceptionOutput
                         : rawResult.ErrorOutput;
 
-
-        return new CommandResult<string>(rawResult.ExitCode, resultString, rawResult.StartTime, rawResult.ExitTime, rawResult.RunTime);
+        return rawResult.ToNewCommandResultWithValue(resultString);
     }
 
     public virtual void SetCommandView(ICommandView view) {

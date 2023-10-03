@@ -24,10 +24,11 @@ public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackage
     }
 
     private Command rpmCommandGenerator(CommandPackageOptions options) {
-        var args = new List<string> { CommandStrings.RPM_ARG_LIST, CommandStrings.RPM_ARG_QUERY_FORMAT, CommandStrings.RPM_ARG_QUERY_FORMAT_STRING };
+        var args = new List<string> { CommandStrings.RPM_ARG_QUERY, CommandStrings.RPM_ARG_QUERY_FORMAT, CommandStrings.RPM_ARG_QUERY_FORMAT_STRING };
         if (!string.IsNullOrWhiteSpace(options.Package)) {
-            args.Add("-q");
             args.Add(options.Package);
+        } else {
+            args.Add(CommandStrings.RPM_ARG_LIST);
         }
 
         return Cli.Wrap(CommandStrings.COMMAND_RPM).WithArguments(args);
@@ -42,10 +43,10 @@ public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackage
         return Cli.Wrap(CommandStrings.COMMAND_DPKG_QUERY).WithArguments(args);
     }
 
-    protected override IList<OsPackage> convertResult(bool success, string result) {
+    protected override IList<OsPackage> convertResult(ICommandResultRaw result) {
         var packages = new List<OsPackage>();
-        if (success && !string.IsNullOrWhiteSpace(result)) {
-            var packageLines = result.Split('\n');
+        if (result.IsSuccess && !string.IsNullOrWhiteSpace(result.StandardOutput)) {
+            var packageLines = result.StandardOutput.Split('\n');
             foreach (var line in packageLines.Where(l => !string.IsNullOrWhiteSpace(l))) {
                 var packageAttributes = line.Split('\t').ToArray();
                 if (packageAttributes.Length >= 2) {

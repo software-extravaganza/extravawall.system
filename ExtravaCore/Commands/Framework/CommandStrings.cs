@@ -28,8 +28,8 @@ public partial class CommandBase {
         public const string COMMAND_RPM = "rpm";
         public const string RPM_ARG_QUERY = "-q";
         public const string RPM_ARG_QUERY_FORMAT = "--queryformat";
-        public const string RPM_ARG_QUERY_FORMAT_STRING = "${NAME}\t${VERSION}\n";
-        public const string RPM_ARG_QUERY_ALL = "-a";
+        public const string RPM_ARG_QUERY_FORMAT_STRING = "%{NAME}\t%{VERSION}\n";
+        public const string RPM_ARG_QUERY_ALL = "-qa";
         public const string RPM_ARG_LIST = "-l";
 
     }

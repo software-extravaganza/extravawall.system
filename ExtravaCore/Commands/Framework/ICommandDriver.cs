@@ -7,7 +7,7 @@ public interface ICommandDriver {
 
         Task<ICommandResult<TResult>> RunAsync<TResult>(
                 Command command,
-                Func<bool, string, TResult>? conversionDelegate = null,
+                Func<ICommandResultRaw, TResult>? conversionDelegate = null,
                 Action<string>? customStandardOutput = null,
                 Action<string>? customErrorOutput = null
         );
