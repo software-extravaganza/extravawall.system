@@ -7,12 +7,16 @@ using Semver;
 
 namespace ExtravaCore;
 
-public class OperatingSystem : IOperatingSystem {
+public class OperatingSystem : IOperatingSystem
+{
     public string Name { get; private init; }
     public SemVersion Version { get; private init; }
     public Func<ICommandDriver> CommandDriverFactory { get; private init; }
 
-    public OperatingSystem(CommandSettings commandSettings, CommandServiceProvider commandServiceProvider) {
+    public OperatingSystem(CommandSettings commandSettings, CommandServiceProvider commandServiceProvider)
+    {
+       // ExtravaCore.Generators.HelloWorld.SayHello();
+
         var runtimeIdentifier = RuntimeInformation.RuntimeIdentifier;
         const string pattern =
             @"(?<name>[^\.]+)\.(?<version>[^-]*)-?(?<architecture>[^-]*)-?(?<qualifiers>.*)";
@@ -20,8 +24,10 @@ public class OperatingSystem : IOperatingSystem {
         var osName = string.Empty;
         var osVersion = new SemVersion(0, 0);
 
-        foreach (Match match in regex.Matches(runtimeIdentifier).Cast<Match>()) {
-            if (match.Success) {
+        foreach (Match match in regex.Matches(runtimeIdentifier).Cast<Match>())
+        {
+            if (match.Success)
+            {
                 osName = (
                     match.Groups.ContainsKey("name") ? match.Groups["name"].Value : string.Empty
                 )
@@ -36,7 +42,8 @@ public class OperatingSystem : IOperatingSystem {
             }
         }
 
-        Func<ICommandDriver> commandDriverFactory = (osName, osVersion) switch {
+        Func<ICommandDriver> commandDriverFactory = (osName, osVersion) switch
+        {
             ("debian", { Major: > 10 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
             ("ubuntu", { Major: > 20 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
             ("fedora", { Major: > 37 }) => () => commandServiceProvider.GetService<LinuxCommandDriver>(),
@@ -66,5 +73,6 @@ public class OperatingSystem : IOperatingSystem {
     // }
 }
 
-public class CommandDriverFactory {
+public class CommandDriverFactory
+{
 }

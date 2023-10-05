@@ -26,6 +26,8 @@ EndProject
 #EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaCore", "ExtravaCore\ExtravaCore.csproj", "{0C8714EB-4758-4B14-9551-A4B57885642D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaCore.Generators", "ExtravaCore.Generators\ExtravaCore.Generators.csproj", "{0C8714EB-475A-4F4C-9C6D-5C5C5F8C7B4A}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtravaCore.Test", "ExtravaCore.Test\ExtravaCore.Test.csproj", "{48C33913-57C9-46F5-BDAF-F8316BC79DD8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "_build", "build\_build.csproj", "{71638997-0573-45DB-9FB7-654F2C0D38C1}"

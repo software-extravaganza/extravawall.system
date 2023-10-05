@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <OptimizationPreference>Size</OptimizationPreference>
@@ -9,6 +10,8 @@
     <SelfContained>true</SelfContained>
     <GenerateRuntimeConfigDevFile>false</GenerateRuntimeConfigDevFile>
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CliWrap" Version="3.6.4" />
@@ -16,4 +19,10 @@
     <PackageReference Include="semver" Version="2.3.0" />
     <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ExtravaCore.Generators\ExtravaCore.Generators.csproj" OutputItemType="Analyzer"  ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+  <!-- <ItemGroup>
+    <Analyzer Include="..\ExtravaCore.Generators\bin\Debug\netstandard2.0\ExtravaCore.Generators.1.0.0.nupkg" />
+  </ItemGroup> -->
 </Project>

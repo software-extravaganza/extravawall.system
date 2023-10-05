@@ -37,43 +37,46 @@ public class CommandRunner : ICommandRunner {
     //     return new ForCommandWithOptionsProperty<TCommand, TOptions>(setOptions);
     // }
 
-    public IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
-        return new ForCommandWithNoInput<TCommand>(_commandProvider);
-    }
+    // public IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
+    //     return new ForCommandWithNoInput<TCommand>(_commandProvider);
+    // }
 
-    public IForCommandWithOptions<TCommand> For2<TCommand>() where TCommand : ICommand {
-        return new ForCommandWithOptions<TCommand>(_commandProvider);
-    }
+    // public IOptionSetter<TCommand, TResult> For2<TCommand>() where TCommand : ICommandWrapperWithOptions<TCommand>, new() {
+    //     var command = _commandProvider.GetService<TCommand>();
+    //     command.OS = _commandProvider.GetService<OperatingSystem>();
+    //     return command;
+    // }
 
-    private class ForCommandWithNoInput<TCommand> : IForCommandWithNoInput<TCommand> where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
+    // private class ForCommandWithNoInput<TCommand> : IForCommandWithNoInput<TCommand> where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
 
-        private CommandServiceProvider _commandProvider;
+    //     private CommandServiceProvider _commandProvider;
 
-        public ForCommandWithNoInput(CommandServiceProvider commandProvider) {
-            _commandProvider = commandProvider;
-        }
+    //     public ForCommandWithNoInput(CommandServiceProvider commandProvider) {
+    //         _commandProvider = commandProvider;
+    //     }
 
-        public TCommand WithNoInput {
-            get {
-                var command = _commandProvider.GetService<TCommand>();
-                command.OS = _commandProvider.GetService<OperatingSystem>();
-                return command;
-            }
-        }
-    }
+    //     public TCommand WithNoInput {
+    //         get {
+    //             var command = _commandProvider.GetService<TCommand>();
+    //             command.OS = _commandProvider.GetService<OperatingSystem>();
+    //             return command;
+    //         }
+    //     }
+    // }
 
-    private class ForCommandWithOptions<TCommand> : IForCommandWithOptions<TCommand> where TCommand : ICommandWithOptions {
-        private CommandServiceProvider _commandProvider;
+    // private class ForCommandWithOptions<TCommand, TOptions> : IForCommandWithOptions<TCommand, TOptions> where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new() {
 
-        public ForCommandWithOptions(CommandServiceProvider commandProvider) {
-            _commandProvider = commandProvider;
-        }
+    //     private CommandServiceProvider _commandProvider;
 
-        public TCommand WithOptions(Action<TOptions> setOptions) {
-            var command = _commandProvider.GetService<TCommand>();
-            command.OS = _commandProvider.GetService<OperatingSystem>();
-            return command;
-        }
-    }
+    //     public ForCommandWithOptions(CommandServiceProvider commandProvider) {
+    //         _commandProvider = commandProvider;
+    //     }
+
+    //     public TCommand WithOptions(Action<TOptions> setOptions) {
+    //         var command = _commandProvider.GetService<TCommand>();
+    //         command.OS = _commandProvider.GetService<OperatingSystem>();
+    //         return command;
+    //     }
+    // }
 }
 

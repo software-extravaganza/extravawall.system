@@ -5,11 +5,11 @@ namespace ExtravaCore.Commands.Framework {
         where TCommand : CommandWrapperWithStringInput<TCommand, TResult> {
 
 
-        public virtual async Task<ICommandResult<TResult>> RunAsync(string input) {
-            input ??= string.Empty;
-            var command = commandGenerator(input);
-            return await runAsync(command);
-        }
+        // public virtual async Task<ICommandResult<TResult>> RunAsync(string input) {
+        //     input ??= string.Empty;
+        //     var command = commandGenerator(input);
+        //     return await runAsync(command);
+        // }
 
         protected abstract Command commandGenerator(string input);
     }

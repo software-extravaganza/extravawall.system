@@ -6,14 +6,16 @@ using static Terminal.Gui.View;
 namespace ExtravaWallSetup.GUI.Framework;
 
 [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay,nq}")]
-public class VirtualConsoleManager {
+public class VirtualConsoleManager
+{
     private readonly DefaultScreen _defaultScreen;
     private readonly ScrollView _consoleView;
     private int _totalScrollWidth;
     private int _totalScrollHeight = 2;
     private ExtravaServiceProvider _services;
 
-    public VirtualConsoleManager(ExtravaServiceProvider _serviceProvider, DefaultScreen defaultScreen) {
+    public VirtualConsoleManager(ExtravaServiceProvider _serviceProvider, DefaultScreen defaultScreen)
+    {
         _defaultScreen = defaultScreen;
         _consoleView = defaultScreen.VirtualConsoleView;
         _consoleView.KeepContentAlwaysInViewport = true;
@@ -22,52 +24,62 @@ public class VirtualConsoleManager {
         _defaultScreen.KeyDown += defaultScreen_KeyDown;
     }
 
-    public ITextOutput GetNewWriter(Color foreground = Color.Green, Color background = Color.Black) {
+    public ITextOutput GetNewWriter(Color foreground = Color.Green, Color background = Color.Black)
+    {
         var textView = new DisplayTextView(foreground, background);
         _ = Add(textView);
         return textView;
     }
 
-    public IProgressBar GetNewProgressBar(float initialProgress, string text = "") {
+    public IProgressBar GetNewProgressBar(float initialProgress, string text = "")
+    {
         var progressView = new DisplayProgressBar(initialProgress, text);
         _ = Add(progressView);
         return progressView;
     }
 
     public async Task CommandAsync<T>(Action<T, CommandView> actions, bool printResult = false)
-        where T : ICommand {
-        await Task.Run(() => {
-            var commandView = new CommandView();
-            var command = _services.GetService<T>();
-            if (printResult) {
-                _ = Add(commandView);
-            }
+        where T : ICommand
+    {
+        await Task.Run(() =>
+        {
+            //todo:bring back
+            // var commandView = new CommandView();
+            // var command = _services.GetService<T>();
+            // if (printResult)
+            // {
+            //     _ = Add(commandView);
+            // }
 
-            command.SetOutput(
-                printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None
-                );
-            command.SetCommandView(commandView);
-            actions.Invoke(command, commandView);
+            // command.SetOutput(
+            //     printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None
+            //     );
+            // command.SetCommandView(commandView);
+            //actions.Invoke(command, commandView);
             return Task.CompletedTask;
         })
             .ConfigureAwait(false);
     }
 
     public async Task CommandAsync<T>(Func<T, CommandView, Task> actions, bool printResult = false)
-        where T : ICommand {
-        await Task.Run(async () => {
-            var commandView = new CommandView();
-            var command = _services.GetService<T>();
+        where T : ICommand
+    {
+        await Task.Run(async () =>
+        {
+            //todo:bring back
+            // var commandView = new CommandView();
+            // var command = _services.GetService<T>();
 
-            if (printResult) {
-                _ = Add(commandView);
-            }
+            // if (printResult)
+            // {
+            //     _ = Add(commandView);
+            // }
 
-            command.SetOutput(
-                printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None
-                );
-            command.SetCommandView(commandView);
-            await actions.Invoke(command, commandView);
+            // command.SetOutput(
+            //     printResult ? CommandOutputType.VirtualConsole : CommandOutputType.None
+            //     );
+            // command.SetCommandView(commandView);
+            // await actions.Invoke(command, commandView);
         })
             .ConfigureAwait(false);
     }
@@ -89,15 +101,19 @@ public class VirtualConsoleManager {
         new Dictionary<View, Point>();
 
     public T Add<T>(T view)
-        where T : View {
-        Application.MainLoop.Invoke(() => {
-            lock (_lockScrollViewRefresh) {
+        where T : View
+    {
+        Application.MainLoop.Invoke(() =>
+        {
+            lock (_lockScrollViewRefresh)
+            {
                 var lowestPosition = _consoleView.Subviews[0].Subviews.LastOrDefault();
                 int? calculatedBottom = null;
                 if (lowestPosition != null
                         && _consoleChildrenSizes.ContainsKey(lowestPosition)
                         && _consoleChildrenPositions.ContainsKey(lowestPosition)
-                    ) {
+                    )
+                {
                     calculatedBottom =
                         _consoleChildrenSizes[lowestPosition].Height
                             + _consoleChildrenPositions[lowestPosition].Y;
@@ -109,13 +125,15 @@ public class VirtualConsoleManager {
                 var size = new Size(currentWidth, currentHeight);
                 var widthIsFill = view.Width == Dim.Fill(0);
                 var heightIsFill = view.Height == Dim.Fill(0);
-                if (widthIsFill) {
+                if (widthIsFill)
+                {
                     _ = _consoleView.GetCurrentWidth(out var scrollViewWidth);
                     size.Width = scrollViewWidth - 1;
                     view.Width = size.Width;
                 }
 
-                if (heightIsFill) {
+                if (heightIsFill)
+                {
                     _ = _consoleView.GetCurrentHeight(out var scrollViewHeight);
                     size.Height = scrollViewHeight - 1;
                     view.Height = size.Height;
@@ -145,23 +163,31 @@ public class VirtualConsoleManager {
     [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
     private string? DebuggerDisplay => ToString();
 
-    private void resetConsoleScroll(View? viewRefresh = null, Size? size = null) {
-        Application.MainLoop.Invoke(() => {
-            lock (_lockScrollViewRefresh) {
+    private void resetConsoleScroll(View? viewRefresh = null, Size? size = null)
+    {
+        Application.MainLoop.Invoke(() =>
+        {
+            lock (_lockScrollViewRefresh)
+            {
                 var widthDiff = 0;
                 var heightDiff = 0;
-                if (viewRefresh != null) {
+                if (viewRefresh != null)
+                {
                     var currentWidth = 0;
                     var currentHeight = 0;
-                    if (size is not null) {
+                    if (size is not null)
+                    {
                         currentWidth = size.Value.Width;
                         currentHeight = size.Value.Height;
-                    } else {
+                    }
+                    else
+                    {
                         _ = viewRefresh.GetCurrentWidth(out currentWidth);
                         _ = viewRefresh.GetCurrentHeight(out currentHeight);
                     }
 
-                    if (_consoleChildrenSizes.ContainsKey(viewRefresh)) {
+                    if (_consoleChildrenSizes.ContainsKey(viewRefresh))
+                    {
                         var storedSize = _consoleChildrenSizes[viewRefresh];
                         widthDiff = currentWidth - storedSize.Width;
                         heightDiff = currentHeight - storedSize.Height;
@@ -185,25 +211,30 @@ public class VirtualConsoleManager {
         });
     }
 
-    private void defaultScreen_Resized(Application.ResizedEventArgs obj) {
+    private void defaultScreen_Resized(Application.ResizedEventArgs obj)
+    {
         resetConsoleScroll();
     }
 
-    private void defaultScreen_KeyDown(KeyEventEventArgs obj) {
-        if (obj.KeyEvent.Key != Key.F5) {
+    private void defaultScreen_KeyDown(KeyEventEventArgs obj)
+    {
+        if (obj.KeyEvent.Key != Key.F5)
+        {
             return;
         }
 
         RefreshConsole();
     }
 
-    public void RefreshConsole(View? viewRefresh = null, Size? size = null) {
+    public void RefreshConsole(View? viewRefresh = null, Size? size = null)
+    {
         resetConsoleScroll(viewRefresh, size);
 
         Application.MainLoop.Invoke(RefreshConsoleAction);
     }
 
-    private void RefreshConsoleAction() {
+    private void RefreshConsoleAction()
+    {
         _defaultScreen.Redraw(_defaultScreen.Bounds);
         _consoleView.SetNeedsDisplay();
     }

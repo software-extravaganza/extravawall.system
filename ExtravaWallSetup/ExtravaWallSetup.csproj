@@ -3,8 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <!-- <RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers> -->
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- <PublishAot>true</PublishAot> -->
@@ -25,7 +24,7 @@
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
     <!-- <TrimmerRootDescriptor Include="TrimRoots.xml" /> -->
     <TrimMode>partial</TrimMode>
-
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="debian-install.sh" />
@@ -86,15 +85,21 @@
     <PackageReference Include="Figgle" Version="0.5.1" />
     <PackageReference Include="Figgle.Generator" Version="0.5.1" />
     <PackageReference Include="Hardware.Info" Version="100.0.0" />
-    <PackageReference Include="Humanizer.Core" Version="2.14.1"><IsTrimmable>false</IsTrimmable></PackageReference>
+    <PackageReference Include="Humanizer.Core" Version="2.14.1">
+      <IsTrimmable>false</IsTrimmable>
+    </PackageReference>
     <PackageReference Include="Jab" Version="0.8.6" />
     <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
     <PackageReference Include="ReactiveMarbles.ObservableEvents.SourceGenerator" Version="1.2.3">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="ReactiveUI" Version="19.4.1"><IsTrimmable>false</IsTrimmable></PackageReference>
-    <PackageReference Include="ReactiveUI.Fody" Version="19.4.1"><IsTrimmable>false</IsTrimmable></PackageReference>
+    <PackageReference Include="ReactiveUI" Version="19.4.1">
+      <IsTrimmable>false</IsTrimmable>
+    </PackageReference>
+    <PackageReference Include="ReactiveUI.Fody" Version="19.4.1">
+      <IsTrimmable>false</IsTrimmable>
+    </PackageReference>
     <PackageReference Include="Roslynator.Analyzers" Version="4.5.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -104,13 +109,20 @@
     <PackageReference Include="StrongInject" Version="1.4.4" />
     <PackageReference Include="Supernova.Enum.Generators" Version="1.0.13" />
     <PackageReference Include="System.Composition.AttributedModel" Version="7.0.0" />
-    <PackageReference Include="Terminal.Gui" Version="1.14.0"><IsTrimmable>false</IsTrimmable></PackageReference>
-    <PackageReference Include="Tmds.DBus" Version="0.15.0"><IsTrimmable>false</IsTrimmable></PackageReference>
+    <PackageReference Include="Terminal.Gui" Version="1.14.0">
+      <IsTrimmable>false</IsTrimmable>
+    </PackageReference>
+    <PackageReference Include="Tmds.DBus" Version="0.15.0">
+      <IsTrimmable>false</IsTrimmable>
+    </PackageReference>
     <PackageReference Include="Tomlyn" Version="0.16.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ExtravaWall.Network\ExtravaWall.Network.csproj" />
     <ProjectReference Include="..\PrivilegedActionHelper\PrivilegedActionHelper.csproj" />
     <ProjectReference Include="..\ExtravaCore\ExtravaCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ExtravaCore.Generators\ExtravaCore.Generators.csproj" OutputItemType="Analyzer" />
   </ItemGroup>
 </Project>

@@ -9,11 +9,11 @@ public abstract class CommandWrapperBase<TCommand, TResult>
     protected CommandOutputType? OverriddenOutputType { get; set; }
 
 
-    protected async Task<ICommandResult<TCustomResult>> runCustomAsync<TCustomResult>(Command command, Func<ICommandResultRaw, TCustomResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+    protected async Task<ICommandResult<TCustomResult>> driverRunCustomAsync<TCustomResult>(Command command, Func<ICommandResultRaw, TCustomResult>? conversionDelegate = null, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         return await Driver.RunAsync(command, conversionDelegate, customStandardOutput, customErrorOutput);
     }
 
-    protected async Task<ICommandResult<TResult>> runAsync(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
+    protected async Task<ICommandResult<TResult>> driverRunAsync(Command command, Action<string>? customStandardOutput = null, Action<string>? customErrorOutput = null) {
         return await Driver.RunAsync(command, convertResult, customStandardOutput, customErrorOutput);
     }
 

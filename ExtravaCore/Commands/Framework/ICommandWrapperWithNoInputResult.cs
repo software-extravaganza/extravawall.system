@@ -3,5 +3,5 @@ public interface ICommandWrapperWithNoInputResult<out TCommand> : ICommandWrappe
     where TCommand : ICommandWrapperWithNoInputResult<TCommand> { }
 public interface ICommandWrapperWithNoInputResult<out TCommand, TResult> : ICommandWrapperBase<TCommand, TResult>, ICommandWrapperWithNoInputResult<TCommand>
     where TCommand : ICommandWrapperWithNoInputResult<TCommand, TResult> {
-    Task<ICommandResult<TResult>> RunAsync();
+    //Task<ICommandResult<TResult>> RunAsync();
 }

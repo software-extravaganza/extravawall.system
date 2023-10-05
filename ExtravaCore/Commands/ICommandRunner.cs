@@ -11,7 +11,7 @@ public interface IForCommandWithOptions<out TCommand, out TOptions> where TComma
 }
 
 public interface ICommandRunner {
-    IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new();
+    // IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new();
 
-    IForCommandWithOptions<TCommand, TOptions> For2<TCommand, TOptions>() where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new();
+    // TCommand For2<TCommand>() where TCommand : ICommandWrapperWithOptions<TCommand>, new();
 }

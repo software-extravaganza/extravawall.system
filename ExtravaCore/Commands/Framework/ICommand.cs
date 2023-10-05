@@ -3,14 +3,14 @@ using System.Text;
 
 namespace ExtravaCore.Commands.Framework;
 
-public interface ICommandWithOptions : ICommand {
-    void SetOptions(Action<CommandOptions> setOptions);
+public interface ICommandWithOptions<TCommand, TOptions> : ICommand {
+    //TCommand SetOptions(Action<TOptions> setOptions);
 }
 
 public interface ICommand {
-    void SetCommandView(ICommandView view);
-    void SetOutput(CommandOutputType? overriddenOutputType);
+    // void SetCommandView(ICommandView view);
+    // void SetOutput(CommandOutputType? overriddenOutputType);
 
-    OperatingSystem OS { get; set; }
-    ICommandDriver Driver { get; }
+    // OperatingSystem OS { get; set; }
+    // ICommandDriver Driver { get; }
 }
