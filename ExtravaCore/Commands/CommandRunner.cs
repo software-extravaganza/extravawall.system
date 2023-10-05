@@ -8,75 +8,75 @@ using ExtravaCore.Commands.Framework;
 
 namespace ExtravaCore.Commands;
 
-public class CommandRunner : ICommandRunner {
-    private CommandServiceProvider _commandProvider;
+// public class CommandRunner : ICommandRunner {
+//     private CommandServiceProvider _commandProvider;
 
-    public CommandRunner(CommandServiceProvider commandProvider) {
-        _commandProvider = commandProvider;
-    }
+//     public CommandRunner(CommandServiceProvider commandProvider) {
+//         _commandProvider = commandProvider;
+//     }
 
-    // public TCommand For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand> {
+// public TCommand For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand> {
 
-    // }
+// }
 
-    // public TCommand For<TCommand, TOptions>(Action<TOptions> setOptions)
-    //     where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>
-    //     where TOptions : new() {
-    //     var command = _commandProvider.GetService<TCommand>();
-    //     command.OS = _commandProvider.GetService<OperatingSystem>();
-    //     return command;
-    // }
+// public TCommand For<TCommand, TOptions>(Action<TOptions> setOptions)
+//     where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>
+//     where TOptions : new() {
+//     var command = _commandProvider.GetService<TCommand>();
+//     command.OS = _commandProvider.GetService<OperatingSystem>();
+//     return command;
+// }
 
-    // public ForCommandNoInputProperty<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
-    //     return new ForCommandNoInputProperty<TCommand>();
-    // }
+// public ForCommandNoInputProperty<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
+//     return new ForCommandNoInputProperty<TCommand>();
+// }
 
-    // public ForCommandWithOptionsProperty<TCommand, TOptions> For<TCommand, TOptions>(Action<TOptions> setOptions = null)
-    //     where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new()
-    //     where TOptions : new() {
-    //     return new ForCommandWithOptionsProperty<TCommand, TOptions>(setOptions);
-    // }
+// public ForCommandWithOptionsProperty<TCommand, TOptions> For<TCommand, TOptions>(Action<TOptions> setOptions = null)
+//     where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new()
+//     where TOptions : new() {
+//     return new ForCommandWithOptionsProperty<TCommand, TOptions>(setOptions);
+// }
 
-    // public IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
-    //     return new ForCommandWithNoInput<TCommand>(_commandProvider);
-    // }
+// public IForCommandWithNoInput<TCommand> For<TCommand>() where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
+//     return new ForCommandWithNoInput<TCommand>(_commandProvider);
+// }
 
-    // public IOptionSetter<TCommand, TResult> For2<TCommand>() where TCommand : ICommandWrapperWithOptions<TCommand>, new() {
-    //     var command = _commandProvider.GetService<TCommand>();
-    //     command.OS = _commandProvider.GetService<OperatingSystem>();
-    //     return command;
-    // }
+// public IOptionSetter<TCommand, TResult> For2<TCommand>() where TCommand : ICommandWrapperWithOptions<TCommand>, new() {
+//     var command = _commandProvider.GetService<TCommand>();
+//     command.OS = _commandProvider.GetService<OperatingSystem>();
+//     return command;
+// }
 
-    // private class ForCommandWithNoInput<TCommand> : IForCommandWithNoInput<TCommand> where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
+// private class ForCommandWithNoInput<TCommand> : IForCommandWithNoInput<TCommand> where TCommand : ICommandWrapperWithNoInputResult<TCommand>, new() {
 
-    //     private CommandServiceProvider _commandProvider;
+//     private CommandServiceProvider _commandProvider;
 
-    //     public ForCommandWithNoInput(CommandServiceProvider commandProvider) {
-    //         _commandProvider = commandProvider;
-    //     }
+//     public ForCommandWithNoInput(CommandServiceProvider commandProvider) {
+//         _commandProvider = commandProvider;
+//     }
 
-    //     public TCommand WithNoInput {
-    //         get {
-    //             var command = _commandProvider.GetService<TCommand>();
-    //             command.OS = _commandProvider.GetService<OperatingSystem>();
-    //             return command;
-    //         }
-    //     }
-    // }
+//     public TCommand WithNoInput {
+//         get {
+//             var command = _commandProvider.GetService<TCommand>();
+//             command.OS = _commandProvider.GetService<OperatingSystem>();
+//             return command;
+//         }
+//     }
+// }
 
-    // private class ForCommandWithOptions<TCommand, TOptions> : IForCommandWithOptions<TCommand, TOptions> where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new() {
+// private class ForCommandWithOptions<TCommand, TOptions> : IForCommandWithOptions<TCommand, TOptions> where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>, new() where TOptions : new() {
 
-    //     private CommandServiceProvider _commandProvider;
+//     private CommandServiceProvider _commandProvider;
 
-    //     public ForCommandWithOptions(CommandServiceProvider commandProvider) {
-    //         _commandProvider = commandProvider;
-    //     }
+//     public ForCommandWithOptions(CommandServiceProvider commandProvider) {
+//         _commandProvider = commandProvider;
+//     }
 
-    //     public TCommand WithOptions(Action<TOptions> setOptions) {
-    //         var command = _commandProvider.GetService<TCommand>();
-    //         command.OS = _commandProvider.GetService<OperatingSystem>();
-    //         return command;
-    //     }
-    // }
-}
+//     public TCommand WithOptions(Action<TOptions> setOptions) {
+//         var command = _commandProvider.GetService<TCommand>();
+//         command.OS = _commandProvider.GetService<OperatingSystem>();
+//         return command;
+//     }
+// }
+// }
 

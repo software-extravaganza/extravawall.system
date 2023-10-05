@@ -1,6 +1,7 @@
 namespace ExtravaCore.Commands.Framework;
 
 public partial class CommandBase {
+
     protected class CommandStrings {
 
         // UNAME COMMAND
@@ -30,7 +31,7 @@ public partial class CommandBase {
         public const string RPM_ARG_QUERY_FORMAT = "--queryformat";
         public const string RPM_ARG_QUERY_FORMAT_STRING = "%{NAME}\t%{VERSION}\n";
         public const string RPM_ARG_QUERY_ALL = "-qa";
-        public const string RPM_ARG_LIST = "-l";
+        public const string RPM_ARG_LIST_INSTALLED = RPM_ARG_QUERY_ALL;
 
     }
 }

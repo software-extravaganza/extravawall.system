@@ -44,11 +44,10 @@ public interface IRunner<TResult> {
 // }
 
 
-public abstract class CommandWrapperWithOptions<TCommand, TOptions, TResult>
-    : CommandWrapperBase<TCommand, TResult>, ICommandWrapperWithOptions<TCommand, TOptions, TResult>,
-    ICommandWithOptions<TCommand, TOptions>//,
+public abstract class CommandWrapperWithOptions<TResult, TOptions>
+    : CommandWrapperBase<TResult>, ICommandWrapperWithOptions<TResult, TOptions>,
+    ICommandWithOptions<TOptions>//,
     //ICommandWrapperWith<TCommand, TOptions>
-    where TCommand : CommandWrapperWithOptions<TCommand, TOptions, TResult>, ICommandWrapperBase<TCommand, TResult>
     where TOptions : new() {
     protected TOptions _options;
 
@@ -61,14 +60,13 @@ public abstract class CommandWrapperWithOptions<TCommand, TOptions, TResult>
         return await driverRunAsync(command);
     }
 
-    protected virtual TCommand setOptions(Action<TOptions> setOptions) {
+    public virtual void SetOptions(Action<TOptions> setOptions) {
         setOptions(_options);
-        return (TCommand)this;
     }
 
-    // public OptionSetter<TCommand, TOptions, TResult> With() {
-    //     return new OptionSetter<TCommand, TOptions, TResult>((TCommand)this, _options);
-    // }
-
     protected abstract Command commandGenerator(TOptions result);
+
+    public override async Task<ICommandResult<TResult>> ExecuteAsync() {
+        return await runAsync();
+    }
 }

@@ -1,8 +1,7 @@
 using CliWrap;
 
 namespace ExtravaCore.Commands.Framework {
-    public abstract class CommandWrapperWithStringInput<TCommand, TResult> : CommandWrapperBase<TCommand, TResult>
-        where TCommand : CommandWrapperWithStringInput<TCommand, TResult> {
+    public abstract class CommandWrapperWithStringInput<TResult> : CommandWrapperBase<TResult> {
 
 
         // public virtual async Task<ICommandResult<TResult>> RunAsync(string input) {

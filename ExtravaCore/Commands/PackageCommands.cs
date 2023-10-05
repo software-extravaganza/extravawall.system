@@ -1,11 +1,11 @@
 
-
-
-
 using System.Text.RegularExpressions;
 using CliWrap;
 using ExtravaCore.Commands.Framework;
 using Semver;
+using ExtravaCore;
+
+namespace ExtravaCore.Commands;
 public record CommandPackageOptions() : ICommandOptions {
     public string? Package { get; set; } = null;
 }
@@ -15,7 +15,8 @@ public interface ICommandOptions {
 
 public record OsPackage(string Name, SemVersion Version);
 
-public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackagesInstalled, CommandPackageOptions, IList<OsPackage>> {
+[ExtravaCommand]
+public class CommandPackagesInstalled : CommandWrapperWithOptions<IList<OsPackage>, CommandPackageOptions> {
     protected override Command commandGenerator(CommandPackageOptions options) {
         if (OS.Name.ToLower() == "debian" || OS.Name.ToLower() == "ubuntu") {
             return debianCommandGenerator(options);
@@ -27,11 +28,12 @@ public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackage
     }
 
     private Command rpmCommandGenerator(CommandPackageOptions options) {
-        var args = new List<string> { CommandStrings.RPM_ARG_QUERY, CommandStrings.RPM_ARG_QUERY_FORMAT, CommandStrings.RPM_ARG_QUERY_FORMAT_STRING };
+        var args = new List<string> { CommandStrings.RPM_ARG_QUERY_FORMAT, CommandStrings.RPM_ARG_QUERY_FORMAT_STRING };
         if (!string.IsNullOrWhiteSpace(options.Package)) {
+            args.Add(CommandStrings.RPM_ARG_QUERY);
             args.Add(options.Package);
         } else {
-            args.Add(CommandStrings.RPM_ARG_LIST);
+            args.Add(CommandStrings.RPM_ARG_LIST_INSTALLED);
         }
 
         return Cli.Wrap(CommandStrings.COMMAND_RPM).WithArguments(args);
@@ -41,6 +43,8 @@ public class CommandPackagesInstalled : CommandWrapperWithOptions<CommandPackage
         var args = new List<string> { CommandStrings.DPKG_ARG_NO_PAGER, CommandStrings.DPKG_ARG_SHOW_FORMAT, CommandStrings.DPKG_ARG_SHOW_PACKAGE };
         if (!string.IsNullOrWhiteSpace(options.Package)) {
             args.Add(options.Package);
+        } else {
+            //todo: list all installed packages
         }
 
         return Cli.Wrap(CommandStrings.COMMAND_DPKG_QUERY).WithArguments(args);

@@ -3,14 +3,12 @@ namespace ExtravaCore.Commands.Framework;
 //     ICommandWrapperWithOptions<TCommand, TOptions> With();
 // }
 
-public interface ICommandWrapperWithOptions<out TCommand, out TOptions> : ICommandWrapperBase<TCommand>
-    where TCommand : ICommandWrapperWithOptions<TCommand, TOptions>
+public interface ICommandWrapperWithOptions<out TOptions> : ICommandWrapperBase, ICommandWithOptions<TOptions>
     where TOptions : new() {
     //TCommand SetOptions(Action<TOptions> setOptions);
 }
 
-public interface ICommandWrapperWithOptions<out TCommand, out TOptions, TResult> : ICommandWrapperBase<TCommand, TResult>, ICommandWrapperWithOptions<TCommand, TOptions>
-    where TCommand : ICommandWrapperWithOptions<TCommand, TOptions, TResult>
+public interface ICommandWrapperWithOptions<TResult, out TOptions> : ICommandWrapperBase<TResult>, ICommandWrapperWithOptions<TOptions>, ICommandWithOptions<TOptions>
     where TOptions : new() {
 
 }

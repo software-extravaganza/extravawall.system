@@ -1,9 +1,8 @@
 using CliWrap;
 
 namespace ExtravaCore.Commands.Framework;
-public abstract class CommandWrapperBase<TCommand, TResult>
-    : CommandBase, ICommandWrapperBase<TCommand, TResult>
-    where TCommand : CommandWrapperBase<TCommand, TResult> {
+public abstract class CommandWrapperBase<TResult>
+    : CommandBase, ICommandWrapperBase<TResult> {
 
     protected ICommandView? CommandView { get; set; }
     protected CommandOutputType? OverriddenOutputType { get; set; }
@@ -19,4 +18,5 @@ public abstract class CommandWrapperBase<TCommand, TResult>
 
     protected abstract TResult convertResult(ICommandResultRaw result);
 
+    public abstract Task<ICommandResult<TResult>> ExecuteAsync();
 }

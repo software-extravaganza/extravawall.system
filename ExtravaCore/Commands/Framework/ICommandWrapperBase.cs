@@ -1,6 +1,7 @@
 namespace ExtravaCore.Commands.Framework;
-public interface ICommandWrapperBase<out TCommand> : ICommand
-    where TCommand : ICommandWrapperBase<TCommand> { }
+public interface ICommandWrapperBase : ICommand { }
 
-public interface ICommandWrapperBase<out TCommand, TResult> : ICommandWrapperBase<TCommand>
-    where TCommand : ICommandWrapperBase<TCommand, TResult> { }
+public interface ICommandWrapperBase<TResult> : ICommandWrapperBase {
+
+    Task<ICommandResult<TResult>> ExecuteAsync();
+}

@@ -25,7 +25,7 @@ class Build : NukeBuild {
             _useAbsolutePaths = true;
         }
 
-        Verbosity = Verbosity.Minimal;
+        Verbosity = Verbosity.Verbose;
 
         return Execute<Build>(x => x.Docs);
     }
@@ -58,10 +58,17 @@ class Build : NukeBuild {
             (ArtifactsDirectory / "coverage").CreateOrCleanDirectory();
             (ArtifactsDirectory / "tests").CreateOrCleanDirectory();
         });
-
+    Target MyTarget => _ => _
+            .Executes(async () => {
+                Console.Out.WriteLine("Hello!");
+            });
     Target Compile => _ => _
         .DependsOn(Clean).Executes(() => {
-            DotNetBuild(s => s.SetProjectFile(RootDirectory / "ExtravaWall.sln")
+            Console.WriteLine("Hello!");
+            DotNetBuild(s =>
+            s.SetProjectFile(RootDirectory / "ExtravaWall.sln")
+            .SetVerbosity(DotNetVerbosity.Detailed)
+            //.SetLoggers(new[] { "\"console;verbosity=detailed\"" })
             .SetConfiguration(Configuration));
         });
 
@@ -76,7 +83,7 @@ class Build : NukeBuild {
             var testResultsFile = ArtifactsDirectory / "tests/TestResults.trx";
             AbsolutePath.Create(testResultsFile.Parent);
             //File.Create(testResultsFile).Close();
-                    Exception? testException = null;
+            Exception? testException = null;
             try {
                 var os = Environment.OSVersion.Platform switch {
                     PlatformID.Unix => "linux",

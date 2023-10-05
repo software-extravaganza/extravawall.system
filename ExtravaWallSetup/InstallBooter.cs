@@ -8,29 +8,24 @@ using ReactiveUI;
 
 namespace ExtravaWallSetup;
 
-public class InstallBooter
-{
+public class InstallBooter {
     private Program _program;
     private ICommandRunner _commandRunner;
     private IElevator _elevator;
     private ExtravaServiceProvider _serviceProvider;
 
-    public InstallBooter(Program program, ICommandRunner commandRunner, IElevator elevator, ExtravaServiceProvider serviceProvider)
-    {
+    public InstallBooter(Program program, ICommandRunner commandRunner, IElevator elevator, ExtravaServiceProvider serviceProvider) {
         _program = program;
         _commandRunner = commandRunner;
         _elevator = elevator;
         _serviceProvider = serviceProvider;
     }
 
-    public async Task Run(string[] args)
-    {
+    public async Task Run(string[] args) {
         bool _noRoot = false;
 
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (args[i] == "--no-root")
-            {
+        for (int i = 0; i < args.Length; i++) {
+            if (args[i] == "--no-root") {
                 _noRoot = true;
                 break;
             }
@@ -40,11 +35,20 @@ public class InstallBooter
         //     File.WriteAllText(tempFile, "1");
         // }
 
-        if (HasElevatedPermissions())
-        {
+        if (HasElevatedPermissions()) {
             _program.Run(this, args);
             return;
         }
+
+
+        var result = await _commandRunner.For(CommandDescriptors.MachineName).RunAsync();
+        var result2 = await _commandRunner.For(CommandDescriptors.MachineOs).RunAsync();
+        var result3 = await _commandRunner.For(CommandDescriptors.MachineArchitecture).RunAsync();
+        var result4 = await _commandRunner.For(CommandDescriptors.MachineAll).RunAsync();
+        var result5 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).Options(o => o.Package = "neofetch").RunAsync();//.o => o.Package = "neofetch").RunAsync();
+        var result6 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).Options(o => o.Package = "tmux").RunAsync();
+        var result7 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).RunAsync();
+
 
         // var result = await _commandRunner.For<CommandMachineName>().WithNoInput.RunAsync();
         // var result2 = await _commandRunner.For<CommandMachineOs>().WithNoInput.RunAsync();
@@ -58,7 +62,7 @@ public class InstallBooter
         //             .Options(o => o.Package = "neofetch")
         //             .RunAsync();
 
-        // Console.WriteLine(result8.Result);
+        Console.WriteLine(result7.Result);
         // var elevator = new Elevator();
         // elevator.RestartAndRunElevated(() => {
         //     _program.Run(this, args);
@@ -71,15 +75,12 @@ public class InstallBooter
     }
 
 
-    private static bool HasElevatedPermissions()
-    {
+    private static bool HasElevatedPermissions() {
         return (int)Interop.geteuid() == 0;
     }
 
-    public void RestartAndRunElevated(bool noRoot, Action action)
-    {
-        if (!noRoot && !HasElevatedPermissions())
-        {
+    public void RestartAndRunElevated(bool noRoot, Action action) {
+        if (!noRoot && !HasElevatedPermissions()) {
             //var writer = Console.GetNewWriter(Color.Gray);
             System.Console.WriteLine("This application requires elevated permissions to run.");
             System.Console.WriteLine("Please enter the root password to continue.");
