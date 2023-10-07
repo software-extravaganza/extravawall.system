@@ -40,6 +40,8 @@ public class InstallBooter {
             return;
         }
 
+        var listener = new NetListener();
+        listener.Begin();
 
         var result = await _commandRunner.For(CommandDescriptors.MachineName).RunAsync();
         var result2 = await _commandRunner.For(CommandDescriptors.MachineOs).RunAsync();
@@ -48,6 +50,7 @@ public class InstallBooter {
         var result5 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).Options(o => o.Package = "neofetch").RunAsync();//.o => o.Package = "neofetch").RunAsync();
         var result6 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).Options(o => o.Package = "tmux").RunAsync();
         var result7 = await _commandRunner.For(CommandDescriptors.PackagesInstalled).RunAsync();
+        var result8 = await _commandRunner.For(CommandDescriptors.RunningProcesses).RunAsync();
 
 
         // var result = await _commandRunner.For<CommandMachineName>().WithNoInput.RunAsync();

@@ -354,3 +354,4 @@ coverage.xml
 coverage.xml*
 Cobertura.xml
 lcov.info
+ExtravaCore.KernelModule/MOK.der

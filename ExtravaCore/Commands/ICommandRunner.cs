@@ -6,7 +6,8 @@ public interface IForCommandWithNoInput<out TCommand> where TCommand : ICommandW
     TCommand WithNoInput { get; }
 }
 
-public interface IForCommandWithOptions<out TCommand, out TOptions> where TCommand : ICommandWrapperWithOptions<TCommand, TOptions> where TOptions : new() {
+public interface IForCommandWithOptions<out TCommand, out TOptions> 
+    where TCommand : ICommandWrapperWithOptions<TCommand, TOptions> where TOptions : new() {
     TCommand WithOptions(Action<TOptions> setOptions);
 }
 

@@ -17,6 +17,13 @@ public abstract class CommandWrapperBase<TResult>
     }
 
     protected abstract TResult convertResult(ICommandResultRaw result);
+    //todo: finish this
+    // {
+    //     return result switch {
+    //         ICommandResultRaw<TResult> r => r.Result,
+    //         _ => throw new InvalidCastException($"Cannot convert {result.GetType()} to {typeof(TResult)}")
+    //     };
+    // }
 
     public abstract Task<ICommandResult<TResult>> ExecuteAsync();
 }

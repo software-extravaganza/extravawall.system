@@ -15,6 +15,7 @@ namespace ExtravaCore.Commands;
 [Transient<CommandMachineArchitecture>]
 [Transient<CommandMachineAll>]
 [Transient<CommandPackagesInstalled>]
+[Transient<CommandRunningProcesses>]
 public partial class CommandServiceProvider {
     public CommandServiceProvider CommandServiceProviderFactory() => this;
 
