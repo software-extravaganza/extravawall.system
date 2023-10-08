@@ -1,4 +1,5 @@
-﻿using ExtravaWallSetup.GUI;
+﻿using ExtravaCore;
+using ExtravaWallSetup.GUI;
 using ExtravaWallSetup.Stages.Framework;
 using System;
 using System.Collections.Generic;
@@ -21,6 +22,9 @@ namespace ExtravaWallSetup.Stages.Install {
         public override bool AutoComplete => true;
 
         protected override async Task Execute() {
+            //NetListener4.Start();
+            NfqnlTest.Main();
+
             Console.GetNewWriter().WriteLine("Beginning installation...");
 
             await Task.Delay(2000);

@@ -40,8 +40,18 @@ public class InstallBooter {
             return;
         }
 
-        var listener = new NetListener();
-        listener.Begin();
+
+
+
+        // KernelInterceptor interceptor = new KernelInterceptor();
+        // interceptor.Start();
+
+
+        // Do something...
+
+        //interceptor.Stop();
+        // var listener = new NetListener();
+        // listener.Begin();
 
         var result = await _commandRunner.For(CommandDescriptors.MachineName).RunAsync();
         var result2 = await _commandRunner.For(CommandDescriptors.MachineOs).RunAsync();

@@ -20,5 +20,17 @@
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         "*.resx": "$(capture).resx, $(capture).designer.cs"
+    },
+    "files.associations": {
+        "kernel.h": "c",
+        "cstdlib": "c"
+    },
+    "cSpell.customDictionaries": {
+        "custom-dictionary-workspace": {
+            "name": "custom-dictionary-workspace",
+            "path": "${workspaceFolder:extravawall}/.cspell/custom-dictionary-workspace.txt",
+            "addWords": true,
+            "scope": "workspace"
+        }
     }
 }
