@@ -81,7 +81,7 @@ static struct device* netmodDevice = NULL;
 static struct device* netmodDeviceAck = NULL;
 static struct nf_hook_ops *nf_pre_routing_ops = NULL;
 static struct nf_hook_ops *nf_post_routing_ops = NULL;
-static wait_queue_head_t penging_packet_queue;
+static wait_queue_head_t pending_packet_queue;
 static PendingPacket pending_packets[MAX_PENDING_PACKETS];
 
 // This will be a simulation of the network packet data
@@ -152,7 +152,7 @@ static unsigned int nf_common_routing_handler(enum RoutingType type, void *priv,
         }
 
         // Wait until the packet has been processed by userspace or until timeout
-        ret = wait_event_interruptible_timeout(penging_packet_queue, pending_packets[i].processed, PACKET_PROCESSING_TIMEOUT);
+        ret = wait_event_interruptible_timeout(pending_packet_queue, pending_packets[i].processed, PACKET_PROCESSING_TIMEOUT);
 
         // Check the return value for timeout (ret == 0) or error (ret == -ERESTARTSYS)
         if (ret == 0) {
@@ -209,24 +209,38 @@ static int dev_usercomm_open(struct inode *inodep, struct file *filep){
 
 // This will send packets to userspace
 static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
+    int i;
     int error_count = 0;
-    struct PendingPacket pending_packet *packet;
+    PacketHeader header;
 
-    if (list_empty(&pending_packets_list))
-        return 0; 
+    // Find an unprocessed packet
+    for (i = 0; i < MAX_PENDING_PACKETS; i++) {
+        if (pending_packets[i].skb != NULL && !pending_packets[i].processed) {
+            header.pkt_id = i; // Using the index as an identifier
+            header.length = pending_packets[i].data_len;
 
-    PacketHeader header = {12345, skb->len}; // Sample data
-    
-    if (len < sizeof(PacketHeader) + header.length)
-        return -EINVAL;
+            // Ensure user buffer has enough space
+            if (len < sizeof(PacketHeader) + header.length)
+                return -EINVAL;
 
-    if (copy_to_user(buf, &header, sizeof(PacketHeader)))
-        return -EFAULT;
+            // Copy header to user space
+            error_count = copy_to_user(buf, &header, sizeof(PacketHeader));
+            if (error_count)
+                return -EFAULT;
 
-    if (copy_to_user(buf + sizeof(PacketHeader), packet_data, header.length))
-        return -EFAULT;
+            // Copy packet data to user space
+            error_count = copy_to_user(buf + sizeof(PacketHeader), packet_data, header.length);
+            if (error_count)
+                return -EFAULT;
 
-    return sizeof(PacketHeader) + header.length;
+            // Mark as processed to avoid resending
+            pending_packets[i].processed = true;
+
+            return sizeof(PacketHeader) + header.length;
+        }
+    }
+
+    return 0;  // No packets found
 }
 
 // This will receive directives from userspace
@@ -246,7 +260,7 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
     }
 
     // Wake up the waiting task(s)
-    wake_up_interruptible(&penging_packet_queue);
+    wake_up_interruptible(&pending_packet_queue);
     
     return sizeof(PacketDirective);
 }
@@ -351,7 +365,7 @@ static int __init nf_minifirewall_init(void) {
     }
 
     mutex_init(&netmod_mutex);
-    init_waitqueue_head(&penging_packet_queue);
+    init_waitqueue_head(&pending_packet_queue);
 
     // Error handling: if either device fails to initialize, cleanup everything and exit
     if(IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)) {
