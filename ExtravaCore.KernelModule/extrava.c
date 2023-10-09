@@ -36,34 +36,26 @@
 #include <linux/uaccess.h>
 #include <linux/mutex.h>
 
-#define DEVICE_NAME_IN "mychardev_in"
-#define DEVICE_NAME_OUT "mychardev_out"
-#define CLASS_NAME  "mychar"
-#define DEVICE_NAME "netmod_to_user"
-#define DEVICE_NAME_ACK "netmod_from_user"
-#define CLASS_NAME  "netmod"
+#define DEVICE_NAME "extrava_to_user"
+#define DEVICE_NAME_ACK "extrava_from_user"
+#define CLASS_NAME  "extrava"
+#define PACKET_PROCESSING_TIMEOUT (5 * HZ)  // 5 seconds
+#define MAX_PENDING_PACKETS 100
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Extravaganza Software");
 MODULE_DESCRIPTION("ExtravaCore Kernel Module");
 
-static int major_num_in, major_num_out;
-static struct class* char_class = NULL;
-static int    majorNumber;
-static struct class*  netmodClass  = NULL;
-static struct device* netmodDevice = NULL;
-static struct device* netmodDeviceAck = NULL;
-static wait_queue_head_t my_queue;
-
-// This will be a simulation of the network packet data
-char packet_data[512];
-
 enum RoutingType {
-    PRE_ROUTING,
-    POST_ROUTING
+    PRE_ROUTING = 0,
+    POST_ROUTING = 1
 };
 
-static DEFINE_MUTEX(netmod_mutex);
+enum RoutingDecision {
+    ACCEPT = 1,
+    DROP = 0,
+    MANIPULATE = 2
+};
 
 typedef struct {
     unsigned long pkt_id;
@@ -71,58 +63,129 @@ typedef struct {
 } PacketHeader;
 
 typedef struct {
-    unsigned long pkt_id;
-    int directive; // Let's say 1 = ACCEPT, 2 = DROP, 3 = MANIPULATE
+    unsigned long packet_index;
+    enum RoutingDecision directive; // Let's say 1 = ACCEPT, 2 = DROP, 3 = MANIPULATE
 } PacketDirective;
 
-// Callbacks for mychardev_in
-static ssize_t dev_in_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
+typedef struct {
+    struct sk_buff *skb;
+    size_t data_len; 
+    bool processed;
+    enum RoutingDecision decision;
+} PendingPacket;
 
-// Callbacks for mychardev_out
-static ssize_t dev_out_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
+static struct class* char_class = NULL;
+static int majorNumber_to_user;
+static int majorNumber_from_user;
+static struct device* netmodDevice = NULL;
+static struct device* netmodDeviceAck = NULL;
+static struct nf_hook_ops *nf_pre_routing_ops = NULL;
+static struct nf_hook_ops *nf_post_routing_ops = NULL;
+static wait_queue_head_t penging_packet_queue;
+static PendingPacket pending_packets[MAX_PENDING_PACKETS];
 
-static struct file_operations fops_in = {
-    .read = dev_in_read,
-};
+// This will be a simulation of the network packet data
+char packet_data[512];
 
-static struct file_operations fops_out = {
-    .write = dev_out_write,
-};
+
+static DEFINE_MUTEX(netmod_mutex);
 
 void to_human_readable_ip(unsigned int ip, char *buffer) {
     sprintf(buffer, "%pI4", &ip);
 }
 
-static unsigned int nf_common_routing_handler(enum RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
-{
-    struct iphdr *iph;   // IP header
-    struct udphdr *udph; // UDP header
-    char routing_str[12]; // To store "Pre" or "Post"
+PendingPacket *create_pending_packet(struct sk_buff *skb, enum RoutingDecision decision) {
+    if (!skb) return NULL;
 
-    if(!skb) return NF_ACCEPT;
+    PendingPacket *packet = kmalloc(sizeof(PendingPacket), GFP_KERNEL);
+    if (!packet) return NULL;
 
-    // Identify the type of routing
-    strcpy(routing_str, (type == PRE_ROUTING) ? "Pre" : "Post");
+    packet->data_len = skb->len; 
+    packet->data = kmalloc(packet->data_len, GFP_KERNEL);
+    if (!packet->data) {
+        kfree(packet);
+        return NULL;
+    }
 
-    iph = ip_hdr(skb); // retrieve the IP headers from the packet
-    if(iph->protocol == IPPROTO_UDP) { 
-        udph = udp_hdr(skb);
-        if(ntohs(udph->dest) == 53) {
-            return NF_ACCEPT; // accept UDP packet
+    // Copy data from skb to the packet
+    skb_copy_bits(skb, 0, packet->data, packet->data_len);
+
+    packet->processed = false;
+    packet->decision = decision;
+
+    return packet;
+}
+
+void free_pending_packet(PendingPacket *packet) {
+    if (packet) {
+        if (packet->data) {
+            kfree(packet->data);
+        }
+        kfree(packet);
+    }
+}
+
+static unsigned int nf_common_routing_handler(enum RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
+    struct iphdr *iph = ip_hdr(skb);
+    int i;
+    int ret;
+ 
+    if (iph->protocol == IPPROTO_ICMP) {
+        // Find an empty slot to store the packet
+        for (i = 0; i < MAX_PENDING_PACKETS; i++) {
+            if (pending_packets[i].skb == NULL) {
+                // Store the data from the packet in our buffer
+                size_t data_len = skb->len < sizeof(packet_data) ? skb->len : sizeof(packet_data);
+                memset(packet_data, 0, sizeof(packet_data));
+                skb_copy_bits(skb, 0, packet_data, data_len);
+                pending_packets[i].skb = skb;
+                pending_packets[i].processed = false;
+                break;
+            }
+        }
+
+        // If no slot found, drop the packet
+        if (i == MAX_PENDING_PACKETS) {
+            // 🫗 dropped packed because the buffer is filled
+            printk(KERN_INFO "🫗 Extrava dropped a packet because the packet buffer is full\n");
+            return NF_DROP;
+        }
+
+        // Wait until the packet has been processed by userspace or until timeout
+        ret = wait_event_interruptible_timeout(penging_packet_queue, pending_packets[i].processed, PACKET_PROCESSING_TIMEOUT);
+
+        // Check the return value for timeout (ret == 0) or error (ret == -ERESTARTSYS)
+        if (ret == 0) {
+            // Handle the timeout case (e.g., drop the packet)
+            pending_packets[i].skb = NULL;
+            // 🚮⏰️ Drop the packet because it timed out
+            printk(KERN_INFO "🚮⏰️ Extrava dropped a packet that timed out\n");
+            return NF_DROP;
+        } else if (ret == -ERESTARTSYS) {
+            // Handle the error case (optional: you can treat it as a timeout)
+            // 🚮⚠️ Drop the packet because of an error
+            printk(KERN_INFO "🚮⚠️ Extrava dropped a packet because of an error\n");
+            pending_packets[i].skb = NULL;
+            return NF_DROP;
+        }
+
+        // Process the packet based on the decision
+        if (pending_packets[i].decision == ACCEPT) {
+            // Release the slot and accept the packet
+            // 📨 decided to Accept the packet
+            printk(KERN_INFO "📨 Extrava decided to accepted a packet\n");
+            pending_packets[i].skb = NULL;
+            return NF_ACCEPT;
+        } else {
+            // Release the slot and drop the packet
+            // 🚮 decided to Drop the packet
+            printk(KERN_INFO "📨 Extrava decided to drop a packet\n");
+            pending_packets[i].skb = NULL;
+            return NF_DROP;
         }
     }
-    else if (iph->protocol == IPPROTO_TCP) {
-        return NF_ACCEPT; // accept TCP packet
-    }
-    else if (iph->protocol == IPPROTO_ICMP) {
-        char dip[16]; // Buffer to store human readable IP address
-        to_human_readable_ip(iph->daddr, dip);
-        char sip[16]; // Buffer to store human readable IP address
-        to_human_readable_ip(iph->saddr, sip);
-        printk(KERN_INFO "Drop ICMP packet from %s to %s (%s-routing)\n", sip, dip, routing_str);
-        return NF_DROP;
-    }
-    return NF_ACCEPT;
+
+    return NF_ACCEPT; // Default action for non-ICMP packets
 }
 
 static unsigned int nf_pre_routing_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
@@ -137,52 +200,99 @@ static unsigned int nf_post_routing_handler(void *priv, struct sk_buff *skb, con
 
 // Open function for our device
 static int dev_usercomm_open(struct inode *inodep, struct file *filep){
-   if(!mutex_trylock(&netmod_mutex)){
-      printk(KERN_ALERT "Netmod: Device used by another process");
-      return -EBUSY;
-   }
+//    if(!mutex_trylock(&netmod_mutex)){
+//       printk(KERN_ALERT "Netmod: Device used by another process");
+//       return -EBUSY;
+//    }
    return 0;
 }
 
 // This will send packets to userspace
-static ssize_t dev_usercomm_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
-   PacketHeader header = {12345, sizeof(packet_data)}; // Sample data
-   copy_to_user(buffer, &header, sizeof(PacketHeader));
-   copy_to_user(buffer + sizeof(PacketHeader), packet_data, sizeof(packet_data));
-   return sizeof(PacketHeader) + sizeof(packet_data);
+static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
+    int error_count = 0;
+    struct PendingPacket pending_packet *packet;
+
+    if (list_empty(&pending_packets_list))
+        return 0; 
+
+    PacketHeader header = {12345, skb->len}; // Sample data
+    
+    if (len < sizeof(PacketHeader) + header.length)
+        return -EINVAL;
+
+    if (copy_to_user(buf, &header, sizeof(PacketHeader)))
+        return -EFAULT;
+
+    if (copy_to_user(buf + sizeof(PacketHeader), packet_data, header.length))
+        return -EFAULT;
+
+    return sizeof(PacketHeader) + header.length;
 }
 
 // This will receive directives from userspace
-static ssize_t dev_usercomm_write(struct file *filep, const char *buffer, size_t len, loff_t *offset){
-   PacketDirective directive;
-   copy_from_user(&directive, buffer, sizeof(PacketDirective));
+static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
+    PacketDirective directive;
+    
+    if (len < sizeof(PacketDirective))
+        return -EINVAL;
 
-   if(directive.directive == 1) {
-      // ACCEPT logic here
-   } else if(directive.directive == 2) {
-      // DROP logic here
-   } else if(directive.directive == 3) {
-      // MANIPULATE logic here
-   }
+    if (copy_from_user(&directive, buffer, sizeof(PacketDirective)))
+        return -EFAULT;
 
-   return sizeof(PacketDirective);
+    // Assuming directive.packet_index contains the index of the packet in our "database"
+    if (directive.packet_index >= 0 && directive.packet_index < MAX_PENDING_PACKETS) {
+        pending_packets[directive.packet_index].decision = directive.directive;
+        pending_packets[directive.packet_index].processed = true;
+    }
+
+    // Wake up the waiting task(s)
+    wake_up_interruptible(&penging_packet_queue);
+    
+    return sizeof(PacketDirective);
 }
 
 static int dev_usercomm_release(struct inode *inodep, struct file *filep){
-   mutex_unlock(&netmod_mutex);
+   //mutex_unlock(&netmod_mutex);
    return 0;
 }
 
-static struct file_operations fops = {
+static struct file_operations fops_netmod_to_user = {
    .open = dev_usercomm_open,
    .read = dev_usercomm_read,
+   .release = dev_usercomm_release,
+};
+
+static struct file_operations fops_netmod_from_user = {
+   .open = dev_usercomm_open,
    .write = dev_usercomm_write,
    .release = dev_usercomm_release,
 };
 
+
+static void cleanup_user_space_comm(void) {
+    mutex_destroy(&netmod_mutex); 
+    device_destroy(char_class, MKDEV(majorNumber_to_user, 0));
+    device_destroy(char_class, MKDEV(majorNumber_from_user, 0));
+    class_unregister(char_class);
+    class_destroy(char_class);
+    unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+    unregister_chrdev(majorNumber_from_user, DEVICE_NAME_ACK);
+}
+
+static void cleanup_netfilter_hooks(void) {
+    if(nf_pre_routing_ops != NULL) {
+		nf_unregister_net_hook(&init_net, nf_pre_routing_ops);
+		kfree(nf_pre_routing_ops);
+	}
+
+    if(nf_post_routing_ops != NULL) {
+		nf_unregister_net_hook(&init_net, nf_post_routing_ops);
+		kfree(nf_post_routing_ops);
+	}
+}
+
 // In mini-firewall.c 
-static struct nf_hook_ops *nf_pre_routing_ops = NULL;
-static struct nf_hook_ops *nf_post_routing_ops = NULL;
+
 static int __init nf_minifirewall_init(void) {
     printk(KERN_INFO "Extrava module initializing ⌛️\n");
 
@@ -209,55 +319,55 @@ static int __init nf_minifirewall_init(void) {
     }
 
     // Register devices for user space communication
-    majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
-    if (majorNumber<0){
-        printk(KERN_ALERT "Netmod failed to register a major number\n");
-        return majorNumber;
+    majorNumber_to_user = register_chrdev(0, DEVICE_NAME, &fops_netmod_to_user);
+    if (majorNumber_to_user<0){
+        printk(KERN_ALERT "Netmod_to_user failed to register a major number\n");
+        return majorNumber_to_user;
     }
 
-    netmodClass = class_create(CLASS_NAME);
-    if (IS_ERR(netmodClass)){
-        unregister_chrdev(majorNumber, DEVICE_NAME);
-        printk(KERN_ALERT "Failed to register device class\n");
-        return PTR_ERR(netmodClass);
+    majorNumber_from_user = register_chrdev(0, DEVICE_NAME_ACK, &fops_netmod_from_user);
+    if (majorNumber_from_user<0){
+        printk(KERN_ALERT "Netmod_from_user failed to register a major number\n");
+        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+        return majorNumber_from_user;
     }
 
-    netmodDevice = device_create(netmodClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-    netmodDeviceAck = device_create(netmodClass, NULL, MKDEV(majorNumber, 1), NULL, DEVICE_NAME_ACK);
-    if (IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)){
-        class_destroy(netmodClass);
-        unregister_chrdev(majorNumber, DEVICE_NAME);
-        printk(KERN_ALERT "Failed to create the device\n");
-        return PTR_ERR(netmodDevice);
+    char_class = class_create(CLASS_NAME);
+    if (IS_ERR(char_class)){
+        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+        unregister_chrdev(majorNumber_from_user, DEVICE_NAME);
+        printk(KERN_ALERT "Failed to register device class 'in'\n");
+        return PTR_ERR(char_class);
+    }
+
+    netmodDevice = device_create(char_class, NULL, MKDEV(majorNumber_to_user, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(netmodDevice)){
+        printk(KERN_ALERT "Failed to create the 'in' device\n");
+    }
+
+    netmodDeviceAck = device_create(char_class, NULL, MKDEV(majorNumber_from_user, 0), NULL, DEVICE_NAME_ACK);
+    if (IS_ERR(netmodDeviceAck)){
+        printk(KERN_ALERT "Failed to create the 'out' device\n");
     }
 
     mutex_init(&netmod_mutex);
-    init_waitqueue_head(&my_queue);
+    init_waitqueue_head(&penging_packet_queue);
 
+    // Error handling: if either device fails to initialize, cleanup everything and exit
+    if(IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)) {
+        cleanup_user_space_comm();
+        cleanup_netfilter_hooks();
+        return -1;  // Or any other appropriate error code
+    }
+    
     printk(KERN_INFO "Extrava module loaded ✔️\n");
 	return 0;
 }
 
 static void __exit nf_minifirewall_exit(void) {
     printk(KERN_INFO "Extrava module exiting ⌛️\n");
-    // clean up devices for user space communication
-    mutex_destroy(&netmod_mutex); 
-    device_destroy(netmodClass, MKDEV(majorNumber, 0));
-    device_destroy(netmodClass, MKDEV(majorNumber, 1));
-    class_unregister(netmodClass);
-    class_destroy(netmodClass);
-    unregister_chrdev(majorNumber, DEVICE_NAME);
-
-    // clean up netfilter hooks
-	if(nf_pre_routing_ops != NULL) {
-		nf_unregister_net_hook(&init_net, nf_pre_routing_ops);
-		kfree(nf_pre_routing_ops);
-	}
-
-    if(nf_post_routing_ops != NULL) {
-		nf_unregister_net_hook(&init_net, nf_post_routing_ops);
-		kfree(nf_post_routing_ops);
-	}
+    cleanup_user_space_comm();
+    cleanup_netfilter_hooks();
 	printk(KERN_INFO "Extrava module unloaded 🛑\n");
 }
 

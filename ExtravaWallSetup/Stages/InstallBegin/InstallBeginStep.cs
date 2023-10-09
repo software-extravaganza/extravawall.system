@@ -23,7 +23,8 @@ namespace ExtravaWallSetup.Stages.Install {
 
         protected override async Task Execute() {
             //NetListener4.Start();
-            NfqnlTest.Main();
+            //NfqnlTest.Main();
+            KernelClient.Start();
 
             Console.GetNewWriter().WriteLine("Beginning installation...");
 

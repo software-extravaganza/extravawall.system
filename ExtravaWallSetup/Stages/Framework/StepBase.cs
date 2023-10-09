@@ -24,7 +24,7 @@ namespace ExtravaWallSetup.Stages.Framework {
                 IsExecuting = true;
                 Install.AddOrUpdateSystemInfo("Install Stage", Name);
                 await Execute();
-            } catch {
+            } catch (Exception ex) {
                 //todo: handle exception
             } finally {
                 if (AutoComplete) {

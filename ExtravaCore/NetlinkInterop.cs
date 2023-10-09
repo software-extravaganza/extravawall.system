@@ -552,28 +552,33 @@ public struct nfqnl_msg_packet_hdr {
 }
 
 public class KernelClient {
-    public void Start() {
-        using (FileStream fsRead = new FileStream("/dev/netmod_to_user", FileMode.Open))
-        using (FileStream fsAck = new FileStream("/dev/netmod_from_user", FileMode.Open)) {
-            while (true) {
-                byte[] headerData = new byte[sizeof(long) + sizeof(int)]; // Assuming 64-bit kernel
-                fsRead.Read(headerData, 0, headerData.Length);
+    public static void Start() {
+        try {
+            using (FileStream fsRead = new FileStream("/dev/extrava_to_user", FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (FileStream fsAck = new FileStream("/dev/extrava_from_user", FileMode.Open, FileAccess.Write, FileShare.ReadWrite)) {
+                while (true) {
+                    byte[] headerData = new byte[sizeof(long) + sizeof(int)]; // Assuming 64-bit kernel
+                    fsRead.Read(headerData, 0, headerData.Length);
 
-                long pktId = BitConverter.ToInt64(headerData, 0);
-                int pktLength = BitConverter.ToInt32(headerData, sizeof(long));
+                    long pktId = BitConverter.ToInt64(headerData, 0);
+                    int pktLength = BitConverter.ToInt32(headerData, sizeof(long));
 
-                byte[] packetData = new byte[pktLength];
-                fsRead.Read(packetData, 0, pktLength);
+                    byte[] packetData = new byte[pktLength];
+                    fsRead.Read(packetData, 0, pktLength);
 
-                // Inspect the packetData as needed
+                    // Inspect the packetData as needed
 
-                // Send back a directive
-                byte[] directiveData = new byte[sizeof(long) + sizeof(int)];
-                BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
-                BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
-                fsAck.Write(directiveData, 0, directiveData.Length);
+                    // Send back a directive
+                    byte[] directiveData = new byte[sizeof(long) + sizeof(int)];
+                    BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
+                    BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
+                    fsAck.Write(directiveData, 0, directiveData.Length);
+                }
             }
+        } catch (Exception ex) {
+            Console.WriteLine("Error: " + ex.Message);
         }
+
     }
 
 }

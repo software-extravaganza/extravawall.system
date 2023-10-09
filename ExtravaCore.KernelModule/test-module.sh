@@ -18,7 +18,17 @@ PARENT_DIR="$(dirname "$CURRENT_DIR")"
 LOGS_DIR="$CURRENT_DIR/logs"
 LOGS_FILE_RUN_TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
 
-pgrep ExtravaWallSetup | xargs kill -9
+# Find the process IDs of ExtravaWallSetup
+pids=$(ps aux | grep ExtravaWallSetup | awk '{print $2}')
+
+if [ -z "$pids" ]; then
+  echo "No processes found" | tee "$TEE_DEST"
+fi
+
+# Kill the processes
+#echo "$pids" | xargs kill -9
+
+echo "Processes killed successfully" | tee "$TEE_DEST"
 
 cd "$CURRENT_DIR" || exit 1
 mkdir -p "$LOGS_DIR"
@@ -26,7 +36,7 @@ gcc -shared -o libnetlink.so libnetlink.c -fPIC
 make clean
 make
 cd "$PARENT_DIR" || exit 1
-./build.sh compile
+#./build.sh compile > /dev/null
 cd "$CURRENT_DIR" || exit 1
 
 {
@@ -46,8 +56,8 @@ cd "$CURRENT_DIR" || exit 1
 {
   echo "Starting ExtravaWallSetup in 10 seconds" | tee "$TEE_DEST"
   sleep 10
-  cd "$PARENT_DIR"/ExtravaWallSetup || exit 1
-  dotnet run > /dev/null 2>&1 &
+  cd "$PARENT_DIR"/ExtravaWallSetup|| exit 1
+  #dotnet run -- --no-root > /dev/null 2>&1 &
   echo "Started ExtravaWallSetup" | tee "$TEE_DEST"
 } &
 
@@ -59,8 +69,8 @@ cd "$CURRENT_DIR" || exit 1
 } &
 
 {
-  echo "Stopping Extrava Kernel Module in 30 seconds" | tee "$TEE_DEST"
-  sleep 30
+  echo "Stopping Extrava Kernel Module in 60 seconds" | tee "$TEE_DEST"
+  sleep 60
   rmmod extrava | tee "$TEE_DEST"
   echo "Stopped Extrava Kernel Module" | tee "$TEE_DEST"
 } &

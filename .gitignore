@@ -364,3 +364,4 @@ ExtravaCore.KernelModule/*.symvers
 ExtravaCore.KernelModule/*.order
 ExtravaCore.KernelModule/*.unsigned
 ExtravaCore.KernelModule/*.signed
+ExtravaCore.KernelModule/.*.o.d
