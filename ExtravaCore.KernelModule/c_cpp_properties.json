@@ -10,6 +10,8 @@
         {
             "name": "Linux",
             "includePath": [
+                "/lib/modules/$(uname -r)/build/include",
+                "/usr/src/kernels/$(uname -r)/include",
                 "/usr/src/linux-headers-$(uname -r)/include",
                 "${myDefaultIncludePath}"
             ],
@@ -28,7 +30,7 @@
             "compilerPath": "C:/MinGW/bin/gcc.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "gcc-x64"
+            "intelliSenseMode": "msvc-x64"
         },
         {
             "name": "Mac",

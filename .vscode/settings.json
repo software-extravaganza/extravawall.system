@@ -23,7 +23,13 @@
     },
     "files.associations": {
         "kernel.h": "c",
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "string.h": "c",
+        "data_structures.h": "c",
+        "logger.h": "c",
+        "packet_queue.h": "c",
+        "netfilter_hooks.h": "c",
+        "skbuff.h": "c"
     },
     "cSpell.customDictionaries": {
         "custom-dictionary-workspace": {
