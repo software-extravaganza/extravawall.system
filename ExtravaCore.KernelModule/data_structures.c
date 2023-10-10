@@ -44,6 +44,8 @@ PacketHeader* create_packet_header(unsigned int version, size_t data_length) {
         return NULL;
     }
 
+    LOG_DEBUG("Successfully created packet header.");
+    
     header->version = version;
     header->data_length = data_length;
 
@@ -74,30 +76,36 @@ void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip) {
  */
 PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
     if (!skb) {
-        LOG_ERR("Null socket buffer (skb) provided to create_pending_packetTrip.");
+        LOG_DEBUG("Null socket buffer (skb) provided.");
         return NULL;
     }
 
     PendingPacketRoundTrip *packetTrip = kzalloc(sizeof(PendingPacketRoundTrip), GFP_KERNEL);
     if (!packetTrip) {
-        LOG_ERR("Failed to allocate memory for PendingPacketRoundTrip.");
+        LOG_DEBUG("Failed to allocate memory for PendingPacketRoundTrip.");
         return NULL;
     }
 
     packetTrip->decision = UNDECIDED;
+    
+    LOG_DEBUG("About to create main packet.");
     packetTrip->packet = create_pending_packet(skb);
     if (!packetTrip->packet) {
+        LOG_DEBUG("Failed to create packet.");
         kfree(packetTrip);
         return NULL;
     }
 
+    LOG_DEBUG("About to create response packet.");
     packetTrip->responsePacket = create_pending_packet(NULL);
     if (!packetTrip->responsePacket) {
+        LOG_DEBUG("Failed to create response packet.");
         free_pending_packet(packetTrip->packet); // freeing the previously allocated packet
         kfree(packetTrip);
         return NULL;
     }
 
+    LOG_DEBUG("Successfully created PendingPacketRoundTrip.");
     return packetTrip;
 }
 
@@ -109,7 +117,8 @@ void free_pending_packet(PendingPacket *packet) {
         return;
 
     if (packet->data) {
-        conditional_memory_zero(packet->data, packet->header->data_length); // Clear the memory
+        size_t data_length = packet->header ? packet->header->data_length : 0;
+        conditional_memory_zero(packet->data, data_length); 
         kfree(packet->data);
     }
 
@@ -121,6 +130,7 @@ void free_pending_packet(PendingPacket *packet) {
     kfree(packet);
 }
 
+
 /* 
  * Creates and returns a new pending packet 
  */
@@ -131,11 +141,12 @@ PendingPacket* create_pending_packet(struct sk_buff *skb) {
         return NULL;
     }
 
-    packet->header = create_packet_header(PACKET_HEADER_VERSION, skb->len);
+    packet->header = create_packet_header(PACKET_HEADER_VERSION, skb ? skb->len : 0);
     if (!packet->header || !add_data_to_packet(packet, skb)) {
         free_pending_packet(packet);
         return NULL;
     }
+
     packet->headerProcessed = false;
     packet->dataProcessed = false;
 
@@ -143,34 +154,60 @@ PendingPacket* create_pending_packet(struct sk_buff *skb) {
 }
 
 bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb){
-    if (!packet || !packet->header || !skb) {
+    if (!packet || !packet->header) {
         LOG_ERR("Failed to add data to packet due to NULL arguments.");
         return false;
     }
 
-    size_t new_data_length = skb ? skb->len : 0;
+    if (!skb) {
+        LOG_DEBUG("No skb provided. Skipping data addition.");
+        return true;
+    }
+
+    size_t new_data_length = skb->len;
+    
+    // Check if previously allocated data is of a different size
     if (packet->data && packet->header->data_length != new_data_length) {
         conditional_memory_zero(packet->data, packet->header->data_length);
         kfree(packet->data);
         packet->data = NULL;
     }
     
+    // Allocate memory for packet data if not already done
     if (!packet->data) {
         packet->data = kmalloc(new_data_length, GFP_KERNEL);
         if (!packet->data) {
             LOG_ERR("Failed to allocate memory for packet data.");
             return false;
         }
+        LOG_DEBUG("Allocated memory for packet data.");
+    } else {
+        LOG_DEBUG("Memory already allocated for packet data.");
     }
 
-    if (skb) {
-        skb_copy_bits(skb, 0, packet->data, new_data_length);
+    // Sanity checks before copying data
+    if (!packet->data) {
+        LOG_ERR("Unexpected error: packet->data is NULL after allocation.");
+        return false;
     }
+
+    if (!skb->data) {
+        LOG_ERR("Unexpected error: skb->data is NULL.");
+        return false;
+    }
+
+    LOG_DEBUG("About to copy data from skb to packet.");
+    
+    // Copying data from skb to packet
+    skb_copy_bits(skb, 0, packet->data, new_data_length);
+    LOG_DEBUG("Successfully copied data from skb to packet.");
     
     packet->header->data_length = new_data_length;
 
     return true;
 }
+
+
 
 /* 
  * Converts an IP address to a human-readable format and stores it in the provided buffer 

@@ -16,7 +16,7 @@ typedef struct {
 bool pq_add_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
 bool pq_remove_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
 PendingPacketRoundTrip* pq_peek_packetTrip(PacketQueue *queue);
-PendingPacketRoundTrip* pq_pop_packet(PacketQueue *queue);
+PendingPacketRoundTrip* pq_pop_packetTrip(PacketQueue *queue);
 void pq_initialize(PacketQueue *queue);
 bool pq_is_full(PacketQueue *queue);
 bool pq_is_empty(PacketQueue *queue);

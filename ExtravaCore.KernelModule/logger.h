@@ -3,19 +3,15 @@
 
 #include <linux/kernel.h>
 
-#define LOG_ERR(fmt, ...) \
-    printk(KERN_ERR "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+extern int log_level;
 
-#define LOG_INFO(fmt, ...) \
-    printk(KERN_INFO "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_BASE(level, kern_level, fmt, ...) \
+    if (log_level <= level) printk(kern_level "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
 
-#define LOG_ALERT(fmt, ...) \
-    printk(KERN_ALERT "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
-
-#define LOG_WARN(fmt, ...) \
-    printk(KERN_WARNING "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
-
-#define LOG_DBG(fmt, ...) \
-    printk(KERN_DEBUG "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) LOG_BASE(0, KERN_DEBUG, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...)  LOG_BASE(1, KERN_INFO, fmt, ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...)   LOG_BASE(2, KERN_ERR, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...)  LOG_BASE(3, KERN_WARNING, fmt, ##__VA_ARGS__)
+#define LOG_ALERT(fmt, ...) LOG_BASE(4, KERN_ALERT, fmt, ##__VA_ARGS__)
 
 #endif // LOGGER_H

@@ -1,3 +1,12 @@
+#include <linux/module.h>
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Extravaganza Software");
+MODULE_DESCRIPTION("ExtravaCore Kernel Module");
+MODULE_VERSION("0.1");
+
+int log_level = 1;
+
 // Make sure you have linux-headers installed on your system
 // Fedora Silverblue: sudo rpm-ostree install kernel-devel-$(uname -r) --apply-live
 //      toolbox enter
@@ -17,16 +26,11 @@
 // Fedora Workstation: sudo dnf install kernel-devel-$(uname -r) make
 // Red Hat Enterprise Linux & CentOS: sudo yum install kernel-devel-$(uname -r)
 // Debian & Ubuntu: sudo apt install linux-headers-$(uname -r)
-#include <linux/module.h>
 #include <linux/kernel.h>
 #include "logger.h"
 #include "netfilter_hooks.h"
 #include "userspace_comm.h"
 
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Extravaganza Software");
-MODULE_DESCRIPTION("ExtravaCore Kernel Module");
 
 
 // This will be a simulation of the network packet data
