@@ -12,4 +12,10 @@
 #define LOG_ALERT(fmt, ...) \
     printk(KERN_ALERT "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
 
+#define LOG_WARN(fmt, ...) \
+    printk(KERN_WARNING "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+
+#define LOG_DBG(fmt, ...) \
+    printk(KERN_DEBUG "[%s:%d] " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+
 #endif // LOGGER_H

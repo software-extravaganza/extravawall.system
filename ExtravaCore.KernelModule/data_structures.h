@@ -19,7 +19,8 @@ typedef enum {
 } RoutingDecision;
 
 typedef enum {
-    MEMORY_FAILURE,
+    MEMORY_FAILURE_PACKET,
+    MEMORY_FAILURE_PACKET_HEADER,
     BUFFER_FULL,
     TIMEOUT,
     ERROR,
@@ -29,31 +30,41 @@ typedef enum {
 
 typedef struct {
     DecisionReason reason;        // Code to represent the reason
-    const char* text; // Description of the reason
+    char* text; // Description of the reason
 } DecisionReasonInfo;
 
 /* Packet Header structure */
 typedef struct {
-    unsigned long pkt_id;
-    size_t length;
+    int version;
+    int data_length;
 } PacketHeader;
 
 /* Pending Packet structure */
 typedef struct {
     struct sk_buff *skb;
-    size_t data_len;
-    bool processed;
-    RoutingDecision decision;
+    bool dataProcessed;
+    bool headerProcessed;
     void *data;
+    PacketHeader *header;
 } PendingPacket;
+
+typedef struct {
+    PendingPacket *packet;
+    PendingPacket *responsePacket;
+    RoutingDecision decision;
+} PendingPacketRoundTrip;
 
 /* Function Declarations */
 void conditional_memory_zero(void* ptr, size_t size);
+PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb);
+void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip);
 PendingPacket* create_pending_packet(struct sk_buff *skb);
 void free_pending_packet(PendingPacket *packet);
-PacketHeader* create_packet_header(unsigned long pkt_id, size_t length);
+PacketHeader* create_packet_header(unsigned int version, size_t data_length);
 void free_packet_header(PacketHeader *header);
+bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb);
 void to_human_readable_ip(const unsigned int ip, char *buffer, size_t buf_len);
 char* get_reason_text(DecisionReason reason);
+void int_to_bytes(int value, unsigned char bytes[4]);
 
 #endif // DATA_STRUCTURES

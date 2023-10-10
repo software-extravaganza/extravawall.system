@@ -58,11 +58,10 @@ static inline void handle_packet_decision(PendingPacket *packet, RoutingDecision
     pq_pop_packet(&pending_packets_queue);
     unlock_pending_packets();
     free_pending_packet(packet);
-
     // Construct the log message using the provided decision and reason
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "%s%s Extrava", decision_icons[decision], get_reason_text(reason));
-    //LOG_INFO(log_msg);
+    LOG_INFO("%s", log_msg);
 }
 
 static unsigned int nf_common_routing_handler(RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
@@ -71,36 +70,47 @@ static unsigned int nf_common_routing_handler(RoutingType type, void *priv, stru
     if (iph->protocol != IPPROTO_ICMP)
         return NF_ACCEPT;
 
+    LOG_INFO("ICMP packet received.");
     // Attempt to add the packet to the queue
-    PendingPacket *packet = create_pending_packet(skb);
-    if (!packet) {
-        handle_packet_decision(NULL, DROP, MEMORY_FAILURE);
+    PendingPacketRoundTrip *packetTrip = create_pending_packetTrip(skb);
+    if (!packetTrip) {
+        // This condition might occur if there's a memory allocation failure.
+        handle_packet_decision(NULL, DROP, MEMORY_FAILURE_PACKET);
+        return NF_DROP;
+    }
+
+    if (!packetTrip->packet || !packetTrip->packet->header) {
+        // Either the packet itself or its header failed to be created.
+        // This can also be due to memory allocation failures.
+        if (packetTrip->packet) {
+            free_pending_packet(packetTrip->packet);  // Ensure we don't leak memory.
+        }
+        handle_packet_decision(NULL, DROP, MEMORY_FAILURE_PACKET_HEADER);
         return NF_DROP;
     }
 
     lock_pending_packets();
-    bool added = pq_add_packet(&pending_packets_queue, packet);
+    bool added = pq_add_packetTrip(&pending_packets_queue, packetTrip);
     unlock_pending_packets();
     if (!added) {
-        handle_packet_decision(packet, DROP, BUFFER_FULL);
+        handle_packet_decision(packetTrip->packet, DROP, BUFFER_FULL);
         return NF_DROP;
     }
     
     complete(&queue_item_added);
-    int ret = wait_event_interruptible_timeout(pending_packets_queue.waitQueue, packet->processed, PACKET_PROCESSING_TIMEOUT);
-
+    int ret = wait_event_interruptible_timeout(pending_packets_queue.waitQueue, packetTrip->packet->headerProcessed && packetTrip->packet->dataProcessed && packetTrip->responsePacket->headerProcessed && packetTrip->responsePacket->dataProcessed, PACKET_PROCESSING_TIMEOUT);
     if (ret <= 0) {
         DecisionReason reason = (ret == 0) ? TIMEOUT : ERROR;
-        handle_packet_decision(packet, DROP, reason);
+        handle_packet_decision(packetTrip->packet, DROP, reason);
         return NF_DROP;
     }
 
     // Process packet based on decision
-    if (packet->decision == ACCEPT) {
-        handle_packet_decision(packet, ACCEPT, USER_ACCEPT);
+    if (packetTrip->decision == ACCEPT) {
+        handle_packet_decision(packetTrip->packet, ACCEPT, USER_ACCEPT);
         return NF_ACCEPT;
     } else {
-        handle_packet_decision(packet, DROP, USER_DROP);
+        handle_packet_decision(packetTrip->packet, DROP, USER_DROP);
         return NF_DROP;
     }
 }
@@ -140,7 +150,7 @@ static struct nf_hook_ops* setup_individual_hook(nf_hookfn *handler, unsigned in
 
 
 void setup_netfilter_hooks(void) {
-    // Initialize the packet queue
+     // Initialize the packet queue
     pq_initialize(&pending_packets_queue);
     queue_processor_thread = kthread_run(queue_processor_fn, NULL, "queue_processor_thread");
     if (IS_ERR(queue_processor_thread)) {
@@ -151,6 +161,7 @@ void setup_netfilter_hooks(void) {
     nf_pre_routing_ops = setup_individual_hook((nf_hookfn*)nf_pre_routing_handler, NF_INET_PRE_ROUTING);
     if (!nf_pre_routing_ops) {
         LOG_ERR("Failed to set up pre-routing hook.");
+        // If the pre-routing hook setup fails, we should halt further setup to prevent potential issues.
         return;
     }
 

@@ -15,7 +15,6 @@
 #define CLASS_NAME  "extrava"
 
 static DEFINE_MUTEX(netmod_mutex);
-static char proc_data[BUF_SIZE];
 static struct class* char_class = NULL;
 static int majorNumber_to_user;
 static int majorNumber_from_user;
@@ -36,48 +35,89 @@ static int dev_usercomm_open(struct inode *inodep, struct file *filep){
 // This will send packets to userspace
 static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
     int error_count = 0;
-    PacketHeader header;
-    PendingPacket *packet;
-
-    // Try to fetch a packet from globalQueue
+    PendingPacketRoundTrip *packetTrip;
+LOG_INFO("DEBUG 12");
+    // Try to fetch a packetTrip from globalQueue
     //todo: lock internally on queue?
-    packet =  pq_peek_packet(globalQueue);
+    packetTrip =  pq_peek_packetTrip(globalQueue);
 
-    while (!packet) {
+    while (!packetTrip || !packetTrip->packet) {
         if (filep->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
-        if (wait_event_interruptible(pending_packet_queue, (packet =  pq_peek_packet(globalQueue))))
+        if (wait_event_interruptible(pending_packet_queue, (packetTrip = pq_peek_packetTrip(globalQueue))))
             return -ERESTARTSYS; // Signal received, stop waiting
     }
 
-    header.length = packet->data_len;
+LOG_INFO("DEBUG 13");
+    if(!packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
+        LOG_INFO("DEBUG 14");
+        // Ensure user buffer has enough space
+        if (len < sizeof(PacketHeader)) {
+            LOG_ERR("User buffer is too small to hold packetTrip header %d < %d", (int)len, (int)sizeof(PacketHeader));
+            return -EINVAL;
+        }
 
-    // Ensure user buffer has enough space
-    if (len < sizeof(PacketHeader) + header.length) {
-        LOG_ERR("User buffer is too small to hold packet");
-        return -EINVAL;
+        // Copy header to user space
+        LOG_INFO("Sending packetTrip header to user space %d bytes; Version: %d; Length: %d", (int)sizeof(PacketHeader), packetTrip->packet->header->version, packetTrip->packet->header->data_length);
+        unsigned char headerVersion[sizeof(int)];
+        int_to_bytes(packetTrip->packet->header->version, headerVersion);
+
+        unsigned char headerLength[sizeof(int)];
+        int_to_bytes(packetTrip->packet->header->data_length, headerVersion);
+
+        unsigned char headerPayload[sizeof(int)*2];
+        memcpy(headerPayload, headerVersion, sizeof(int));
+        memcpy(headerPayload + sizeof(int), headerLength, sizeof(int));
+
+        error_count = copy_to_user(buf, headerPayload, sizeof(int)*2);
+        if (error_count){
+            LOG_ERR("Failed to copy packetTrip header to user space");
+            return -EFAULT;
+        }
+
+        packetTrip->packet->headerProcessed = true;
+        return sizeof(PacketHeader);
     }
+    else if(packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
+        LOG_INFO("DEBUG 15");
+        if (len < packetTrip->packet->header->data_length) {
+            LOG_ERR("User buffer is too small to hold packetTrip data %d < %d", len, packetTrip->packet->header->data_length);
+            return -EINVAL;
+        }
 
-    // Copy header to user space
-    error_count = copy_to_user(buf, &header, sizeof(PacketHeader));
-    if (error_count){
-        LOG_ERR("Failed to copy packet header to user space");
+        // Copy packetTrip data to user space
+        //error_count = copy_to_user(buf + sizeof(packetTrip->data), packetTrip->data, header.length);
+        error_count = copy_to_user(buf, packetTrip->packet->data, packetTrip->packet->header->data_length);
+        if (error_count){
+            LOG_ERR("Failed to copy packetTrip data to user space");
+            return -EFAULT;
+        }
+
+        packetTrip->packet->dataProcessed = true;
+        return packetTrip->packet->header->data_length;
+    }
+    else if(packetTrip->packet->headerProcessed && packetTrip->packet->dataProcessed){
+        LOG_WARN("Packet was already processed");
+    }
+    else{
+        LOG_ERR("Packet is in an invalid state");
         return -EFAULT;
+
     }
 
-    // Copy packet data to user space
-    error_count = copy_to_user(buf + sizeof(PacketHeader), packet->data, header.length);
-    if (error_count){
-        LOG_ERR("Failed to copy packet data to user space");
-        return -EFAULT;
-    }
-
-    return sizeof(PacketHeader) + header.length;
+    return 0;
 }
 
 // This will receive directives from userspace
 static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
+    PendingPacketRoundTrip *packetTrip;
+LOG_INFO("DEBUG 16");
+    // Try to fetch a packetTrip from globalQueue
+    //todo: lock internally on queue?
+    packetTrip =  pq_peek_packetTrip(globalQueue);
+    
+    
     RoutingDecision decision;
 
     if (len < sizeof(RoutingDecision))
@@ -87,8 +127,8 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
         return -EFAULT;
 
     // Process the decision
-    // For example, if you have a decision to drop a packet, remove it from the queue
-    // Use the decision.packet_index or other identifiers to locate the packet
+    // For example, if you have a decision to drop a packetTrip, remove it from the queue
+    // Use the decision.packet_index or other identifiers to locate the packetTrip
 
     // Wake up the waiting task(s)
     wake_up_interruptible(&pending_packet_queue);

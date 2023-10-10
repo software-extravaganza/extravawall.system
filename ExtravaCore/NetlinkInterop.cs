@@ -1,3 +1,4 @@
+using System.Buffers;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -552,31 +553,62 @@ public struct nfqnl_msg_packet_hdr {
 }
 
 public class KernelClient {
+
+
     public static void Start() {
-        try {
-            using (FileStream fsRead = new FileStream("/dev/extrava_to_user", FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (FileStream fsAck = new FileStream("/dev/extrava_from_user", FileMode.Open, FileAccess.Write, FileShare.ReadWrite)) {
+        const int intSize = sizeof(int);
+        while (true) {
+            try {
+                using FileStream fsRead = new FileStream("/dev/extrava_to_user", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using FileStream fsAck = new FileStream("/dev/extrava_from_user", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+                //using MemoryStream readMem = new MemoryStream();
                 while (true) {
-                    byte[] headerData = new byte[sizeof(long) + sizeof(int)]; // Assuming 64-bit kernel
+                    //fsRead.CopyTo(readMem);
+                    //Span<byte> readStream = new Span<byte>(readMem.GetBuffer());
+
+                    //Span<byte> headerSpan = stackalloc byte[intSize + intSize];
+                    byte[] headerData = new byte[intSize * 2]; // Assuming 64-bit kernel
                     fsRead.Read(headerData, 0, headerData.Length);
+                    Span<byte> headerSpan = headerData.AsSpan().Slice(0, headerData.Length);
+                    if (BitConverter.IsLittleEndian) {
+                        headerSpan.Reverse();
+                    }
 
-                    long pktId = BitConverter.ToInt64(headerData, 0);
-                    int pktLength = BitConverter.ToInt32(headerData, sizeof(long));
+                    int version = BitConverter.ToInt32(headerSpan.Slice(0, intSize));
+                    int dataLength = BitConverter.ToInt32(headerSpan.Slice(intSize, intSize));
 
-                    byte[] packetData = new byte[pktLength];
-                    fsRead.Read(packetData, 0, pktLength);
+                    byte[] packetData = new byte[dataLength];
+                    fsRead.Read(packetData, 0, dataLength);
 
                     // Inspect the packetData as needed
 
-                    // Send back a directive
-                    byte[] directiveData = new byte[sizeof(long) + sizeof(int)];
-                    BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
-                    BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
-                    fsAck.Write(directiveData, 0, directiveData.Length);
+                    //Convert bytes to string
+                    string str = Encoding.UTF8.GetString(packetData);
+                    Console.WriteLine(str);
+                    // // Send back a directive
+                    byte[] responseHeader = new byte[intSize * 2];
+                    //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
+                    //BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
+                    var responseVersionBytes = BitConverter.GetBytes(1);
+                    var responseDataBytes = BitConverter.GetBytes(30);
+                    if (BitConverter.IsLittleEndian) {
+                        responseVersionBytes = responseVersionBytes.Reverse().ToArray();
+                        responseDataBytes = responseDataBytes.Reverse().ToArray();
+                    }
+
+                    responseVersionBytes.CopyTo(responseHeader, 0);
+                    responseDataBytes.CopyTo(responseHeader, intSize);
+                    fsAck.Write(responseHeader, 0, responseHeader.Length);
+                    //Console.WriteLine(responseHeader);
+
+                    byte[] responseData = new byte[4];
+                    fsAck.Write(responseData, 0, responseData.Length);
+
                 }
+            } catch (Exception ex) {
+                Console.WriteLine("Error: " + ex.Message);
+                Thread.Sleep(1000);
             }
-        } catch (Exception ex) {
-            Console.WriteLine("Error: " + ex.Message);
         }
 
     }

@@ -33,8 +33,7 @@ MODULE_DESCRIPTION("ExtravaCore Kernel Module");
 char packet_data[512];
 
 
-
-static int __init nf_minifirewall_init(void) {
+static int __init extrava_init(void) {
     LOG_INFO("Extrava module initializing ⌛️");
     setup_user_space_comm();
     setup_netfilter_hooks();
@@ -43,12 +42,12 @@ static int __init nf_minifirewall_init(void) {
 	return 0;
 }
 
-static void __exit nf_minifirewall_exit(void) {
+static void __exit extrava_exit(void) {
     LOG_INFO("Extrava module exiting ⌛️");
     cleanup_netfilter_hooks();
     cleanup_user_space_comm();
 	LOG_INFO("Extrava module unloaded 🛑");
 }
 
-module_init(nf_minifirewall_init);
-module_exit(nf_minifirewall_exit);
+module_init(extrava_init);
+module_exit(extrava_exit);
