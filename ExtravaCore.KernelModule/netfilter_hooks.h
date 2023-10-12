@@ -12,8 +12,11 @@
 #include "logger.h"
 #include "data_structures.h"
 #include "packet_queue.h"
+#include <linux/kfifo.h>
 
-typedef void (*packet_processing_callback_t)(PacketQueue *queue);
+typedef void (*packet_processing_callback_t)(PendingPacketRoundTrip *packetTrip);
+
+extern PacketQueue pending_packets_queue;
 
 void setup_netfilter_hooks(void);
 void cleanup_netfilter_hooks(void);

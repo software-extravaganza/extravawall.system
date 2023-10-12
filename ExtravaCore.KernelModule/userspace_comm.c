@@ -21,14 +21,13 @@ static int majorNumber_from_user;
 static struct device* netmodDevice = NULL;
 static struct device* netmodDeviceAck = NULL;
 static wait_queue_head_t pending_packet_queue;
-static PacketQueue *globalQueue = NULL;
 
 // Open function for our device
 static int dev_usercomm_open(struct inode *inodep, struct file *filep){
-//    if(!mutex_trylock(&netmod_mutex)){
-//       printk(KERN_ALERT "Netmod: Device used by another process");
-//       return -EBUSY;
-//    }
+   if(!mutex_trylock(&netmod_mutex)){
+      printk(KERN_ALERT "Netmod: Device used by another process");
+      return -EBUSY;
+   }
    return 0;
 }
 
@@ -37,15 +36,15 @@ static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t le
     int error_count = 0;
     PendingPacketRoundTrip *packetTrip;
 LOG_INFO("DEBUG 12");
-    // Try to fetch a packetTrip from globalQueue
+    // Try to fetch a packetTrip from pending_packets_queue
     //todo: lock internally on queue?
-    packetTrip =  pq_peek_packetTrip(globalQueue);
+    packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
 
     while (!packetTrip || !packetTrip->packet) {
         if (filep->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
-        if (wait_event_interruptible(pending_packet_queue, (packetTrip = pq_peek_packetTrip(globalQueue))))
+        if (wait_event_interruptible(pending_packet_queue, (packetTrip = pq_peek_packetTrip(&pending_packets_queue))))
             return -ERESTARTSYS; // Signal received, stop waiting
     }
 
@@ -54,17 +53,17 @@ LOG_INFO("DEBUG 13");
         LOG_INFO("DEBUG 14");
         // Ensure user buffer has enough space
         if (len < sizeof(PacketHeader)) {
-            LOG_ERR("User buffer is too small to hold packetTrip header %d < %d", (int)len, (int)sizeof(PacketHeader));
+            LOG_ERR("User buffer is too small to hold packetTrip header %zu < %zu", len, sizeof(PacketHeader));
             return -EINVAL;
         }
 
         // Copy header to user space
-        LOG_INFO("Sending packetTrip header to user space %d bytes; Version: %d; Length: %d", (int)sizeof(PacketHeader), packetTrip->packet->header->version, packetTrip->packet->header->data_length);
+        LOG_INFO("Sending packetTrip header to user space %zu bytes; Version: %d; Length: %d", sizeof(PacketHeader), packetTrip->packet->header->version, packetTrip->packet->header->data_length);
         unsigned char headerVersion[sizeof(int)];
         int_to_bytes(packetTrip->packet->header->version, headerVersion);
 
         unsigned char headerLength[sizeof(int)];
-        int_to_bytes(packetTrip->packet->header->data_length, headerVersion);
+        int_to_bytes(packetTrip->packet->header->data_length, headerLength);
 
         unsigned char headerPayload[sizeof(int)*2];
         memcpy(headerPayload, headerVersion, sizeof(int));
@@ -82,7 +81,7 @@ LOG_INFO("DEBUG 13");
     else if(packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
         LOG_INFO("DEBUG 15");
         if (len < packetTrip->packet->header->data_length) {
-            LOG_ERR("User buffer is too small to hold packetTrip data %d < %d", len, packetTrip->packet->header->data_length);
+            LOG_ERR("User buffer is too small to hold packetTrip data %zu < %d", len, packetTrip->packet->header->data_length);
             return -EINVAL;
         }
 
@@ -113,9 +112,9 @@ LOG_INFO("DEBUG 13");
 static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
     PendingPacketRoundTrip *packetTrip;
 LOG_INFO("DEBUG 16");
-    // Try to fetch a packetTrip from globalQueue
+    // Try to fetch a packetTrip from pending_packets_queue
     //todo: lock internally on queue?
-    packetTrip =  pq_peek_packetTrip(globalQueue);
+    packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
     
     
     RoutingDecision decision;
@@ -137,7 +136,7 @@ LOG_INFO("DEBUG 16");
 }
 
 static int dev_usercomm_release(struct inode *inodep, struct file *filep){
-   //mutex_unlock(&netmod_mutex);
+   mutex_unlock(&netmod_mutex);
    return 0;
 }
 
@@ -154,15 +153,12 @@ static struct file_operations fops_netmod_from_user = {
 };
 
 bool fired = false;
-void packet_processor(PacketQueue *queue) {
+void packet_processor(PendingPacketRoundTrip *packetTrip) {
     if(!fired) {
         fired = true;
         LOG_INFO("Packet processor fired");
     }
 
-    if (!globalQueue) {
-        globalQueue = queue;
-    }
 
     // Wake up any reading process
     wake_up_interruptible(&pending_packet_queue);

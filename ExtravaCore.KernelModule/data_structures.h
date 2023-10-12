@@ -3,6 +3,7 @@
 
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
+#include <linux/kfifo.h>
 #include "logger.h"
 
 /* Enumerations for Routing Types and Decisions */
@@ -35,13 +36,12 @@ typedef struct {
 
 /* Packet Header structure */
 typedef struct {
-    int version;
-    int data_length;
+    s32 version;
+    s32 data_length;
 } PacketHeader;
 
 /* Pending Packet structure */
 typedef struct {
-    struct sk_buff *skb;
     bool dataProcessed;
     bool headerProcessed;
     void *data;
@@ -52,6 +52,7 @@ typedef struct {
     PendingPacket *packet;
     PendingPacket *responsePacket;
     RoutingDecision decision;
+    struct completion packet_processed;
 } PendingPacketRoundTrip;
 
 /* Function Declarations */
@@ -60,7 +61,7 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb);
 void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip);
 PendingPacket* create_pending_packet(struct sk_buff *skb);
 void free_pending_packet(PendingPacket *packet);
-PacketHeader* create_packet_header(unsigned int version, size_t data_length);
+PacketHeader* create_packet_header(u32 version, size_t data_length);
 void free_packet_header(PacketHeader *header);
 bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb);
 void to_human_readable_ip(const unsigned int ip, char *buffer, size_t buf_len);
