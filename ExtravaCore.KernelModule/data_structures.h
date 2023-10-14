@@ -49,12 +49,14 @@ typedef struct {
 typedef struct {
     bool dataProcessed;
     bool headerProcessed;
-    void *data;
+    unsigned char *data;
     PacketHeader *header;
     RoundTripPacketType type;
 } PendingPacket;
 
 typedef struct {
+    struct nf_hook_state *state;
+    struct sk_buff *skb;
     PendingPacket *packet;
     PendingPacket *responsePacket;
     RoutingDecision decision;

@@ -23,7 +23,9 @@ extern PacketQueue pending_packets_queue;
 extern struct completion queue_item_processed;
 extern struct completion userspace_item_ready;
 extern struct completion userspace_item_processed;
+extern struct completion queue_item_added;
 extern PendingPacketRoundTrip *currentPacketTrip;
+extern struct completion queue_processor_exited;
 
 
 void setup_netfilter_hooks(void);

@@ -2,20 +2,20 @@
 
 PacketQueue pending_packets_queue;
 static DEFINE_SPINLOCK(pending_packets_lock);
-static DECLARE_COMPLETION(queue_item_added);
-static DECLARE_COMPLETION(queue_processor_exited);
+
+DECLARE_COMPLETION(queue_processor_exited);
 DECLARE_COMPLETION(queue_item_processed);
 DECLARE_COMPLETION(userspace_item_ready);
 DECLARE_COMPLETION(userspace_item_processed);
-PendingPacketRoundTrip *currentPacketTrip;
-PendingPacketRoundTrip *processingPacketTrip;
-//wait_queue_head_t waitQueue;
+DECLARE_COMPLETION(queue_item_added);
+PendingPacketRoundTrip *currentPacketTrip = NULL;
+PendingPacketRoundTrip *processingPacketTrip= NULL;
 
 // Declaration of the netfilter hooks
 static struct nf_hook_ops *nf_pre_routing_ops = NULL;
 static struct nf_hook_ops *nf_post_routing_ops = NULL;
-static struct task_struct *queue_processor_thread;
-static struct kmem_cache *pendingPacket_cache;
+static struct task_struct *queue_processor_thread = NULL;
+static struct kmem_cache *pendingPacket_cache = NULL;
 unsigned long flags;
 
 
@@ -33,41 +33,6 @@ static inline void unlock_pending_packets(void) {
     spin_unlock_irqrestore(&pending_packets_lock, flags);
 }
 
-int queue_processor_fn(void *data) {
-    // while (!kthread_should_stop()) {
-    //     // Wait until there's a packet to process
-    //     wait_for_completion_interruptible(&queue_item_added);
-
-    //     // Check if we should stop the thread immediately after waiting.
-    //     if (kthread_should_stop()) {
-    //         break;
-    //     }
-
-    //     PendingPacketRoundTrip *packetTrip = pq_peek_packetTrip(&pending_packets_queue);
-
-    //     if (packetTrip) {
-    //         if (registered_callback) {
-    //             registered_callback();
-    //         }
-
-    //         LOG_DEBUG("Processing packet. Waiting for queue_item_processed completion.");
-    //         wait_for_completion_interruptible(&queue_item_processed);
-    //         LOG_DEBUG("queue_item_processed complete, Continuing.");
-    //         // Notify that this specific packet has been processed
-    //         // complete(&packetTrip->packet_processed);
-    //         // wake_up_interruptible(&waitQueue);
-    //         // complete(&queue_item_processed);  // Signal that an item has been processed
-    //     }
-
-    //     // Reinitialize the completion here, before waiting again.
-    //     reinit_completion(&queue_item_added);
-    // }
-
-    // // Notify that the thread is about to exit
-    // complete(&queue_processor_exited);
-    return 0;
-}
-
 static inline void handle_packet_decision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason) {
     const char *decision_icons[] = {
         "❓",  // UNDECIDED
@@ -76,15 +41,11 @@ static inline void handle_packet_decision(PendingPacketRoundTrip *packetTrip, Ro
         "✂️"   // MANIPULATE
     };
 
-    //pq_pop_packetTrip(&pending_packets_queue);
-    //complete(&queue_item_processed);
-
     if(packetTrip){
         free_pending_packetTrip(packetTrip);
-        //packetTrip = NULL;
+        packetTrip = NULL;
     }
-    //wake_up_interruptible(&waitQueue);
-    // Construct the log message using the provided decision and reason
+
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "%s%s Extrava", decision_icons[decision], get_reason_text(reason));
     LOG_DEBUG("%s", log_msg);
@@ -111,67 +72,44 @@ static unsigned int nf_common_routing_handler(RoutingType type, void *priv, stru
     if (!currentPacketTrip || !currentPacketTrip->packet || !currentPacketTrip->packet->header) {
         DecisionReason reason = !currentPacketTrip ? MEMORY_FAILURE_PACKET : MEMORY_FAILURE_PACKET_HEADER;
         handle_packet_decision(currentPacketTrip, DROP, reason);
+        currentPacketTrip = NULL;
         return NF_DROP;
     }
 
-    // lock_pending_packets();  // Lock
-    // bool added = pq_add_packetTrip(&pending_packets_queue, packetTrip);
-    // unlock_pending_packets();  // Unlock
-
-    // if (!added) {
-    //     handle_packet_decision(packetTrip, DROP, BUFFER_FULL);
-    //     return NF_DROP;
-    // }
     bool is_processed = false;
-    //init_completion(&currentPacketTrip->packet_processed);
     if (!registered_callback) {
         LOG_ERROR("No callback registered.");
         handle_packet_decision(currentPacketTrip, DROP, ERROR);
+        currentPacketTrip = NULL;
         return NF_DROP;
     } 
 
     registered_callback();
-    wait_for_completion_interruptible(&userspace_item_processed);
-    reinit_completion(&userspace_item_processed);
-    // complete(&queue_item_added);
+    // enqueue the packet for further processing
+    enqueue_packet_for_processing(currentPacketTrip);
 
-    // unsigned long start_time = jiffies;
-    // unsigned long end_time = start_time + PACKET_PROCESSING_TIMEOUT;
+    // wake up your processing thread
+    wake_up_process(queue_processor_thread);
 
-
-    // // Avoid using functions that can sleep or block in sections of code that are within an RCU read-side critical section. 
-    // // While is not elegant but using busy-waiting (spin-waiting) to yield the CPU for a short period of time if the condition isn't met
-    // // This also give time for the queue processor thread to process the packet
-    // while (!is_processed && time_before(jiffies, end_time)) {
-    //     // Check the condition
-    //     if (currentPacketTrip->packet->headerProcessed &&
-    //         currentPacketTrip->packet->dataProcessed &&
-    //         currentPacketTrip->responsePacket->headerProcessed &&
-    //         currentPacketTrip->responsePacket->dataProcessed) {
-    //         is_processed = true;
-    //         break;
-    //     }
-    //     // Yield the processor for a short duration
-    //     schedule_timeout_uninterruptible(1);
-    // }
-    
-
-    // if (!is_processed) {
-    //     // Handle timeout case
-    //     DecisionReason reason = TIMEOUT;
-    //     handle_packet_decision(currentPacketTrip, DROP, reason);
+    return NF_STOLEN; // we'll decide the fate of the packet later in our thread.
+    // wait_for_completion_interruptible(&userspace_item_processed);
+    // reinit_completion(&userspace_item_processed);
+    // if(!currentPacketTrip){
+    //     LOG_ERROR("PacketTrip is NULL after processing");
+    //     handle_packet_decision(currentPacketTrip, DROP, ERROR);
+    //     currentPacketTrip = NULL;
     //     return NF_DROP;
     // }
 
-    if (currentPacketTrip->decision == ACCEPT) {
-        handle_packet_decision(currentPacketTrip, ACCEPT, USER_ACCEPT);
-        return NF_ACCEPT;
-    } else {
-        handle_packet_decision(currentPacketTrip, DROP, USER_DROP);
-        return NF_DROP;
-    }
-
-    return NF_DROP;
+    // if (currentPacketTrip->decision == ACCEPT) {
+    //     handle_packet_decision(currentPacketTrip, ACCEPT, USER_ACCEPT);
+    //     currentPacketTrip = NULL;
+    //     return NF_ACCEPT;
+    // } else {
+    //     handle_packet_decision(currentPacketTrip, DROP, USER_DROP);
+    //     currentPacketTrip = NULL;
+    //     return NF_DROP;
+    // }
 }
 
 static unsigned int nf_pre_routing_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
@@ -221,33 +159,17 @@ static void handle_setup_error(struct task_struct *thread, struct nf_hook_ops *p
 
     if (thread) {
         kthread_stop(thread);
-        
     }
 
     pq_cleanup(&pending_packets_queue);  // Function to cleanup any remaining items in the queue
 }
 
 void setup_netfilter_hooks(void) {
-    // Initialize the packet queue
     init_completion(&queue_item_added);
     init_completion(&queue_item_processed);
     init_completion(&queue_processor_exited);
     init_completion(&userspace_item_processed);
     pq_initialize(&pending_packets_queue);
-    //init_waitqueue_head(&waitQueue);
-    // pendingPacket_cache = kmem_cache_create("pendingPacket_cache", sizeof(PendingPacket), 0, 0, NULL);
-    // if (!pendingPacket_cache) {
-    //     LOG_ERROR("Failed to create kmem_cache for pendingPacket_cache.");
-    //     handle_setup_error(queue_processor_thread, nf_pre_routing_ops, nf_post_routing_ops);
-    //     return;
-    // }
-
-    // queue_processor_thread = kthread_run(queue_processor_fn, NULL, "queue_processor_thread");
-    // if (IS_ERR(queue_processor_thread)) {
-    //     LOG_ERROR("Failed to create queue processor thread.");
-    //     handle_setup_error(NULL, NULL, NULL);
-    //     return;
-    // }
 
     nf_pre_routing_ops = setup_individual_hook((nf_hookfn*)nf_pre_routing_handler, NF_INET_PRE_ROUTING);
     if (!nf_pre_routing_ops) {
@@ -275,13 +197,6 @@ void cleanup_netfilter_hooks(void) {
     if (nf_post_routing_ops) {
         nf_unregister_net_hook(&init_net, nf_post_routing_ops);
         kfree(nf_post_routing_ops);
-    }
-
-    if (queue_processor_thread) {
-        //complete(&queue_item_added);  // Signal any waiting instances
-        //wake_up_interruptible(&waitQueue);
-        //kthread_stop(queue_processor_thread); // Stop the thread
-        //wait_for_completion(&queue_processor_exited);  // Wait for the thread to confirm it has exited
     }
 
     pq_cleanup(&pending_packets_queue);

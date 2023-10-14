@@ -16,8 +16,9 @@ static DecisionReasonInfo reason_infos[] = {
 };
 
 void safe_kfree(void* ptr) {
-    if (!ptr)
+    if (!ptr){
         return;
+    }
     kfree(ptr);
 }
 
@@ -26,8 +27,10 @@ void safe_kfree(void* ptr) {
  * Zeros out the memory of a given pointer only if the ZERO_MEMORY_BEFORE_FREE is set to 1
  */
 void conditional_memory_zero(void* ptr, size_t size) {
-    if (!ptr)
+    if (!ptr){
         return;
+    }
+
     if (ZERO_MEMORY_BEFORE_FREE) {
         memset(ptr, 0, size);
     }
@@ -37,10 +40,11 @@ void conditional_memory_zero(void* ptr, size_t size) {
  * Frees the memory occupied by a packet header 
  */
 void free_packet_header(PacketHeader *header) {
-    if (!header)
+    if (!header){
         return;
+    }
 
-    kfree(header);
+    //safe_kfree(header);
 }
 
 /* 
@@ -66,8 +70,9 @@ PacketHeader* create_packet_header(RoundTripPacketType type, u32 version, size_t
  * Frees the memory occupied by a pending packet 
  */
 void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip) {
-    if (!packetTrip)
+    if (!packetTrip){
         return;
+    }
 
     if (packetTrip->packet) {
         free_pending_packet(packetTrip->packet);
@@ -79,8 +84,8 @@ void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip) {
         packetTrip->responsePacket = NULL;  // Set the pointer to NULL after freeing
     }
 
-    conditional_memory_zero(packetTrip, sizeof(PendingPacketRoundTrip));
-    kfree(packetTrip);
+    //conditional_memory_zero(packetTrip, sizeof(PendingPacketRoundTrip));
+    safe_kfree(packetTrip);
 }
 
 /* 
@@ -129,6 +134,7 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
     if (!setup_pending_packet_trip_main_packet(packetTrip, skb) ||
         !setup_pending_packet_trip_response_packet(packetTrip)) {
         free_pending_packetTrip(packetTrip);
+        packetTrip = NULL;
         return NULL;
     }
 
@@ -140,6 +146,10 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
  * Frees the memory occupied by a pending packet 
  */
 void free_pending_packet(PendingPacket *packet) {
+    if (!packet) {
+        return;
+    }
+
     if (packet->data) {
         size_t data_length = packet->header ? packet->header->data_length : 0;
         conditional_memory_zero(packet->data, data_length);
@@ -148,11 +158,10 @@ void free_pending_packet(PendingPacket *packet) {
     }
 
     if (packet->header) {
-        safe_kfree(packet->header);
+        free_packet_header(packet->header);
         packet->header = NULL;  // Set the pointer to NULL after freeing
     }
 
-    conditional_memory_zero(packet, sizeof(PendingPacket));
     safe_kfree(packet);
 }
 
@@ -205,7 +214,7 @@ bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
     }
     char *packetTypeString = createPacketTypeString(packet);
 
-    if (!skb || skb->len == 0) {  // Check if skb->len is 0
+    if (!skb || skb->len == 0) {
         LOG_DEBUG("No skb provided or skb->len is 0. Skipping data addition on %s packet.", packetTypeString);
         return true;
     }
@@ -214,7 +223,7 @@ bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
 
     if (packet->data && packet->header->data_length != new_data_length) {
         conditional_memory_zero(packet->data, packet->header->data_length);
-        kfree(packet->data);
+        safe_kfree(packet->data);
         packet->data = NULL;
     }
 
@@ -229,18 +238,14 @@ bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
         LOG_DEBUG("Memory already allocated for %s packet data.", packetTypeString);
     }
 
-    if (!skb->data) {
-        LOG_ERROR("Unexpected error: skb->data is NULL for %s packet.", packetTypeString);
+    if (!skb_copy_bits(skb, 0, packet->data, new_data_length)) {
+        LOG_DEBUG("Successfully copied data from skb to %s packet.", packetTypeString);
+    } else {
+        LOG_ERROR("Failed to copy data from skb to %s packet.", packetTypeString);
         return false;
     }
 
-    LOG_DEBUG("About to copy data from skb to %s packet.", packetTypeString);
-
-    skb_copy_bits(skb, 0, packet->data, new_data_length);
-    LOG_DEBUG("Successfully copied data from skb to %s packet.", packetTypeString);
-
     packet->header->data_length = new_data_length;
-
     return true;
 }
 

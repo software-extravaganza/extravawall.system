@@ -54,6 +54,7 @@ void pq_cleanup(PacketQueue *queue) {
     while (kfifo_out(queue, &packetTrip, sizeof(packetTrip))) {
         if (packetTrip) {
             free_pending_packetTrip(packetTrip);
+            packetTrip = NULL;
         }
     }
     kfifo_free(queue);

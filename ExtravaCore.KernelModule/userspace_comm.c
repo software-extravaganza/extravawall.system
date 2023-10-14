@@ -55,6 +55,41 @@ static int dev_usercomm_from_open(struct inode *inodep, struct file *filep){
     return dev_usercomm_open(inodep, filep);
 }
 
+int packet_processor_thread(void *data) {
+    while (!kthread_should_stop()) {
+        // Sleep until there's work to do
+        wait_for_completion_interruptible(&queue_item_added);
+        reinit_completion(&queue_item_added);
+
+        // Dequeue a packet for processing
+        currentPacketTrip = dequeue_packet_for_processing();
+        if (currentPacketTrip) {
+            // Communicate with user space and process the packet
+                struct nf_queue_entry entry;
+
+                entry.skb = currentPacketTrip->packet->skb;
+                entry.state = currentPacketTrip->packet->state;
+                nf_reinject(&entry, NF_ACCEPT);
+            // if (user_decision == DROP) {
+            //     kfree_skb(currentPacketTrip->packet);
+            // } else if (user_decision == ACCEPT) {
+            //     struct nf_queue_entry entry;
+
+            //     entry.skb = currentPacketTrip->packet;
+            //     entry.state = currentPacketTrip->state;
+            //     nf_reinject(&entry, NF_ACCEPT);
+            // }
+
+            // Ensure you also free any additional memory or structures related to currentPacketTrip
+            free_pending_packetTrip(currentPacketTrip);
+        }
+    }
+
+    // Signal that we're done processing and exiting
+    complete(&queue_processor_exited);
+    return 0;
+}
+
 // This will send packets to userspace
 //static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
     // int error_count = 0;
@@ -262,30 +297,31 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
             return -EINVAL;
         }
 
-        if (copy_from_user(&responseHeader, buffer, 8) != 0){
+        if (copy_from_user(&responseHeader, buffer, sizeof(PacketHeader)) != 0){
             LOG_ERROR("Failed to copy response packet header from user space (%zu bytes)", len);
             stopProcessingPacket();
             return -EFAULT;
         }
 
+        buffer += sizeof(PacketHeader);
         LOG_DEBUG("Received response packet header from user space %zu bytes; Version: %d; Length: %d", sizeof(PacketHeader), responseHeader.version, responseHeader.data_length);
         currentPacketTrip->responsePacket->header = &responseHeader;
         currentPacketTrip->responsePacket->headerProcessed = true;
 
         s32 decisionInt;
-        if (copy_from_user(&decisionInt, buffer, 4) != 0){
-            LOG_ERROR("Failed to copy response packet data from user space (%zu bytes)", len);
+        if (copy_from_user(&decisionInt, buffer, sizeof(s32)) != 0){
+            LOG_ERROR("Failed to copy response packet decision from user space (%zu bytes)", len);
             stopProcessingPacket();
             return -EFAULT;
         }
+        buffer += sizeof(s32);
 
-        LOG_DEBUG("Received response packet data from user space %zu bytes; Decision: %d", sizeof(RoutingDecision), decisionInt);
-        currentPacketTrip->decision = decisionInt;
+        LOG_DEBUG("Received response packet data from user space %zu bytes; Decision: %d", sizeof(s32), decisionInt);
+        currentPacketTrip->decision = (s64)decisionInt;
         currentPacketTrip->responsePacket->dataProcessed = true;
 
         LOG_DEBUG("PACKET FULLY PROCESSED - USER SPACE");
-        complete(&userspace_item_processed);
-        currentPacketTrip = NULL;
+        stopProcessingPacket();
 
         return 0;
     }
@@ -299,20 +335,17 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
         // }
         
         LOG_ERROR("Response packet was partially processed");
-        complete(&userspace_item_processed);
-        currentPacketTrip = NULL;
+        stopProcessingPacket();
         return -EFAULT;
     }
     else if (currentPacketTrip->responsePacket->headerProcessed && currentPacketTrip->responsePacket->dataProcessed){
          LOG_WARN("Response packet was already processed");
-         complete(&userspace_item_processed);
-         currentPacketTrip = NULL;
+         stopProcessingPacket();
          return 0;
     }
     else{
         LOG_ERROR("Response packet is in an invalid state");
-        complete(&userspace_item_processed);
-        currentPacketTrip = NULL;
+        stopProcessingPacket();
         return -EFAULT;
     }
     // Process the decision
@@ -321,8 +354,7 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
 
     // Wake up the waiting task(s)
     //wake_up_interruptible(&userspace_item_ready);
-    complete(&userspace_item_processed);
-    currentPacketTrip = NULL;
+    stopProcessingPacket();
     return 0;
 }
 

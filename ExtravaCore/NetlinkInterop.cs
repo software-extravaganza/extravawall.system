@@ -554,6 +554,14 @@ public struct nfqnl_msg_packet_hdr {
 
 public class KernelClient {
 
+    public static string PrintByteArray(byte[] bytes) {
+        var sb = new StringBuilder("new byte[] { ");
+        foreach (var b in bytes) {
+            sb.Append(b + ", ");
+        }
+        sb.Append("}");
+        return sb.ToString();
+    }
 
     public static async Task StartAsync() {
         const int intSize = sizeof(int);
@@ -610,20 +618,23 @@ public class KernelClient {
                         string str = Encoding.UTF8.GetString(packetData);
                         Console.WriteLine(str);
                         // // Send back a directive
-                        byte[] responseHeader = new byte[intSize * 2];
+                        byte[] responseHeader = new byte[intSize * 3];
                         //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
                         //BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
                         var responseVersionBytes = BitConverter.GetBytes(1);
                         var responseDataBytes = BitConverter.GetBytes(1);
                         var decisionBytes = BitConverter.GetBytes(2);
+                        Console.WriteLine($"Sending response: {PrintByteArray(responseVersionBytes.ToArray())} {PrintByteArray(responseDataBytes.ToArray())} {PrintByteArray(decisionBytes.ToArray())}");
                         // if (BitConverter.IsLittleEndian) {
                         //     responseVersionBytes = responseVersionBytes.Reverse().ToArray();
                         //     responseDataBytes = responseDataBytes.Reverse().ToArray();
+                        //     decisionBytes = decisionBytes.Reverse().ToArray();
                         // }
+                        Console.WriteLine($"Alternate response: {PrintByteArray(responseVersionBytes.Reverse().ToArray())} {PrintByteArray(responseDataBytes.Reverse().ToArray())} {PrintByteArray(decisionBytes.Reverse().ToArray())}");
 
                         responseVersionBytes.CopyTo(responseHeader, 0);
                         responseDataBytes.CopyTo(responseHeader, intSize);
-                        decisionBytes.CopyTo(responseHeader, 2);
+                        decisionBytes.CopyTo(responseHeader, intSize * 2);
                         fsAck.Write(responseHeader, 0, responseHeader.Length);
                         fsAck.Flush();
                         //Console.WriteLine(responseHeader);
