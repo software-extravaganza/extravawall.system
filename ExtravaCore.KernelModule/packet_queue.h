@@ -16,5 +16,6 @@ bool pq_is_full(PacketQueue *queue);
 bool pq_is_empty(PacketQueue *queue);
 bool deep_copy_packet(PendingPacketRoundTrip *dest, const PendingPacketRoundTrip *src);
 void pq_cleanup(PacketQueue *queue);
+int pq_len_packetTrip(PacketQueue *queue);
 
 #endif // _PACKET_QUEUE_H_

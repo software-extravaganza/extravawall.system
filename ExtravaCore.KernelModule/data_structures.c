@@ -46,18 +46,19 @@ void free_packet_header(PacketHeader *header) {
 /* 
  * Creates and returns a new packet header 
  */
-PacketHeader* create_packet_header(u32 version, size_t data_length) {
+PacketHeader* create_packet_header(RoundTripPacketType type, u32 version, size_t data_length) {
     PacketHeader *header = kzalloc(sizeof(PacketHeader), GFP_KERNEL);
+    char *packetTypeString = createPacketTypeStringFromType(type);
     if (!header) {
-        LOG_ERR("Failed to allocate memory for PacketHeader.");
+        LOG_ERROR("Failed to allocate memory for % PacketHeader.", packetTypeString);
         return NULL;
     }
 
-    LOG_DEBUG("Successfully created packet header.");
-    
     header->version = version;
     header->data_length = data_length;
 
+    LOG_DEBUG("Successfully created %s packet header.", packetTypeString);
+    
     return header;
 }
 
@@ -94,16 +95,16 @@ PendingPacketRoundTrip* allocate_pending_packet_trip(void) {
 }
 
 bool setup_pending_packet_trip_main_packet(PendingPacketRoundTrip *packetTrip, struct sk_buff *skb) {
-    packetTrip->packet = create_pending_packet(skb);
+    packetTrip->packet = create_pending_packet(REQUEST_PACKET, skb);
     if (!packetTrip->packet) {
-        LOG_DEBUG("Failed to create packet.");
+        LOG_DEBUG("Failed to create request packet.");
         return false;
     }
     return true;
 }
 
 bool setup_pending_packet_trip_response_packet(PendingPacketRoundTrip *packetTrip) {
-    packetTrip->responsePacket = create_pending_packet(NULL);
+    packetTrip->responsePacket = create_pending_packet(RESPONSE_PACKET, NULL);
     if (!packetTrip->responsePacket) {
         LOG_DEBUG("Failed to create response packet.");
         return false;
@@ -123,7 +124,7 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
     }
 
     packetTrip->decision = UNDECIDED;
-    init_completion(&packetTrip->packet_processed);
+    //init_completion(&packetTrip->packet_processed);
 
     if (!setup_pending_packet_trip_main_packet(packetTrip, skb) ||
         !setup_pending_packet_trip_response_packet(packetTrip)) {
@@ -155,18 +156,37 @@ void free_pending_packet(PendingPacket *packet) {
     safe_kfree(packet);
 }
 
+char* createPacketTypeString(PendingPacket *packet) {
+    return createPacketTypeStringFromType(packet->type);
+}
+
+char* createPacketTypeStringFromType(RoundTripPacketType type) {
+    switch (type) {
+        case REQUEST_PACKET:
+            return "Request";
+            break;
+        case RESPONSE_PACKET:
+            return "Response";
+            break;
+        default:
+            return "Unknown";
+            break;
+    }
+}
 
 /* 
  * Creates and returns a new pending packet 
  */
-PendingPacket* create_pending_packet(struct sk_buff *skb) {
+PendingPacket* create_pending_packet(RoundTripPacketType type, struct sk_buff *skb) {
+    char *packetTypeString = createPacketTypeStringFromType(type);
     PendingPacket *packet = kzalloc(sizeof(PendingPacket), GFP_KERNEL);
     if (!packet) {
-        LOG_ERR("Failed to allocate memory for PendingPacket.");
+        LOG_ERROR("Failed to allocate memory for %s PendingPacket.", packetTypeString);
         return NULL;
     }
 
-    packet->header = create_packet_header(PACKET_HEADER_VERSION, skb ? skb->len : 0);
+    packet->type = type;
+    packet->header = create_packet_header(type, PACKET_HEADER_VERSION, skb ? skb->len : 0);
     if (!packet->header || !add_data_to_packet(packet, skb)) {
         free_pending_packet(packet);
         return NULL;
@@ -180,12 +200,13 @@ PendingPacket* create_pending_packet(struct sk_buff *skb) {
 
 bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
     if (!packet || !packet->header) {
-        LOG_ERR("Failed to add data to packet due to NULL arguments.");
+        LOG_ERROR("Failed to add data to packet due to NULL arguments.");
         return false;
     }
+    char *packetTypeString = createPacketTypeString(packet);
 
     if (!skb || skb->len == 0) {  // Check if skb->len is 0
-        LOG_DEBUG("No skb provided or skb->len is 0. Skipping data addition.");
+        LOG_DEBUG("No skb provided or skb->len is 0. Skipping data addition on %s packet.", packetTypeString);
         return true;
     }
 
@@ -200,23 +221,23 @@ bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
     if (!packet->data) {
         packet->data = kmalloc(new_data_length, GFP_KERNEL);
         if (!packet->data) {
-            LOG_ERR("Failed to allocate memory for packet data.");
+            LOG_ERROR("Failed to allocate memory for %s packet data.", packetTypeString);
             return false;
         }
-        LOG_DEBUG("Allocated memory for packet data.");
+        LOG_DEBUG("Allocated memory for %s packet data.", packetTypeString);
     } else {
-        LOG_DEBUG("Memory already allocated for packet data.");
+        LOG_DEBUG("Memory already allocated for %s packet data.", packetTypeString);
     }
 
     if (!skb->data) {
-        LOG_ERR("Unexpected error: skb->data is NULL.");
+        LOG_ERROR("Unexpected error: skb->data is NULL for %s packet.", packetTypeString);
         return false;
     }
 
-    LOG_DEBUG("About to copy data from skb to packet.");
+    LOG_DEBUG("About to copy data from skb to %s packet.", packetTypeString);
 
     skb_copy_bits(skb, 0, packet->data, new_data_length);
-    LOG_DEBUG("Successfully copied data from skb to packet.");
+    LOG_DEBUG("Successfully copied data from skb to %s packet.", packetTypeString);
 
     packet->header->data_length = new_data_length;
 
@@ -231,12 +252,12 @@ bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
  */
 void to_human_readable_ip(const unsigned int ip, char *buffer, size_t buf_len) {
     if (!buffer) {
-        LOG_ERR("Buffer provided is NULL.");
+        LOG_ERROR("Buffer provided is NULL.");
         return;
     }
 
     if (buf_len < IP_BUFFER_SIZE) {  
-        LOG_ERR("Buffer size is incorrect. Expected at least %d, got %zu.", IP_BUFFER_SIZE, buf_len);
+        LOG_ERROR("Buffer size is incorrect. Expected at least %d, got %zu.", IP_BUFFER_SIZE, buf_len);
         return;  // added this line
     }
 

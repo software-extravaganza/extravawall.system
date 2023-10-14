@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ExtravaCore\ExtravaCore.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <!-- <RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers> -->
+
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- <PublishAot>true</PublishAot> -->
+    <OptimizationPreference>Size</OptimizationPreference>
+    <PublishTrimmed>true</PublishTrimmed>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <!-- <StripSymbols>false</StripSymbols> -->
+    <!--<PublishAot>true</PublishAot>-->
+    <!-- <StaticICULinking>true</StaticICULinking>
+		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
+		<IlcDisableReflection>true</IlcDisableReflection>
+		<IlcOptimizationPreference>Size</IlcOptimizationPreference> -->
+    <!-- <CodeAnalysisRuleSet>..\roslynator.ruleset</CodeAnalysisRuleSet>  -->
+    <GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
+    <GenerateRuntimeConfigDevFile>false</GenerateRuntimeConfigDevFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <!-- <TrimmerRootDescriptor Include="TrimRoots.xml" /> -->
+    <TrimMode>partial</TrimMode>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
+</Project>

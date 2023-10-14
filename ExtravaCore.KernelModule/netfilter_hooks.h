@@ -14,9 +14,17 @@
 #include "packet_queue.h"
 #include <linux/kfifo.h>
 
-typedef void (*packet_processing_callback_t)(PendingPacketRoundTrip *packetTrip);
+#define PACKET_PROCESSING_TIMEOUT (5 * HZ)  // 5 seconds
+#define MAX_PENDING_PACKETS 100
+
+typedef void (*packet_processing_callback_t)(void);
 
 extern PacketQueue pending_packets_queue;
+extern struct completion queue_item_processed;
+extern struct completion userspace_item_ready;
+extern struct completion userspace_item_processed;
+extern PendingPacketRoundTrip *currentPacketTrip;
+
 
 void setup_netfilter_hooks(void);
 void cleanup_netfilter_hooks(void);

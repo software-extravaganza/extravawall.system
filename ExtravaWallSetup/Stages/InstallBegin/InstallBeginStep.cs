@@ -22,10 +22,6 @@ namespace ExtravaWallSetup.Stages.Install {
         public override bool AutoComplete => true;
 
         protected override async Task Execute() {
-            //NetListener4.Start();
-            //NfqnlTest.Main();
-            KernelClient.Start();
-
             Console.GetNewWriter().WriteLine("Beginning installation...");
 
             await Task.Delay(2000);

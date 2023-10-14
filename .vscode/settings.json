@@ -29,7 +29,9 @@
         "logger.h": "c",
         "packet_queue.h": "c",
         "netfilter_hooks.h": "c",
-        "skbuff.h": "c"
+        "skbuff.h": "c",
+        "compare": "c",
+        "type_traits": "c"
     },
     "cSpell.customDictionaries": {
         "custom-dictionary-workspace": {

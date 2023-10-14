@@ -555,7 +555,7 @@ public struct nfqnl_msg_packet_hdr {
 public class KernelClient {
 
 
-    public static void Start() {
+    public static async Task StartAsync() {
         const int intSize = sizeof(int);
         while (true) {
             try {
@@ -568,43 +568,88 @@ public class KernelClient {
 
                     //Span<byte> headerSpan = stackalloc byte[intSize + intSize];
                     byte[] headerData = new byte[intSize * 2]; // Assuming 64-bit kernel
-                    fsRead.Read(headerData, 0, headerData.Length);
-                    Span<byte> headerSpan = headerData.AsSpan().Slice(0, headerData.Length);
-                    if (BitConverter.IsLittleEndian) {
-                        headerSpan.Reverse();
+                    Task<int> headerReadTask = fsRead.ReadAsync(headerData, 0, headerData.Length);
+                    //Task headerDelayTask = Task.Delay(1000);
+                    //fsRead.Read(headerData, 0, headerData.Length);
+                    Task headerCompletedTask = await Task.WhenAny(headerReadTask); //, headerDelayTask);
+
+                    if (headerCompletedTask != headerReadTask) {
+                        fsRead.Close();
+                        // The timeout elapsed before the read operation completed.
+                        throw new TimeoutException("Header read operation timed out.");
                     }
 
-                    int version = BitConverter.ToInt32(headerSpan.Slice(0, intSize));
-                    int dataLength = BitConverter.ToInt32(headerSpan.Slice(intSize, intSize));
+                    (int version, int dataLength) ProcessHeader() {
+                        Span<byte> headerSpan = headerData.AsSpan().Slice(0, headerData.Length);
+                        if (BitConverter.IsLittleEndian) {
+                            headerSpan.Reverse();
+                        }
 
+                        int dataLength = BitConverter.ToInt32(headerSpan.Slice(0, intSize));
+                        int version = BitConverter.ToInt32(headerSpan.Slice(intSize, intSize));
+                        return (version, dataLength);
+                    }
+
+                    (int version, int dataLength) = ProcessHeader();
                     byte[] packetData = new byte[dataLength];
-                    fsRead.Read(packetData, 0, dataLength);
+                    Task<int> dataReadTask = fsRead.ReadAsync(packetData, 0, packetData.Length);
+                    /// Task dataDelayTask = Task.Delay(1000);
+                    //fsRead.Read(headerData, 0, headerData.Length);
+                    Task dataCompletedTask = await Task.WhenAny(dataReadTask); //, dataDelayTask);
+                    if (dataCompletedTask != dataReadTask) {
+                        fsRead.Close();
+                        // The timeout elapsed before the read operation completed.
+                        throw new TimeoutException("Data read operation timed out.");
+                    }
+                    //fsRead.Read(packetData, 0, dataLength);
 
-                    // Inspect the packetData as needed
+                    void ProcessData() {
+                        // Inspect the packetData as needed
 
-                    //Convert bytes to string
-                    string str = Encoding.UTF8.GetString(packetData);
-                    Console.WriteLine(str);
-                    // // Send back a directive
-                    byte[] responseHeader = new byte[intSize * 2];
-                    //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
-                    //BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
-                    var responseVersionBytes = BitConverter.GetBytes(1);
-                    var responseDataBytes = BitConverter.GetBytes(30);
-                    if (BitConverter.IsLittleEndian) {
-                        responseVersionBytes = responseVersionBytes.Reverse().ToArray();
-                        responseDataBytes = responseDataBytes.Reverse().ToArray();
+                        //Convert bytes to string
+                        string str = Encoding.UTF8.GetString(packetData);
+                        Console.WriteLine(str);
+                        // // Send back a directive
+                        byte[] responseHeader = new byte[intSize * 2];
+                        //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
+                        //BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
+                        var responseVersionBytes = BitConverter.GetBytes(1);
+                        var responseDataBytes = BitConverter.GetBytes(1);
+                        var decisionBytes = BitConverter.GetBytes(2);
+                        // if (BitConverter.IsLittleEndian) {
+                        //     responseVersionBytes = responseVersionBytes.Reverse().ToArray();
+                        //     responseDataBytes = responseDataBytes.Reverse().ToArray();
+                        // }
+
+                        responseVersionBytes.CopyTo(responseHeader, 0);
+                        responseDataBytes.CopyTo(responseHeader, intSize);
+                        decisionBytes.CopyTo(responseHeader, 2);
+                        fsAck.Write(responseHeader, 0, responseHeader.Length);
+                        fsAck.Flush();
+                        //Console.WriteLine(responseHeader);
+
+                        // byte[] responseData = new byte[intSize];
+
+                        // // if (BitConverter.IsLittleEndian) {
+                        // //     decisionBytes = decisionBytes.Reverse().ToArray();
+                        // // }
+
+
+                        // fsAck.Write(responseData, 0, responseData.Length);
+                        // fsAck.Flush();
                     }
 
-                    responseVersionBytes.CopyTo(responseHeader, 0);
-                    responseDataBytes.CopyTo(responseHeader, intSize);
-                    fsAck.Write(responseHeader, 0, responseHeader.Length);
-                    //Console.WriteLine(responseHeader);
-
-                    byte[] responseData = new byte[4];
-                    fsAck.Write(responseData, 0, responseData.Length);
+                    ProcessData();
 
                 }
+
+            } catch (IOException ex) {
+                if (ex.Message.ToLower().Contains("unknown error 512")) {
+                    Console.WriteLine("Can't access device file due to privilages.");
+                    Thread.Sleep(1000);
+                    continue;
+                }
+                Thread.Sleep(1000);
             } catch (Exception ex) {
                 Console.WriteLine("Error: " + ex.Message);
                 Thread.Sleep(1000);

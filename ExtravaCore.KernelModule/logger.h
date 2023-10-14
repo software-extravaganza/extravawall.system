@@ -10,7 +10,7 @@ extern int log_level;
 
 #define LOG_DEBUG(fmt, ...) LOG_BASE(0, KERN_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...)  LOG_BASE(1, KERN_INFO, fmt, ##__VA_ARGS__)
-#define LOG_ERR(fmt, ...)   LOG_BASE(2, KERN_ERR, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...)   LOG_BASE(2, KERN_ERR, fmt, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...)  LOG_BASE(3, KERN_WARNING, fmt, ##__VA_ARGS__)
 #define LOG_ALERT(fmt, ...) LOG_BASE(4, KERN_ALERT, fmt, ##__VA_ARGS__)
 
