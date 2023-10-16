@@ -240,7 +240,7 @@ static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t le
     
     LOG_DEBUG("Packet trip info: %p; Packet to eval: %p (size: %d)", currentPacketTrip, currentPacketTrip->packet, currentPacketTrip->entry->skb->len);
     if(!currentPacketTrip->packet->headerProcessed && !currentPacketTrip->packet->dataProcessed){
-        s32 transactionSize = sizeof(s32)*2;
+        s32 transactionSize = sizeof(s32)*3;
         LOG_DEBUG("Neither header nor data has been processed. Processing header (%d bytes)...", transactionSize);
         // Ensure user buffer has enough space
         if (len < transactionSize) {
@@ -257,9 +257,13 @@ static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t le
         unsigned char headerLength[sizeof(s32)];
         int_to_bytes(currentPacketTrip->entry->skb->len, headerLength);
 
+        unsigned char headerRoutingType[sizeof(s32)];
+        int_to_bytes(currentPacketTrip->routingType, headerRoutingType);
+
         unsigned char headerPayload[transactionSize];
-        memcpy(headerPayload, headerVersion, sizeof(s32));
-        memcpy(headerPayload + sizeof(s32), headerLength, sizeof(s32));
+        memcpy(headerPayload, headerRoutingType, sizeof(s32));
+        memcpy(headerPayload + sizeof(s32), headerVersion, sizeof(s32));
+        memcpy(headerPayload + (sizeof(s32)*2), headerLength, sizeof(s32));
 
         error_count = copy_to_user(buf, headerPayload, transactionSize);
         if (error_count){

@@ -20,6 +20,7 @@ static struct kmem_cache *pendingPacket_cache = NULL;
 struct task_struct *queue_processor_thread = NULL;
 static packet_processing_callback_t registered_callback = NULL;
 static bool isActive = false;
+static RoutingType lastRoutingType = NONE_ROUTING;
 
 void register_packet_processing_callback(packet_processing_callback_t callback) {
     registered_callback = callback;
@@ -56,7 +57,7 @@ static inline void handle_packet_decision(PendingPacketRoundTrip *packetTrip, Ro
 
 static int packet_queue_handler(struct nf_queue_entry *entry, unsigned int queuenum)
 {
-    PendingPacketRoundTrip *packetTrip = create_pending_packetTrip(entry);
+    PendingPacketRoundTrip *packetTrip = create_pending_packetTrip(entry, lastRoutingType);
     if (!packetTrip || !packetTrip->packet) {
         LOG_ERROR("Failed to create pending packet trip.");
         handle_packet_decision(packetTrip, DROP, MEMORY_FAILURE_PACKET);
@@ -86,6 +87,7 @@ static int packet_queue_handler(struct nf_queue_entry *entry, unsigned int queue
 }
 
 static unsigned int nf_common_routing_handler(RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
+    lastRoutingType = NONE_ROUTING;
     struct iphdr *iph = ip_hdr(skb);
     if (!iph) {
         LOG_ERROR("IP header is NULL.");
@@ -116,7 +118,8 @@ static unsigned int nf_common_routing_handler(RoutingType type, void *priv, stru
             return NF_DROP;
         }
     }
-
+    
+    lastRoutingType = type;
     return NF_QUEUE; // we'll decide the fate of the packet later in our thread.
 
     

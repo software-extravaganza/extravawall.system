@@ -12,8 +12,9 @@
 
 /* Enumerations for Routing Types and Decisions */
 typedef enum {
-    PRE_ROUTING = 0,  // Signifies if the packet is in the pre-routing stage
-    POST_ROUTING = 1  // Signifies if the packet is in the post-routing stage
+    NONE_ROUTING = 0,
+    PRE_ROUTING = 1,  // Signifies if the packet is in the pre-routing stage
+    POST_ROUTING = 2  // Signifies if the packet is in the post-routing stage
 } RoutingType;
 
 typedef enum {
@@ -55,11 +56,12 @@ typedef struct {
     PendingPacket *packet;
     PendingPacket *responsePacket;
     RoutingDecision decision;
+    RoutingType routingType;
 } PendingPacketRoundTrip;
 
 /* Function Declarations */
 void conditional_memory_zero(void* ptr, size_t size);
-PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry);
+PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry, RoutingType type);
 void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip);
 PendingPacket* create_pending_packet(RoundTripPacketType type);
 void free_pending_packet(PendingPacket *packet);

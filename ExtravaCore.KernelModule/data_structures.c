@@ -103,7 +103,7 @@ bool setup_pending_packet_trip_response_packet(PendingPacketRoundTrip *packetTri
     return true;
 }
 
-PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry) {
+PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry, RoutingType type) {
     if (!entry) {
         LOG_DEBUG("Entry provided is NULL.");
         return NULL;
@@ -116,6 +116,7 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry) 
 
     packetTrip->entry = entry;
     packetTrip->decision = UNDECIDED;
+    packetTrip->routingType = type;
 
     //init_completion(&packetTrip->packet_processed);
 
