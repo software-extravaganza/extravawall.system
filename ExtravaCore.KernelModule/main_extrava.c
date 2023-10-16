@@ -39,8 +39,17 @@ char packet_data[512];
 
 static int __init extrava_init(void) {
     LOG_INFO("Extrava module initializing ⌛️");
-    setup_user_space_comm();
-    setup_netfilter_hooks();
+    LOG_DEBUG("Initializing packet queue");
+    if(setup_user_space_comm() != 0){
+        LOG_ERROR("Failed to setup user space communication");
+        return -1;
+    }
+
+    LOG_DEBUG("Initializing packet queue");
+    if(setup_netfilter_hooks() != 0){
+        LOG_ERROR("Failed to setup netfilter hooks");
+        return -1;
+    }
 
     LOG_INFO("Extrava module loaded ✔️");
 	return 0;
@@ -48,7 +57,9 @@ static int __init extrava_init(void) {
 
 static void __exit extrava_exit(void) {
     LOG_INFO("Extrava module exiting ⌛️");
+    LOG_DEBUG("Cleaning up netfilter hooks");
     cleanup_netfilter_hooks();
+    LOG_DEBUG("Cleaning up user space communication");
     cleanup_user_space_comm();
 	LOG_INFO("Extrava module unloaded 🛑");
 }

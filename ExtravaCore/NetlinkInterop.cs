@@ -571,6 +571,7 @@ public class KernelClient {
                 using FileStream fsAck = new FileStream("/dev/extrava_from_user", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
                 //using MemoryStream readMem = new MemoryStream();
                 while (true) {
+                    Console.WriteLine("Waiting for data...");
                     //fsRead.CopyTo(readMem);
                     //Span<byte> readStream = new Span<byte>(readMem.GetBuffer());
 
@@ -588,6 +589,7 @@ public class KernelClient {
                     }
 
                     (int version, int dataLength) ProcessHeader() {
+                        Console.WriteLine("Processing Header");
                         Span<byte> headerSpan = headerData.AsSpan().Slice(0, headerData.Length);
                         if (BitConverter.IsLittleEndian) {
                             headerSpan.Reverse();
@@ -612,11 +614,12 @@ public class KernelClient {
                     //fsRead.Read(packetData, 0, dataLength);
 
                     void ProcessData() {
+                        Console.WriteLine("Processing Data");
                         // Inspect the packetData as needed
 
                         //Convert bytes to string
-                        string str = Encoding.UTF8.GetString(packetData);
-                        Console.WriteLine(str);
+                        // string str = Encoding.UTF8.GetString(packetData);
+                        // Console.WriteLine(str);
                         // // Send back a directive
                         byte[] responseHeader = new byte[intSize * 3];
                         //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
@@ -630,13 +633,14 @@ public class KernelClient {
                         //     responseDataBytes = responseDataBytes.Reverse().ToArray();
                         //     decisionBytes = decisionBytes.Reverse().ToArray();
                         // }
-                        Console.WriteLine($"Alternate response: {PrintByteArray(responseVersionBytes.Reverse().ToArray())} {PrintByteArray(responseDataBytes.Reverse().ToArray())} {PrintByteArray(decisionBytes.Reverse().ToArray())}");
+                        // Console.WriteLine($"Alternate response: {PrintByteArray(responseVersionBytes.Reverse().ToArray())} {PrintByteArray(responseDataBytes.Reverse().ToArray())} {PrintByteArray(decisionBytes.Reverse().ToArray())}");
 
                         responseVersionBytes.CopyTo(responseHeader, 0);
                         responseDataBytes.CopyTo(responseHeader, intSize);
                         decisionBytes.CopyTo(responseHeader, intSize * 2);
                         fsAck.Write(responseHeader, 0, responseHeader.Length);
                         fsAck.Flush();
+                        Console.WriteLine("Response sent.");
                         //Console.WriteLine(responseHeader);
 
                         // byte[] responseData = new byte[intSize];

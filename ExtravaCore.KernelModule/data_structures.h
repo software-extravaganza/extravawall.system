@@ -4,6 +4,10 @@
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
 #include <linux/kfifo.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
+#include <net/netfilter/nf_queue.h>
+#include <linux/skbuff.h>
 #include "logger.h"
 
 /* Enumerations for Routing Types and Decisions */
@@ -39,24 +43,15 @@ typedef struct {
     char* text; // Description of the reason
 } DecisionReasonInfo;
 
-/* Packet Header structure */
-typedef struct {
-    s32 version;
-    s32 data_length;
-} PacketHeader;
-
 /* Pending Packet structure */
 typedef struct {
     bool dataProcessed;
     bool headerProcessed;
-    unsigned char *data;
-    PacketHeader *header;
     RoundTripPacketType type;
 } PendingPacket;
 
 typedef struct {
-    struct nf_hook_state *state;
-    struct sk_buff *skb;
+    struct nf_queue_entry *entry;
     PendingPacket *packet;
     PendingPacket *responsePacket;
     RoutingDecision decision;
@@ -64,17 +59,16 @@ typedef struct {
 
 /* Function Declarations */
 void conditional_memory_zero(void* ptr, size_t size);
-PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb);
+PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry);
 void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip);
-PendingPacket* create_pending_packet(RoundTripPacketType type, struct sk_buff *skb) ;
+PendingPacket* create_pending_packet(RoundTripPacketType type);
 void free_pending_packet(PendingPacket *packet);
-PacketHeader* create_packet_header(RoundTripPacketType type, u32 version, size_t data_length);
-void free_packet_header(PacketHeader *header);
 bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb);
 void to_human_readable_ip(const unsigned int ip, char *buffer, size_t buf_len);
 char* get_reason_text(DecisionReason reason);
 void int_to_bytes(int value, unsigned char bytes[4]);
 char* createPacketTypeString(PendingPacket *packet);
 char* createPacketTypeStringFromType(RoundTripPacketType type);
+struct nf_queue_entry *create_queue_entry(struct sk_buff *skb, const struct nf_hook_state *state);
 
 #endif // DATA_STRUCTURES

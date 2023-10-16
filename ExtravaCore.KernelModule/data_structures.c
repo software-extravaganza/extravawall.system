@@ -22,7 +22,6 @@ void safe_kfree(void* ptr) {
     kfree(ptr);
 }
 
-
 /* 
  * Zeros out the memory of a given pointer only if the ZERO_MEMORY_BEFORE_FREE is set to 1
  */
@@ -36,34 +35,15 @@ void conditional_memory_zero(void* ptr, size_t size) {
     }
 }
 
-/* 
- * Frees the memory occupied by a packet header 
- */
-void free_packet_header(PacketHeader *header) {
-    if (!header){
-        return;
-    }
-
-    //safe_kfree(header);
-}
-
-/* 
- * Creates and returns a new packet header 
- */
-PacketHeader* create_packet_header(RoundTripPacketType type, u32 version, size_t data_length) {
-    PacketHeader *header = kzalloc(sizeof(PacketHeader), GFP_KERNEL);
-    char *packetTypeString = createPacketTypeStringFromType(type);
-    if (!header) {
-        LOG_ERROR("Failed to allocate memory for % PacketHeader.", packetTypeString);
+struct nf_queue_entry *create_queue_entry(struct sk_buff *skb, const struct nf_hook_state *state) {
+    struct nf_queue_entry *entry = kmalloc(sizeof(struct nf_queue_entry), GFP_ATOMIC);
+    if (!entry) {
         return NULL;
     }
-
-    header->version = version;
-    header->data_length = data_length;
-
-    LOG_DEBUG("Successfully created %s packet header.", packetTypeString);
-    
-    return header;
+    entry->skb = skb;
+    entry->state = *state;  // Copying the state
+    // Populate other necessary fields for entry if needed
+    return entry;
 }
 
 /* 
@@ -84,6 +64,12 @@ void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip) {
         packetTrip->responsePacket = NULL;  // Set the pointer to NULL after freeing
     }
 
+    // If packetTrip->skb is set, free it
+    if (packetTrip->entry) {
+        //safe_kfree(packetTrip->entry);  // Use kfree_skb to free sk_buffs
+        packetTrip->entry = NULL;
+    }
+
     //conditional_memory_zero(packetTrip, sizeof(PendingPacketRoundTrip));
     safe_kfree(packetTrip);
 }
@@ -99,8 +85,8 @@ PendingPacketRoundTrip* allocate_pending_packet_trip(void) {
     return packetTrip;
 }
 
-bool setup_pending_packet_trip_main_packet(PendingPacketRoundTrip *packetTrip, struct sk_buff *skb) {
-    packetTrip->packet = create_pending_packet(REQUEST_PACKET, skb);
+bool setup_pending_packet_trip_main_packet(PendingPacketRoundTrip *packetTrip) {
+    packetTrip->packet = create_pending_packet(REQUEST_PACKET);
     if (!packetTrip->packet) {
         LOG_DEBUG("Failed to create request packet.");
         return false;
@@ -109,7 +95,7 @@ bool setup_pending_packet_trip_main_packet(PendingPacketRoundTrip *packetTrip, s
 }
 
 bool setup_pending_packet_trip_response_packet(PendingPacketRoundTrip *packetTrip) {
-    packetTrip->responsePacket = create_pending_packet(RESPONSE_PACKET, NULL);
+    packetTrip->responsePacket = create_pending_packet(RESPONSE_PACKET);
     if (!packetTrip->responsePacket) {
         LOG_DEBUG("Failed to create response packet.");
         return false;
@@ -117,9 +103,9 @@ bool setup_pending_packet_trip_response_packet(PendingPacketRoundTrip *packetTri
     return true;
 }
 
-PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
-    if (!skb) {
-        LOG_DEBUG("Null socket buffer (skb) provided.");
+PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry) {
+    if (!entry) {
+        LOG_DEBUG("Entry provided is NULL.");
         return NULL;
     }
 
@@ -128,10 +114,12 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
         return NULL;
     }
 
+    packetTrip->entry = entry;
     packetTrip->decision = UNDECIDED;
+
     //init_completion(&packetTrip->packet_processed);
 
-    if (!setup_pending_packet_trip_main_packet(packetTrip, skb) ||
+    if (!setup_pending_packet_trip_main_packet(packetTrip) ||
         !setup_pending_packet_trip_response_packet(packetTrip)) {
         free_pending_packetTrip(packetTrip);
         packetTrip = NULL;
@@ -148,18 +136,6 @@ PendingPacketRoundTrip* create_pending_packetTrip(struct sk_buff *skb) {
 void free_pending_packet(PendingPacket *packet) {
     if (!packet) {
         return;
-    }
-
-    if (packet->data) {
-        size_t data_length = packet->header ? packet->header->data_length : 0;
-        conditional_memory_zero(packet->data, data_length);
-        safe_kfree(packet->data);
-        packet->data = NULL;  // Set the pointer to NULL after freeing
-    }
-
-    if (packet->header) {
-        free_packet_header(packet->header);
-        packet->header = NULL;  // Set the pointer to NULL after freeing
     }
 
     safe_kfree(packet);
@@ -186,7 +162,7 @@ char* createPacketTypeStringFromType(RoundTripPacketType type) {
 /* 
  * Creates and returns a new pending packet 
  */
-PendingPacket* create_pending_packet(RoundTripPacketType type, struct sk_buff *skb) {
+PendingPacket* create_pending_packet(RoundTripPacketType type) {
     char *packetTypeString = createPacketTypeStringFromType(type);
     PendingPacket *packet = kzalloc(sizeof(PendingPacket), GFP_KERNEL);
     if (!packet) {
@@ -195,61 +171,11 @@ PendingPacket* create_pending_packet(RoundTripPacketType type, struct sk_buff *s
     }
 
     packet->type = type;
-    packet->header = create_packet_header(type, PACKET_HEADER_VERSION, skb ? skb->len : 0);
-    if (!packet->header || !add_data_to_packet(packet, skb)) {
-        free_pending_packet(packet);
-        return NULL;
-    }
-
     packet->headerProcessed = false;
     packet->dataProcessed = false;
 
     return packet;
 }
-
-bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb) {
-    if (!packet || !packet->header) {
-        LOG_ERROR("Failed to add data to packet due to NULL arguments.");
-        return false;
-    }
-    char *packetTypeString = createPacketTypeString(packet);
-
-    if (!skb || skb->len == 0) {
-        LOG_DEBUG("No skb provided or skb->len is 0. Skipping data addition on %s packet.", packetTypeString);
-        return true;
-    }
-
-    size_t new_data_length = skb->len;
-
-    if (packet->data && packet->header->data_length != new_data_length) {
-        conditional_memory_zero(packet->data, packet->header->data_length);
-        safe_kfree(packet->data);
-        packet->data = NULL;
-    }
-
-    if (!packet->data) {
-        packet->data = kmalloc(new_data_length, GFP_KERNEL);
-        if (!packet->data) {
-            LOG_ERROR("Failed to allocate memory for %s packet data.", packetTypeString);
-            return false;
-        }
-        LOG_DEBUG("Allocated memory for %s packet data.", packetTypeString);
-    } else {
-        LOG_DEBUG("Memory already allocated for %s packet data.", packetTypeString);
-    }
-
-    if (!skb_copy_bits(skb, 0, packet->data, new_data_length)) {
-        LOG_DEBUG("Successfully copied data from skb to %s packet.", packetTypeString);
-    } else {
-        LOG_ERROR("Failed to copy data from skb to %s packet.", packetTypeString);
-        return false;
-    }
-
-    packet->header->data_length = new_data_length;
-    return true;
-}
-
-
 
 /* 
  * Converts an IP address to a human-readable format and stores it in the provided buffer 

@@ -5,6 +5,7 @@
 #include <linux/kernel.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter/nfnetlink_queue.h>
 #include <linux/ip.h>
 #include <linux/kthread.h>
 #include <linux/completion.h>
@@ -18,18 +19,20 @@
 #define MAX_PENDING_PACKETS 100
 
 typedef void (*packet_processing_callback_t)(void);
+typedef int (*packet_processor_thread_handler_t)(void *data);
 
-extern PacketQueue pending_packets_queue;
+extern struct kfifo pending_packets_queue;
 extern struct completion queue_item_processed;
 extern struct completion userspace_item_ready;
 extern struct completion userspace_item_processed;
 extern struct completion queue_item_added;
 extern PendingPacketRoundTrip *currentPacketTrip;
 extern struct completion queue_processor_exited;
+extern struct task_struct *queue_processor_thread;
 
-
-void setup_netfilter_hooks(void);
+int setup_netfilter_hooks(void);
 void cleanup_netfilter_hooks(void);
 void register_packet_processing_callback(packet_processing_callback_t callback);
-
+int register_queue_processor_thread_handler(packet_processor_thread_handler_t handler);
+void hook_drop(struct net *net);
 #endif // NETFILTER_HOOKS
