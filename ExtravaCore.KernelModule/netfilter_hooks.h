@@ -1,52 +1,54 @@
 #ifndef NETFILTER_HOOKS
 #define NETFILTER_HOOKS
 
-#include <linux/module.h>
+// Includes
+#include <linux/completion.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
 #include <linux/kernel.h>
+#include <linux/kfifo.h>
+#include <linux/kthread.h>
+#include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter/nfnetlink_queue.h>
-#include <linux/ip.h>
-#include <linux/if_ether.h>
-#include <linux/kthread.h>
-#include <linux/completion.h>
 #include <linux/skbuff.h>
-#include "logger.h"
-#include "helpers.h"
 #include "data_structures.h"
+#include "helpers.h"
+#include "logger.h"
 #include "packet_queue.h"
 #include "type_converters.h"
-#include <linux/kfifo.h>
 
-#define PACKET_PROCESSING_TIMEOUT (5 * HZ)  // 5 seconds
+// Constants
 #define MAX_PENDING_PACKETS 100
+#define PACKET_PROCESSING_TIMEOUT (5 * HZ)  // 5 seconds
 
+// Typedefs
 typedef void (*packet_processing_callback_t)(void);
 typedef int (*packet_processor_thread_handler_t)(void *data);
 
+// Extern Variables (alphabetically ordered)
+extern PacketQueue _injectionPacketsQueue;
+extern PacketQueue _pendingPacketsQueue;
+extern PacketQueue _read1PacketsQueue;
+extern PacketQueue _read2PacketsQueue;
+extern PacketQueue _writePacketsQueue;
+extern DECLARE_WAIT_QUEUE_HEAD(_queueItemProcessedWaitQueue);
+extern DECLARE_WAIT_QUEUE_HEAD(_queueProcessorExitedWaitQueue);
+extern DECLARE_WAIT_QUEUE_HEAD(_readQueueItemAddedWaitQueue);
+extern DECLARE_WAIT_QUEUE_HEAD(_userspaceItemProcessedWaitQueue);
+extern bool _queueItemProcessed;
+extern bool _queueProcessorExited;
+extern bool _readQueueItemAdded;
+extern bool _userRead;
+extern bool _userspaceItemProcessed;
+extern struct task_struct *_queueProcessorThread;
 
-extern bool read_queue_item_added;
-extern bool queue_item_processed;
-extern bool queue_processor_exited;
-extern bool userspace_item_processed;
-extern bool user_read;
-extern struct kfifo pending_packets_queue;
-extern struct kfifo read1_packets_queue;
-extern struct kfifo read2_packets_queue;
-extern struct kfifo write_packets_queue;
-extern struct kfifo injection_packets_queue;
-extern wait_queue_head_t queue_item_processed_wait_queue;
-extern wait_queue_head_t userspace_item_ready;
-extern wait_queue_head_t userspace_item_processed_wait_queue;
-extern wait_queue_head_t read_queue_item_added_wait_queue;
-extern wait_queue_head_t user_read_wait_queue;
+// Function Declarations (alphabetically ordered)
+void CleanupNetfilterHooks(void);
+void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason);
+void RegisterPacketProcessingCallback(packet_processing_callback_t callback);
+int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler);
+int SetupNetfilterHooks(void);
 
-
-extern struct task_struct *queue_processor_thread;
-
-int setup_netfilter_hooks(void);
-void cleanup_netfilter_hooks(void);
-void register_packet_processing_callback(packet_processing_callback_t callback);
-int register_queue_processor_thread_handler(packet_processor_thread_handler_t handler);
-void hook_drop(struct net *net);
 #endif // NETFILTER_HOOKS

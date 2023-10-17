@@ -20,13 +20,24 @@ static atomic_t device_open_to_count = ATOMIC_INIT(0);
 static atomic_t device_open_from_count = ATOMIC_INIT(0);
 static bool data_needs_processing = false;
 static bool isLoaded = false;
+bool fired = false;
 bool processingPacketTrip = false;
-
+long packets_captured_counter = 0;
+long packets_processed_counter = 0;
+long packets_accept_counter = 0;
+long packets_manipulate_counter = 0;
+long packets_drop_counter = 0;
 
 DECLARE_WAIT_QUEUE_HEAD(user_read_wait_queue);
 extern bool user_read;
 
-// Open function for our device
+static int dev_usercomm_release(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *mutex_lock, atomic_t *atomic_value){
+    atomic_dec(atomic_value);
+    mutex_unlock(mutex_lock);
+    LOG_INFO("Device %s disconnected from user space", deviceName);
+    return 0;
+}
+
 static int dev_usercomm_open(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *mutex_lock, atomic_t *atomic_value){
     if(!mutex_trylock(mutex_lock)){
         LOG_INFO("Device %s can not lock; is being used by another process.", deviceName);
@@ -38,34 +49,103 @@ static int dev_usercomm_open(struct inode *inodep, struct file *filep, char* dev
     return 0;
 }
 
-static int dev_usercomm_to_open(struct inode *inodep, struct file *filep){
-    return dev_usercomm_open(inodep, filep, DEVICE_NAME, &netmod_to_mutex, &device_open_to_count);
-}
-
-static int dev_usercomm_from_open(struct inode *inodep, struct file *filep){
-    return dev_usercomm_open(inodep, filep, DEVICE_NAME_ACK, &netmod_from_mutex, &device_open_from_count);
-}
-
-void reset_packet_processing(void){
-    processingPacketTrip = false;
+int setup_user_space_comm(void) {
+    processingPacketTrip= false;
     data_needs_processing = false;
-    user_read = false;
-    read_queue_item_added = false;
-    userspace_item_processed = false;
-    queue_item_processed = false;
-    queue_processor_exited = false;
-    //reinit_completion(&read_queue_item_added_wait_queue);
-    //reinit_completion(&userspace_item_processed_wait_queue);
-    //reinit_completion(&userspace_item_ready);
-    //reinit_completion(&queue_item_processed_wait_queue);
-    //reinit_completion(&queue_processor_exited_wait_queue);
+    // Register devices for user space communication
+    majorNumber_to_user = register_chrdev(0, DEVICE_NAME, &fops_netmod_to_user);
+    if (majorNumber_to_user<0){
+        LOG_ERROR("Netmod_to_user failed to register a major number");
+        return -1;
+    }
+
+    majorNumber_from_user = register_chrdev(0, DEVICE_NAME_ACK, &fops_netmod_from_user);
+    if (majorNumber_from_user<0){
+        LOG_ERROR("Netmod_from_user failed to register a major number");
+        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+        return -1;
+    }
+
+    char_class = class_create(CLASS_NAME);
+    if (IS_ERR(char_class)){
+        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+        unregister_chrdev(majorNumber_from_user, DEVICE_NAME);
+        LOG_ERROR("Failed to register device class 'in'");
+        return PTR_ERR(char_class);
+    }
+
+    netmodDevice = device_create(char_class, NULL, MKDEV(majorNumber_to_user, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(netmodDevice)){
+        LOG_ERROR("Failed to create the 'in' device");
+    }
+
+    netmodDeviceAck = device_create(char_class, NULL, MKDEV(majorNumber_from_user, 0), NULL, DEVICE_NAME_ACK);
+    if (IS_ERR(netmodDeviceAck)){
+        LOG_ERROR("Failed to create the 'out' device");
+    }
+
+    mutex_init(&netmod_to_mutex);
+    mutex_init(&netmod_from_mutex);
+    init_waitqueue_head(&pending_packet_queue);
+    init_waitqueue_head(&user_read_wait_queue);
+
+    // Error handling: if either device fails to initialize, cleanup everything and exit
+    if(IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)) {
+        cleanup_user_space_comm();
+        cleanup_netfilter_hooks();
+        return IS_ERR(netmodDevice) ? PTR_ERR(netmodDevice) : PTR_ERR(netmodDeviceAck); 
+    }
+
+    // register_packet_processing_callback(packet_processor);
+    // init_completion(&userspace_item_ready);
+    //init_completion(&userspace_item_processed_wait_queue);
+    int thread_reg = register_queue_processor_thread_handler(packet_processor_thread);
+    if(IS_ERR(thread_reg)){
+        LOG_ERROR("Failed to register queue processor thread handler");
+        cleanup_user_space_comm();
+        cleanup_netfilter_hooks();
+        return IS_ERR(thread_reg);
+    }
+
+    isLoaded = true;
+    return 0;
 }
 
-long packets_captured_counter = 0;
-long packets_processed_counter = 0;
-long packets_accept_counter = 0;
-long packets_manipulate_counter = 0;
-long packets_drop_counter = 0;
+
+void cleanup_user_space_comm(void) {
+    isLoaded = false;
+    processingPacketTrip= false;
+    data_needs_processing = false;
+    
+     // Ensure no one is using the device or waits until they're done
+    // If you've used try_module_get/module_put in your open and release fops, this can help here.
+    LOG_DEBUG("Waiting for user space communication to be released...");
+    while (atomic_read(&device_open_to_count) > 0 || atomic_read(&device_open_from_count) > 0) {
+        msleep(50); // This will sleep for 50ms before checking again.
+    }
+    LOG_DEBUG("...User space communication released");
+
+    // Destroy any synchronization primitives associated with the device
+    LOG_DEBUG("Destroying user space communication synchronization primitives");
+    mutex_destroy(&netmod_to_mutex);
+    mutex_destroy(&netmod_from_mutex);
+
+    // Remove the device files under /dev
+    LOG_DEBUG("Removing user space communication device files");
+    device_destroy(char_class, MKDEV(majorNumber_to_user, 0));
+    device_destroy(char_class, MKDEV(majorNumber_from_user, 0));
+
+    // Cleanup the device class
+    LOG_DEBUG("Cleaning up user space communication device class");
+    class_unregister(char_class);
+    class_destroy(char_class);
+
+    // Unregister the character devices
+    LOG_DEBUG("Unregistering user space communication character devices");
+    unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
+    unregister_chrdev(majorNumber_from_user, DEVICE_NAME_ACK);
+}
+
 int packet_processor_thread(void *data) {
     LOG_INFO("Packet processor thread started");
     long timeout = msecs_to_jiffies(5000); 
@@ -141,6 +221,16 @@ int packet_processor_thread(void *data) {
     queue_processor_exited = true;
     wake_up_interruptible(&queue_processor_exited_wait_queue);
     return 0;
+}
+
+void reset_packet_processing(void){
+    processingPacketTrip = false;
+    data_needs_processing = false;
+    user_read = false;
+    read_queue_item_added = false;
+    userspace_item_processed = false;
+    queue_item_processed = false;
+    queue_processor_exited = false;
 }
 
 static void stopProcessingPacket(PendingPacketRoundTrip *packetTrip){
@@ -290,12 +380,9 @@ static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t le
     return 0;
 }
 
-// This will receive directives from userspace
 static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
 
     // Try to fetch a packetTrip from pending_packets_queue
-    //todo: lock internally on queue?
-    //packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
     if(processingPacketTrip == false){
         return 0;
     }
@@ -392,13 +479,15 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
     return 0;
 }
 
-static int dev_usercomm_release(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *mutex_lock, atomic_t *atomic_value){
-    atomic_dec(atomic_value);
-    mutex_unlock(mutex_lock);
-    LOG_INFO("Device %s disconnected from user space", deviceName);
-    return 0;
+static int dev_usercomm_to_open(struct inode *inodep, struct file *filep){
+    return dev_usercomm_open(inodep, filep, DEVICE_NAME, &netmod_to_mutex, &device_open_to_count);
 }
 
+static int dev_usercomm_from_open(struct inode *inodep, struct file *filep){
+    return dev_usercomm_open(inodep, filep, DEVICE_NAME_ACK, &netmod_from_mutex, &device_open_from_count);
+}
+
+// This will receive directives from userspac
 static int dev_usercomm_to_release(struct inode *inodep, struct file *filep){
     return dev_usercomm_release(inodep, filep, DEVICE_NAME, &netmod_to_mutex, &device_open_to_count);
 }
@@ -419,100 +508,4 @@ static struct file_operations fops_netmod_from_user = {
    .release = dev_usercomm_from_release,
 };
 
-bool fired = false;
 
-int setup_user_space_comm(void) {
-    processingPacketTrip= false;
-    data_needs_processing = false;
-    // Register devices for user space communication
-    majorNumber_to_user = register_chrdev(0, DEVICE_NAME, &fops_netmod_to_user);
-    if (majorNumber_to_user<0){
-        LOG_ERROR("Netmod_to_user failed to register a major number");
-        return -1;
-    }
-
-    majorNumber_from_user = register_chrdev(0, DEVICE_NAME_ACK, &fops_netmod_from_user);
-    if (majorNumber_from_user<0){
-        LOG_ERROR("Netmod_from_user failed to register a major number");
-        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
-        return -1;
-    }
-
-    char_class = class_create(CLASS_NAME);
-    if (IS_ERR(char_class)){
-        unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
-        unregister_chrdev(majorNumber_from_user, DEVICE_NAME);
-        LOG_ERROR("Failed to register device class 'in'");
-        return PTR_ERR(char_class);
-    }
-
-    netmodDevice = device_create(char_class, NULL, MKDEV(majorNumber_to_user, 0), NULL, DEVICE_NAME);
-    if (IS_ERR(netmodDevice)){
-        LOG_ERROR("Failed to create the 'in' device");
-    }
-
-    netmodDeviceAck = device_create(char_class, NULL, MKDEV(majorNumber_from_user, 0), NULL, DEVICE_NAME_ACK);
-    if (IS_ERR(netmodDeviceAck)){
-        LOG_ERROR("Failed to create the 'out' device");
-    }
-
-    mutex_init(&netmod_to_mutex);
-    mutex_init(&netmod_from_mutex);
-    init_waitqueue_head(&pending_packet_queue);
-    init_waitqueue_head(&user_read_wait_queue);
-
-    // Error handling: if either device fails to initialize, cleanup everything and exit
-    if(IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)) {
-        cleanup_user_space_comm();
-        cleanup_netfilter_hooks();
-        return IS_ERR(netmodDevice) ? PTR_ERR(netmodDevice) : PTR_ERR(netmodDeviceAck); 
-    }
-
-    // register_packet_processing_callback(packet_processor);
-    // init_completion(&userspace_item_ready);
-    //init_completion(&userspace_item_processed_wait_queue);
-    int thread_reg = register_queue_processor_thread_handler(packet_processor_thread);
-    if(IS_ERR(thread_reg)){
-        LOG_ERROR("Failed to register queue processor thread handler");
-        cleanup_user_space_comm();
-        cleanup_netfilter_hooks();
-        return IS_ERR(thread_reg);
-    }
-
-    isLoaded = true;
-    return 0;
-}
-
-void cleanup_user_space_comm(void) {
-    isLoaded = false;
-    processingPacketTrip= false;
-    data_needs_processing = false;
-    
-     // Ensure no one is using the device or waits until they're done
-    // If you've used try_module_get/module_put in your open and release fops, this can help here.
-    LOG_DEBUG("Waiting for user space communication to be released...");
-    while (atomic_read(&device_open_to_count) > 0 || atomic_read(&device_open_from_count) > 0) {
-        msleep(50); // This will sleep for 50ms before checking again.
-    }
-    LOG_DEBUG("...User space communication released");
-
-    // Destroy any synchronization primitives associated with the device
-    LOG_DEBUG("Destroying user space communication synchronization primitives");
-    mutex_destroy(&netmod_to_mutex);
-    mutex_destroy(&netmod_from_mutex);
-
-    // Remove the device files under /dev
-    LOG_DEBUG("Removing user space communication device files");
-    device_destroy(char_class, MKDEV(majorNumber_to_user, 0));
-    device_destroy(char_class, MKDEV(majorNumber_from_user, 0));
-
-    // Cleanup the device class
-    LOG_DEBUG("Cleaning up user space communication device class");
-    class_unregister(char_class);
-    class_destroy(char_class);
-
-    // Unregister the character devices
-    LOG_DEBUG("Unregistering user space communication character devices");
-    unregister_chrdev(majorNumber_to_user, DEVICE_NAME);
-    unregister_chrdev(majorNumber_from_user, DEVICE_NAME_ACK);
-}

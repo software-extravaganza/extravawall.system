@@ -4,6 +4,8 @@
 #include <linux/kernel.h>
 #include "logger.h"
 
+#define NAME_OF(x) #x
+
 #define CHECK_NULL(log_type, ptr, ret_val) \
     do { \
         if ((ptr) == NULL) { \
