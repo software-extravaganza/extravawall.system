@@ -27,31 +27,23 @@ DECLARE_WAIT_QUEUE_HEAD(user_read_wait_queue);
 extern bool user_read;
 
 // Open function for our device
-static int dev_usercomm_open(struct inode *inodep, struct file *filep){
-   
-   return 0;
+static int dev_usercomm_open(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *mutex_lock, atomic_t *atomic_value){
+    if(!mutex_trylock(mutex_lock)){
+        LOG_INFO("Device %s can not lock; is being used by another process.", deviceName);
+        return -EBUSY;
+    }
+
+    atomic_inc(atomic_value);
+    LOG_INFO("Device %s connected from user space", deviceName);
+    return 0;
 }
 
 static int dev_usercomm_to_open(struct inode *inodep, struct file *filep){
-    if(!mutex_trylock(&netmod_to_mutex)){
-        LOG_ALERT("Netmod: Device %s used by another process", DEVICE_NAME);
-        return -EBUSY;
-    }
-
-    atomic_inc(&device_open_to_count);
-    LOG_DEBUG_PACKET("Netmod: Device %s opened", DEVICE_NAME);
-    return dev_usercomm_open(inodep, filep);
+    return dev_usercomm_open(inodep, filep, DEVICE_NAME, &netmod_to_mutex, &device_open_to_count);
 }
 
 static int dev_usercomm_from_open(struct inode *inodep, struct file *filep){
-    if(!mutex_trylock(&netmod_from_mutex)){
-        LOG_ALERT("Netmod: Device %s used by another process", DEVICE_NAME_ACK);
-        return -EBUSY;
-    }
-
-    atomic_inc(&device_open_from_count);
-    LOG_DEBUG_PACKET("Netmod: Device %s opened", DEVICE_NAME_ACK);
-    return dev_usercomm_open(inodep, filep);
+    return dev_usercomm_open(inodep, filep, DEVICE_NAME_ACK, &netmod_from_mutex, &device_open_from_count);
 }
 
 void reset_packet_processing(void){
@@ -400,21 +392,19 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
     return 0;
 }
 
-static int dev_usercomm_release(struct inode *inodep, struct file *filep){
-   
-   return 0;
+static int dev_usercomm_release(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *mutex_lock, atomic_t *atomic_value){
+    atomic_dec(atomic_value);
+    mutex_unlock(mutex_lock);
+    LOG_INFO("Device %s disconnected from user space", deviceName);
+    return 0;
 }
 
 static int dev_usercomm_to_release(struct inode *inodep, struct file *filep){
-    atomic_dec(&device_open_to_count);
-    mutex_unlock(&netmod_to_mutex);
-    return dev_usercomm_release(inodep, filep);
+    return dev_usercomm_release(inodep, filep, DEVICE_NAME, &netmod_to_mutex, &device_open_to_count);
 }
 
 static int dev_usercomm_from_release(struct inode *inodep, struct file *filep){
-    atomic_dec(&device_open_from_count);
-    mutex_unlock(&netmod_from_mutex);
-    return dev_usercomm_release(inodep, filep);
+    return dev_usercomm_release(inodep, filep, DEVICE_NAME_ACK, &netmod_from_mutex, &device_open_from_count);
 }
 
 static struct file_operations fops_netmod_to_user = {
