@@ -1,19 +1,27 @@
 #include "netfilter_hooks.h"
 
 PacketQueue pending_packets_queue;
+PacketQueue read1_packets_queue;
+PacketQueue read2_packets_queue;
+PacketQueue write_packets_queue;
+PacketQueue injection_packets_queue;
 static DEFINE_SPINLOCK(pending_packets_lock);
 
-DECLARE_COMPLETION(queue_processor_exited);
-DECLARE_COMPLETION(queue_item_processed);
-DECLARE_COMPLETION(userspace_item_ready);
-DECLARE_COMPLETION(userspace_item_processed);
-DECLARE_COMPLETION(queue_item_added);
-PendingPacketRoundTrip *currentPacketTrip = NULL;
-PendingPacketRoundTrip *processingPacketTrip= NULL;
+bool read_queue_item_added = false;
+bool queue_item_processed = false;
+bool queue_processor_exited = false;
+bool userspace_item_processed = false;
+bool user_read = false;
+DECLARE_WAIT_QUEUE_HEAD(queue_processor_exited_wait_queue);
+DECLARE_WAIT_QUEUE_HEAD(queue_item_processed_wait_queue);
+//DECLARE_WAIT_QUEUE_HEAD(userspace_item_ready);
+DECLARE_WAIT_QUEUE_HEAD(userspace_item_processed_wait_queue);
+DECLARE_WAIT_QUEUE_HEAD(read_queue_item_added_wait_queue);
 
 // Declaration of the netfilter hooks
 static struct nf_hook_ops *nf_pre_routing_ops = NULL;
 static struct nf_hook_ops *nf_post_routing_ops = NULL;
+static struct nf_hook_ops *nf_local_routing_ops = NULL;
 static struct nf_queue_handler *nf_queue_handler_ops = NULL;
 
 static struct kmem_cache *pendingPacket_cache = NULL;
@@ -52,7 +60,7 @@ static inline void handle_packet_decision(PendingPacketRoundTrip *packetTrip, Ro
 
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "%s%s Extrava", decision_icons[decision], get_reason_text(reason));
-    LOG_DEBUG("%s", log_msg);
+    LOG_DEBUG_PACKET("%s", log_msg);
 }
 
 static int packet_queue_handler(struct nf_queue_entry *entry, unsigned int queuenum)
@@ -65,51 +73,94 @@ static int packet_queue_handler(struct nf_queue_entry *entry, unsigned int queue
         return NF_DROP;
     }
 
-    bool is_processed = false;
-    if (!registered_callback) {
-        LOG_ERROR("No callback registered.");
-        handle_packet_decision(packetTrip, DROP, ERROR);
-        packetTrip = NULL;
+    //bool is_processed = false;
+    // if (!registered_callback) {
+    //     LOG_ERROR("No callback registered.");
+    //     handle_packet_decision(packetTrip, DROP, ERROR);
+    //     packetTrip = NULL;
+    //     return NF_DROP;
+    // }
+
+    struct sk_buff *skb = entry->skb;
+    struct ethhdr *eth_header;
+
+    if (!skb) {
+        LOG_ERROR("No skb available");
         return NF_DROP;
     }
 
-    // Signal to userspace that there's a packet to process (e.g., via a char device or netlink).
-    registered_callback();
+    int mac_header_set = skb_mac_header_was_set(skb);
+    if (!mac_header_set) {
+        LOG_DEBUG_PACKET("Ethernet (MAC) header pointer not set in skb");
+    }
+    else {
+        eth_header = (struct ethhdr *)skb_mac_header(skb);
+        if (!eth_header) {
+            LOG_DEBUG_PACKET("No Ethernet (MAC) header found");
+            return NF_DROP;
+        }
 
+        LOG_DEBUG_PACKET("Ethernet (MAC) header found. Size: %zu bytes", sizeof(struct ethhdr));
+    }
+
+  
     // enqueue the packet for further processing
-    int queueLength = pq_len_packetTrip(&pending_packets_queue);
-    LOG_DEBUG("Adding packet to queue. Current queue size: %d; Size after add: %d", queueLength, queueLength + 1);
-    pq_add_packetTrip(&pending_packets_queue, packetTrip);
-    // wake up your processing thread
-    wake_up_process(queue_processor_thread);
+    // int queueLength = pq_len_packetTrip(&pending_packets_queue);
+    // LOG_DEBUG_PACKET("Pushing to pending_packets_queue. Current size: %d; Size after push: %d", queueLength, queueLength + 1);
+    // pq_push_packetTrip(&pending_packets_queue, packetTrip);
+    
+    int queueLength = pq_len_packetTrip(&read1_packets_queue);
+    LOG_DEBUG_PACKET("Pushing to read1_packets_queue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
+    pq_push_packetTrip(&read1_packets_queue, packetTrip);
+    // Signal to userspace that there's a packet to process (e.g., via a char device or netlink).
+    //registered_callback();
 
+    // wake up your processing thread
+    //wake_up_process(queue_processor_thread);
+    read_queue_item_added = true;
+    wake_up_interruptible(&read_queue_item_added_wait_queue);
+    //wake_up_process(queue_processor_thread);
     return 0;
 }
 
 static unsigned int nf_common_routing_handler(RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     lastRoutingType = NONE_ROUTING;
-    struct iphdr *iph = ip_hdr(skb);
-    if (!iph) {
-        LOG_ERROR("IP header is NULL.");
-        return NF_DROP;
-    }
+    CHECK_NULL(LOG_TYPE_ERROR, state, NF_DROP);
+    char* hookName = TEST_AND_MAKE_STRING_OR_EMPTY(LOG_TYPE_DEBUG_PACKET, state->hook, hook_to_string(value));
+    char* routeTypeName = route_type_to_string(type);
+    CHECK_NULL_AND_LOG(LOG_TYPE_ERROR, skb, NF_DROP, LOG_TYPE_DEBUG_PACKET, "skb pointer: %p length: %u", skb, skb->len);
+    struct iphdr *ip_header = ip_hdr(skb);
+    CHECK_NULL(LOG_TYPE_ERROR, ip_header, NF_DROP);
+    CHECK_NULL(LOG_TYPE_ERROR, ip_header->protocol, NF_DROP);
+    char* protocolName = ip_protocol_to_string(ip_header->protocol);
+    TEST_NULL(LOG_TYPE_DEBUG_PACKET, ip_header->tos);
+    char* type_of_service = TOS_TO_STRING(ip_header->tos);
 
-    if (iph->protocol != IPPROTO_ICMP) {
+    if (ip_header->protocol != IPPROTO_ICMP){ //} || type == LOCAL_ROUTING) {
         return NF_ACCEPT;
     }
 
+    LOG_DEBUG_PACKET("ICMP packet received. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, type_of_service, hookName);
+
     if(!isActive){
-        LOG_DEBUG("Extrava is not active. Dropping packet.");
+        LOG_DEBUG_PACKET("Extrava is not active. Dropping packet. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, type_of_service, hookName);
         return NF_DROP;
     }
 
-    LOG_DEBUG("ICMP packet received. Routing Type: %d Type: %u, Code: %u", type, iph->protocol, iph->tos);
-    if(!skb){
-        LOG_ERROR("skb is NULL.");
-        return NF_DROP;
+    struct ethhdr *eth_header;
+    int mac_header_set = skb_mac_header_was_set(skb);
+    if (!mac_header_set) {
+        LOG_DEBUG_PACKET("Ethernet (MAC) header pointer not set in skb. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, type_of_service, hookName);
     }
+    else {
+        eth_header = (struct ethhdr *)skb_mac_header(skb);
+        if (!eth_header) {
+            LOG_DEBUG_PACKET("No Ethernet (MAC) header found. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, type_of_service, hookName);
+            return NF_DROP;
+        }
 
-    LOG_DEBUG("skb pointer: %p length: %u", skb, skb->len);
+        LOG_DEBUG_PACKET("Ethernet (MAC) header found. Size: %zu bytes. Routing Type: %s, Protocol: %s, ToS: %u, Hook Type: %s", sizeof(struct ethhdr), routeTypeName, protocolName, type_of_service, hookName);
+    }
 
     if (skb_is_nonlinear(skb)) {
         if (!skb_try_make_writable(skb, skb->len)) {
@@ -124,8 +175,8 @@ static unsigned int nf_common_routing_handler(RoutingType type, void *priv, stru
 
     
 
-    // wait_for_completion_interruptible(&userspace_item_processed);
-    // reinit_completion(&userspace_item_processed);
+    // wait_for_completion_interruptible(&userspace_item_processed_wait_queue);
+    // reinit_completion(&userspace_item_processed_wait_queue);
     // if(!currentPacketTrip){
     //     LOG_ERROR("PacketTrip is NULL after processing");
     //     handle_packet_decision(currentPacketTrip, DROP, ERROR);
@@ -150,6 +201,10 @@ static unsigned int nf_pre_routing_handler(void *priv, struct sk_buff *skb, cons
 
 static unsigned int nf_post_routing_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
     return nf_common_routing_handler(POST_ROUTING, priv, skb, state);
+}
+
+static unsigned int nf_local_routing_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
+    return nf_common_routing_handler(LOCAL_ROUTING, priv, skb, state);
 }
 
 static struct nf_queue_handler* setup_queue_handler_hook(void) {
@@ -206,7 +261,7 @@ static struct nf_hook_ops* setup_individual_hook(nf_hookfn *handler, unsigned in
 /**
  * Handle errors during netfilter hook setup.
  */
-static void handle_setup_error(struct task_struct *thread, struct nf_hook_ops *pre_ops, struct nf_hook_ops *post_ops) {
+static void handle_setup_error(struct task_struct *thread, struct nf_hook_ops *pre_ops, struct nf_hook_ops *post_ops, struct nf_hook_ops *local_ops) {
     if (pre_ops) {
         nf_unregister_net_hook(&init_net, pre_ops);
         kfree(pre_ops);
@@ -217,27 +272,52 @@ static void handle_setup_error(struct task_struct *thread, struct nf_hook_ops *p
         kfree(post_ops);
     }
 
+    if (local_ops) {
+        nf_unregister_net_hook(&init_net, local_ops);
+        kfree(local_ops);
+    }
+
     if (thread) {
         kthread_stop(thread);
     }
 
     pq_cleanup(&pending_packets_queue);  // Function to cleanup any remaining items in the queue
+    pq_cleanup(&read1_packets_queue);
+    pq_cleanup(&read2_packets_queue);
+    pq_cleanup(&write_packets_queue);
+    pq_cleanup(&injection_packets_queue);
 }
 
 
 int setup_netfilter_hooks(void) {
     LOG_DEBUG("Initializing packet queues");
-    init_completion(&queue_item_added);
-    init_completion(&queue_item_processed);
-    init_completion(&queue_processor_exited);
-    init_completion(&userspace_item_processed);
+    // init_completion(&read_queue_item_added_wait_queue);
+    // init_completion(&queue_item_processed_wait_queue);
+    // init_completion(&queue_processor_exited_wait_queue);
+    // init_completion(&userspace_item_processed_wait_queue);
+    read_queue_item_added = false;
+    queue_item_processed = false;
+    queue_processor_exited = false;
+    userspace_item_processed = false;
+    user_read = false;
+    init_waitqueue_head(&read_queue_item_added_wait_queue);
+    init_waitqueue_head(&queue_item_processed_wait_queue);
+    init_waitqueue_head(&queue_processor_exited_wait_queue);
+    init_waitqueue_head(&userspace_item_processed_wait_queue);
+
+
+
     pq_initialize(&pending_packets_queue);
+    pq_initialize(&read1_packets_queue);
+    pq_initialize(&read2_packets_queue);
+    pq_initialize(&write_packets_queue);
+    pq_initialize(&injection_packets_queue);
 
     LOG_DEBUG("Initializing netfilter pre-routing hooks");
     nf_pre_routing_ops = setup_individual_hook((nf_hookfn*)nf_pre_routing_handler, NF_INET_PRE_ROUTING);
     if (!nf_pre_routing_ops) {
         LOG_ERROR("Failed to set up pre-routing hook.");
-        handle_setup_error(queue_processor_thread, NULL, NULL);
+        handle_setup_error(queue_processor_thread, NULL, NULL, NULL);
         return PTR_ERR(nf_pre_routing_ops);
     }
 
@@ -245,8 +325,16 @@ int setup_netfilter_hooks(void) {
     nf_post_routing_ops = setup_individual_hook((nf_hookfn*)nf_post_routing_handler, NF_INET_POST_ROUTING);
     if (!nf_post_routing_ops) {
         LOG_ERROR("Failed to set up post-routing hook.");
-        handle_setup_error(queue_processor_thread, nf_pre_routing_ops, NULL);
+        handle_setup_error(queue_processor_thread, nf_pre_routing_ops, NULL, NULL);
         return PTR_ERR(nf_post_routing_ops);
+    }
+
+    LOG_DEBUG("Initializing netfilter post-routing hooks");
+    nf_local_routing_ops = setup_individual_hook((nf_hookfn*)nf_local_routing_handler, NF_INET_LOCAL_OUT);
+    if (!nf_local_routing_ops) {
+        LOG_ERROR("Failed to set up post-routing hook.");
+        handle_setup_error(queue_processor_thread, nf_pre_routing_ops, nf_post_routing_ops, NULL);
+        return PTR_ERR(nf_local_routing_ops);
     }
 
     LOG_DEBUG("Initializing packet queue handler");
@@ -275,8 +363,19 @@ void cleanup_netfilter_hooks(void) {
         nf_post_routing_ops = NULL;
     }
 
+    LOG_DEBUG("Cleaning up netfilter local-routing hooks");
+    if (nf_local_routing_ops) {
+        nf_unregister_net_hook(&init_net, nf_local_routing_ops);
+        kfree(nf_local_routing_ops);
+        nf_local_routing_ops = NULL;
+    }
+
     LOG_DEBUG("Cleaning up packet queue");
     pq_cleanup(&pending_packets_queue);
+    pq_cleanup(&read1_packets_queue);
+    pq_cleanup(&read2_packets_queue);
+    pq_cleanup(&write_packets_queue);
+    pq_cleanup(&injection_packets_queue);
 
     LOG_DEBUG("Cleaning up netfilter queue hooks");
     if(nf_queue_handler_ops){

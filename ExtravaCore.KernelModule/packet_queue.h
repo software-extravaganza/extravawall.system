@@ -8,7 +8,7 @@
 
 typedef struct kfifo PacketQueue;
 
-bool pq_add_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
+bool pq_push_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
 PendingPacketRoundTrip* pq_peek_packetTrip(PacketQueue *queue);
 PendingPacketRoundTrip* pq_pop_packetTrip(PacketQueue *queue);
 void pq_initialize(PacketQueue *queue);

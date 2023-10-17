@@ -16,7 +16,8 @@ using System.Runtime.InteropServices;
 public enum RoutingType : int {
     NONE = 0,
     PRE_ROUTING = 1,  // Signifies if the packet is in the pre-routing stage
-    POST_ROUTING = 2  // Signifies if the packet is in the post-routing stage
+    POST_ROUTING = 2, // Signifies if the packet is in the post-routing stage
+    LOCAL_ROUTING = 3 // Signifies if the packet is in the local-routing stage
 }
 
 public enum RoutingDecision : int {
@@ -181,15 +182,27 @@ public class KernelClient {
         return options;
     }
 
-    public static IPHeader ParseIPHeader(byte[] data) {
+    public class CreationResult<T> {
+        public T? Value { get; private set; }
+        public bool Success { get; private set; }
+        public string? Error { get; private set; }
+
+        public CreationResult(T? value, bool success, string? error) {
+            Value = value;
+            Success = success;
+            Error = error;
+        }
+    }
+
+    public static CreationResult<IPHeader> ParseIPHeader(byte[] data) {
         if (data.Length < 20) {
-            throw new ArgumentException("Data is too short to be a valid IP header.");
+            return new CreationResult<IPHeader>(null, false, "Data is too short to be a valid IP header.");
         }
 
         byte version = (byte)(data[0] >> 4);
         if (version != 4) // We only handle IPv4 here
         {
-            throw new ArgumentException("Only IPv4 is supported.");
+            return new CreationResult<IPHeader>(null, false, "Only IPv4 is supported.");
         }
 
         var ipHeader = new IPHeader {
@@ -211,7 +224,7 @@ public class KernelClient {
             ipHeader.Options = ParseIPOptions(data.Skip(20).Take((ihl - 5) * 4).ToArray());
         }
 
-        return ipHeader;
+        return new CreationResult<IPHeader>(ipHeader, true, null);
     }
 
     public static TCPHeader ParseTCPHeader(byte[] data) {
@@ -325,12 +338,19 @@ public class KernelClient {
                     var routingDecision = RoutingDecision.UNDECIDED;
                     //EthernetHeader ethernetHeader = ParseEthernetHeader(packetData);
                     //if (ethernetHeader.Type == EtherType.IPv4) {
-                    IPHeader ipHeader = ParseIPHeader(packetData); //.Skip(14).ToArray());
+                    CreationResult<IPHeader> ipHeaderResult = ParseIPHeader(packetData); //.Skip(14).ToArray());
+                    if (!ipHeaderResult.Success || ipHeaderResult.Value is null) {
+                        Console.WriteLine(ipHeaderResult.Error);
+                        continue;
+                    }
+
+                    IPHeader ipHeader = ipHeaderResult.Value;
                     if (ipHeader.Protocol == IPProtocol.TCP) {
                         TCPHeader tcpHeader = ParseTCPHeader(packetData.Skip(14 + (ipHeader.VersionAndHeaderLength & 0xF) * 4).ToArray());
                         // Continue with further processing.
                     } else if (ipHeader.Protocol == IPProtocol.ICMP) {
-                        if ((ipHeader.DestinationAddressString == "1.1.1.2" && routingType == RoutingType.POST_ROUTING) || routingType == RoutingType.PRE_ROUTING) {
+                        Console.WriteLine($"Ping! Source {ipHeader.SourceAddressString}, Destination {ipHeader.DestinationAddressString}, Routing Type {routingType}");
+                        if ((ipHeader.DestinationAddressString == "1.1.1.2" && routingType != RoutingType.PRE_ROUTING) || routingType == RoutingType.PRE_ROUTING) {
                             routingDecision = RoutingDecision.ACCEPT;
                         } else {
                             routingDecision = RoutingDecision.DROP;
@@ -353,7 +373,6 @@ public class KernelClient {
                         var responseVersionBytes = BitConverter.GetBytes(1);
                         var responseDataBytes = BitConverter.GetBytes(1);
                         var decisionBytes = BitConverter.GetBytes((int)decision);
-                        Console.WriteLine($"Sending response: {PrintByteArray(responseVersionBytes.ToArray())} {PrintByteArray(responseDataBytes.ToArray())} {PrintByteArray(decisionBytes.ToArray())}");
                         // if (BitConverter.IsLittleEndian) {
                         //     responseVersionBytes = responseVersionBytes.Reverse().ToArray();
                         //     responseDataBytes = responseDataBytes.Reverse().ToArray();

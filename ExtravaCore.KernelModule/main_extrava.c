@@ -45,7 +45,7 @@ static int __init extrava_init(void) {
         return -1;
     }
 
-    LOG_DEBUG("Initializing packet queue");
+    LOG_DEBUG("Initializing netfilter hooks");
     if(setup_netfilter_hooks() != 0){
         LOG_ERROR("Failed to setup netfilter hooks");
         return -1;

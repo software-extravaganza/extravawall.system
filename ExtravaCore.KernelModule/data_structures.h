@@ -8,13 +8,15 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/netfilter/nf_queue.h>
 #include <linux/skbuff.h>
+#include <linux/ip.h>
 #include "logger.h"
 
 /* Enumerations for Routing Types and Decisions */
 typedef enum {
     NONE_ROUTING = 0,
-    PRE_ROUTING = 1,  // Signifies if the packet is in the pre-routing stage
-    POST_ROUTING = 2  // Signifies if the packet is in the post-routing stage
+    PRE_ROUTING = 1,    // Signifies if the packet is in the pre-routing stage
+    POST_ROUTING = 2,   // Signifies if the packet is in the post-routing stage
+    LOCAL_ROUTING = 3   // Signifies if the packet is in the local-routing stage
 } RoutingType;
 
 typedef enum {

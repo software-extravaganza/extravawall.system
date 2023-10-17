@@ -31,7 +31,8 @@
         "netfilter_hooks.h": "c",
         "skbuff.h": "c",
         "compare": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "typeinfo": "cpp"
     },
     "cSpell.customDictionaries": {
         "custom-dictionary-workspace": {

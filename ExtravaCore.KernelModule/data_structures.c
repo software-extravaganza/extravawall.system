@@ -150,13 +150,10 @@ char* createPacketTypeStringFromType(RoundTripPacketType type) {
     switch (type) {
         case REQUEST_PACKET:
             return "Request";
-            break;
         case RESPONSE_PACKET:
             return "Response";
-            break;
         default:
             return "Unknown";
-            break;
     }
 }
 

@@ -10,7 +10,7 @@ void pq_initialize(PacketQueue *queue) {
     }
 }
 
-bool pq_add_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip) {
+bool pq_push_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip) {
     return kfifo_in(queue, &packetTrip, sizeof(packetTrip));
 }
 
@@ -19,24 +19,24 @@ bool pq_remove_packetTrip(PacketQueue *queue, PendingPacketRoundTrip *packetTrip
 }
 
 int pq_len_packetTrip(PacketQueue *queue) {
-    return kfifo_len(queue);
+    return kfifo_len(queue) / sizeof(PendingPacketRoundTrip *);
 }
 
 PendingPacketRoundTrip* pq_peek_packetTrip(PacketQueue *queue) {
-    LOG_DEBUG("Peeking packet trip from queue. Current queue length: %d", pq_len_packetTrip(queue));
-    PendingPacketRoundTrip *packetTrip;
+    LOG_DEBUG_PACKET("Peeking packet trip from queue. Current queue length: %d", pq_len_packetTrip(queue));
+    PendingPacketRoundTrip *packetTrip = NULL;
     kfifo_peek(queue, &packetTrip); 
-    LOG_DEBUG("Peek");
+    LOG_DEBUG_PACKET("Peek");
     return packetTrip;
 }
 
 PendingPacketRoundTrip* pq_pop_packetTrip(PacketQueue *queue) {
-    PendingPacketRoundTrip *packetTrip;
+    PendingPacketRoundTrip *packetTrip = NULL;
     if (kfifo_out(queue, &packetTrip, sizeof(packetTrip))){
         return packetTrip;
     }
     else{
-        LOG_DEBUG("Pop returning NULL packet trip.");
+        LOG_DEBUG_PACKET("Pop returning NULL packet trip.");
         return NULL;
     }
 }

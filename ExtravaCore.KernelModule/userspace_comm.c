@@ -20,11 +20,11 @@ static atomic_t device_open_to_count = ATOMIC_INIT(0);
 static atomic_t device_open_from_count = ATOMIC_INIT(0);
 static bool data_needs_processing = false;
 static bool isLoaded = false;
-PendingPacketRoundTrip *processedPacketTrip = NULL;
+bool processingPacketTrip = false;
 
 
-DECLARE_WAIT_QUEUE_HEAD(user_read_queue);
-bool is_data_ready_for_user = false;
+DECLARE_WAIT_QUEUE_HEAD(user_read_wait_queue);
+extern bool user_read;
 
 // Open function for our device
 static int dev_usercomm_open(struct inode *inodep, struct file *filep){
@@ -39,7 +39,7 @@ static int dev_usercomm_to_open(struct inode *inodep, struct file *filep){
     }
 
     atomic_inc(&device_open_to_count);
-    LOG_DEBUG("Netmod: Device %s opened", DEVICE_NAME);
+    LOG_DEBUG_PACKET("Netmod: Device %s opened", DEVICE_NAME);
     return dev_usercomm_open(inodep, filep);
 }
 
@@ -50,42 +50,84 @@ static int dev_usercomm_from_open(struct inode *inodep, struct file *filep){
     }
 
     atomic_inc(&device_open_from_count);
-    LOG_DEBUG("Netmod: Device %s opened", DEVICE_NAME_ACK);
+    LOG_DEBUG_PACKET("Netmod: Device %s opened", DEVICE_NAME_ACK);
     return dev_usercomm_open(inodep, filep);
 }
 
+void reset_packet_processing(void){
+    processingPacketTrip = false;
+    data_needs_processing = false;
+    user_read = false;
+    read_queue_item_added = false;
+    userspace_item_processed = false;
+    queue_item_processed = false;
+    queue_processor_exited = false;
+    //reinit_completion(&read_queue_item_added_wait_queue);
+    //reinit_completion(&userspace_item_processed_wait_queue);
+    //reinit_completion(&userspace_item_ready);
+    //reinit_completion(&queue_item_processed_wait_queue);
+    //reinit_completion(&queue_processor_exited_wait_queue);
+}
+
+long packets_captured_counter = 0;
+long packets_processed_counter = 0;
+long packets_accept_counter = 0;
+long packets_manipulate_counter = 0;
+long packets_drop_counter = 0;
 int packet_processor_thread(void *data) {
-    LOG_DEBUG("Packet processor thread started");
+    LOG_INFO("Packet processor thread started");
+    long timeout = msecs_to_jiffies(5000); 
     while (!kthread_should_stop()) {
         // Sleep until there's work to do
-        LOG_DEBUG("Waiting for new packet trip");
-        wait_for_completion_interruptible(&queue_item_added);
-        reinit_completion(&queue_item_added);
-
-        // Dequeue a packet for processing
-        int queueLength = pq_len_packetTrip(&pending_packets_queue);
-        LOG_DEBUG("Processing new packet trip. Current queue size: %d; Size after add: %d", queueLength, queueLength + 1);
-        currentPacketTrip = pq_pop_packetTrip(&pending_packets_queue);
-        if (currentPacketTrip == NULL || currentPacketTrip->entry == NULL) {
-            LOG_ERROR("Invalid packetTrip structure");
-            continue;
+        LOG_DEBUG_PACKET("Waiting for new packet trip");
+        
+        wait_event_interruptible(read_queue_item_added_wait_queue, read_queue_item_added == true);
+        read_queue_item_added = false;
+        packets_captured_counter++;
+        if(packets_captured_counter % 1000 == 0){
+            LOG_INFO("Packets captured: %ld; Packets processed: %ld; Packets accepted: %ld; Packets modified: %ld; Packets dropped: %ld", packets_captured_counter, packets_processed_counter, packets_accept_counter, packets_manipulate_counter, packets_drop_counter);
         }
-        LOG_DEBUG("Packet trip info: %p; Packet to eval: %p (size: %d)", currentPacketTrip, currentPacketTrip->entry->skb, currentPacketTrip->entry->skb->len);
+
         // Communicate with user space and process the packet
-        is_data_ready_for_user = true;
-        wake_up_interruptible(&user_read_queue);  // Notify the read handler
+        user_read = true;
+        wake_up_interruptible(&user_read_wait_queue);  // Notify the read handler
 
         // Wait until user has processed the packet
-        LOG_DEBUG("Waiting for user space to process packet");
-        wait_for_completion_interruptible(&userspace_item_processed);
-        
-        if(processedPacketTrip == NULL){
+        LOG_DEBUG_PACKET("Waiting for user space to process packet");
+        long ret = wait_event_interruptible_timeout(userspace_item_processed_wait_queue, userspace_item_processed == true, timeout);
+        userspace_item_processed = false;
+
+        if (ret == 0) {
+            LOG_DEBUG_PACKET("Packet processor thread timed out on userspace_item_processed_wait_queue");
+            reset_packet_processing();
+            continue;
+        } else if (ret == -ERESTARTSYS) {
+            LOG_ERROR("Packet processor thread failed on userspace_item_processed_wait_queue");
+            reset_packet_processing();
+            continue;
+        }
+
+        int queueLength = pq_len_packetTrip(&injection_packets_queue);
+        LOG_DEBUG_PACKET("Popping from pq_pop_packetTrip. Current size: %d; Size after pop: %d", queueLength, queueLength - 1);
+        PendingPacketRoundTrip *packetTrip = pq_pop_packetTrip(&injection_packets_queue);
+        if(packetTrip == NULL){
             LOG_ERROR("Processed packet trip is null");
             continue;
         }
         
-        LOG_DEBUG("User space has processed packet with decision %lld", processedPacketTrip->decision);
-        nf_reinject(processedPacketTrip->entry, processedPacketTrip->decision == ACCEPT ? NF_ACCEPT : NF_DROP);
+        LOG_DEBUG_PACKET("User space has processed packet with decision %lld. Reinjecting...", packetTrip->decision);
+        nf_reinject(packetTrip->entry, packetTrip->decision == ACCEPT ? NF_ACCEPT : NF_DROP);
+        if(packetTrip->decision == ACCEPT){
+            packets_accept_counter++;
+        }
+        else if(packetTrip->decision == MANIPULATE){
+            packets_manipulate_counter++;
+        }
+        else if(packetTrip->decision == DROP){
+            packets_drop_counter++;
+        }
+
+        LOG_DEBUG_PACKET("Reinjection complete (%lld)", packetTrip->decision);
         // if (user_decision == DROP) {
         //     kfree_skb(processedPacketTrip->packet);
         // } else if (user_decision == ACCEPT) {
@@ -97,168 +139,99 @@ int packet_processor_thread(void *data) {
         // }
 
         // Ensure you also free any additional memory or structures related to processedPacketTrip
-        free_pending_packetTrip(processedPacketTrip);
-        processedPacketTrip = NULL;
-        reinit_completion(&userspace_item_processed); 
-        LOG_DEBUG("Packet trip processed. Done cleaning up and ready for new packet.");
+        free_pending_packetTrip(packetTrip);
+        LOG_DEBUG_PACKET("Packet trip processed. Done cleaning up and ready for new packet.");
+        packets_processed_counter++;
     }
 
     // Signal that we're done processing and exiting
-    LOG_DEBUG("Packet processor thread exiting");
-    complete(&queue_processor_exited);
+    LOG_INFO("Packet processor thread exiting");
+    queue_processor_exited = true;
+    wake_up_interruptible(&queue_processor_exited_wait_queue);
     return 0;
 }
 
-// This will send packets to userspace
-//static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
-    // int error_count = 0;
-    // PendingPacketRoundTrip *packetTrip;
-    // LOG_DEBUG("Read active for %s", DEVICE_NAME);
-    // // Try to fetch a packetTrip from pending_packets_queue
-    // //todo: lock internally on queue?
-    // packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
-    
-    // while (!packetTrip || !packetTrip->packet) {
-    //     LOG_DEBUG("No packet found");
-    //     if (filep->f_flags & O_NONBLOCK){
-    //         LOG_WARN("Non-blocking read, no packet found for %s", DEVICE_NAME);
-    //         return -EAGAIN;
-    //     }
-
-    //     LOG_DEBUG("Blocking read for %s. Waiting for new data...", DEVICE_NAME);
-    //     //int ret = wait_event_interruptible_timeout(pending_packet_queue, (packetTrip = pq_peek_packetTrip(&pending_packets_queue)), PACKET_PROCESSING_TIMEOUT);
-    //     //int ret = wait_event_interruptible(pending_packet_queue, (packetTrip = pq_peek_packetTrip(&pending_packets_queue)));
-    //     unsigned long start_time = jiffies;
-    //     unsigned long end_time = start_time + PACKET_PROCESSING_TIMEOUT;
-
-    //     // Avoid using functions that can sleep or block in sections of code that are within an RCU read-side critical section. 
-    //     // While is not elegant but using busy-waiting (spin-waiting) to yield the CPU for a short period of time if the condition isn't met
-    //     // This also give time for the queue processor thread to process the packet
-    //     while (!data_needs_processing && isLoaded) {  // && !kthread_should_stop()
-    //         // Yield the processor for a short duration
-    //         schedule_timeout_uninterruptible(1);
-    //     }
-    //     data_needs_processing = false;
-
-    //     if(!isLoaded){  // || kthread_should_stop()
-    //         return -EINVAL;
-    //     }
-
-    //     packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
-    //     if(packetTrip && packetTrip->packet && packetTrip->packet->header){
-    //         LOG_DEBUG("...new packet found available on %s.", DEVICE_NAME);
-    //         break;
-    //     }
-
-    //     if(packetTrip && !packetTrip->packet){
-    //         LOG_WARN("...packet found but packet is not available on %s.", DEVICE_NAME);
-    //         return -ERESTARTSYS;
-    //     }
-
-    //     if(packetTrip && packetTrip->packet && !packetTrip->packet->header){
-    //         LOG_WARN("...packet found but header is not available on %s.", DEVICE_NAME);
-    //         return -ERESTARTSYS;
-    //     }
-
-        
-    //     //LOG_DEBUG("...wait_event_interruptible returned %d", ret);
-    //     // Check the return value for timeout (ret == 0) or error (ret == -ERESTARTSYS)
-    //     // if (ret == 0) {
-    //     //     LOG_WARN("user space communication moving to next packet due to timeout\n");
-    //     //     return -ERESTARTSYS;
-    //     // } else if (ret == -ERESTARTSYS) {
-    //     //     LOG_ERROR("user space communication failed\n");
-    //     //     return -ERESTARTSYS;
-    //     // }
-
-    //     LOG_DEBUG("...still waiting for packets on %s.", DEVICE_NAME);
-    //     //return -ERESTARTSYS; // Signal received, stop waiting
-    // }
-
-static void stopProcessingPacket(void){
-    LOG_DEBUG("STOPPING PROCESSING FOR THIS PACKET");
-    if(processedPacketTrip != NULL){
-        free_pending_packetTrip(processedPacketTrip);
-        processedPacketTrip = NULL;
+static void stopProcessingPacket(PendingPacketRoundTrip *packetTrip){
+    LOG_DEBUG_PACKET("STOPPING PROCESSING FOR THIS PACKET");
+    if (packetTrip == NULL || packetTrip->packet == NULL || packetTrip->entry == NULL || packetTrip->entry->skb == NULL) {
+        LOG_ERROR("Invalid packetTrip structure");
+    }
+    else{
+        int injectQueueLength = pq_len_packetTrip(&injection_packets_queue);
+        LOG_DEBUG_PACKET("Processing packet trip. Current injection queue size: %d; Size after add: %d", injectQueueLength, injectQueueLength + 1);
+        pq_push_packetTrip(&injection_packets_queue, packetTrip);
     }
 
-    if (currentPacketTrip != NULL){
-        processedPacketTrip = currentPacketTrip;
-        currentPacketTrip = NULL;
-    }
-    
-    is_data_ready_for_user = false;
+    user_read = false;
     processingPacketTrip = false;
-    complete(&userspace_item_processed); 
-    
+    userspace_item_processed = true;
+    wake_up_interruptible(&userspace_item_processed_wait_queue);
+    //wake_up_process(queue_processor_thread);
 }
 
 static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t len, loff_t *offset) {
     int error_count = 0;
     //PendingPacketRoundTrip *packetTrip;
-    LOG_DEBUG("Read active for %s", DEVICE_NAME);
-    //buf[0] = 1;
+    LOG_DEBUG_PACKET("Read active for %s", DEVICE_NAME);
+    LOG_DEBUG_PACKET("Blocking read for %s. Waiting for new data...", DEVICE_NAME);
+    // Using wait_event_interruptible to sleep until a packet is available
+    wait_event_interruptible(user_read_wait_queue, user_read);
+
+    LOG_DEBUG_PACKET("Woke up from wait_event_interruptible for %s", DEVICE_NAME);
+    if (filep->f_flags & O_NONBLOCK) {
+        LOG_WARN("Non-blocking read, no packet found for %s", DEVICE_NAME);
+        stopProcessingPacket(NULL);
+        return -EAGAIN;
+    }
+
+    // Re-check packet after being woken up
+    //packetTrip = pq_peek_packetTrip(&pending_packets_queue);
+    processingPacketTrip = true;
     
-    //return 0;
-   // packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
 
-    while (!is_data_ready_for_user) {
-        LOG_DEBUG("Blocking read for %s. Waiting for new data...", DEVICE_NAME);
-        // Using wait_event_interruptible to sleep until a packet is available
-        if (wait_event_interruptible(user_read_queue, is_data_ready_for_user)) {
-            LOG_ERROR("Received signal, stopping wait");
-            stopProcessingPacket();
-            return -ERESTARTSYS;
-        }
-
-        LOG_DEBUG("Woke up from wait_event_interruptible for %s", DEVICE_NAME);
-        if (filep->f_flags & O_NONBLOCK) {
-            LOG_WARN("Non-blocking read, no packet found for %s", DEVICE_NAME);
-            stopProcessingPacket();
-            return -EAGAIN;
-        }
-
-        // Re-check packet after being woken up
-        //packetTrip = pq_peek_packetTrip(&pending_packets_queue);
-        processingPacketTrip = true;
-    }
-
-    if(!is_data_ready_for_user){
+    if(!user_read){
         LOG_ERROR("Packet is not being processed");
-        stopProcessingPacket();
-        return -EFAULT;
+        return 0;
     }
 
-    if (currentPacketTrip == NULL || currentPacketTrip->packet == NULL || currentPacketTrip->entry == NULL || currentPacketTrip->entry->skb == NULL) {
-        LOG_ERROR("Invalid packetTrip structure");
-        stopProcessingPacket();
-        return -EFAULT;
+    int queue1Length = pq_len_packetTrip(&read1_packets_queue);
+    int queue2Length = pq_len_packetTrip(&read2_packets_queue);
+    PendingPacketRoundTrip *packetTrip = NULL;
+    if(queue2Length > 0){
+        LOG_DEBUG_PACKET("Popping from read2_packets_queue. Current size: %d; Size after pop: %d", queue2Length, queue2Length - 1);
+        packetTrip = pq_pop_packetTrip(&read2_packets_queue);
     }
     else{
-        LOG_DEBUG("Valid packetTrip structure");
+        LOG_DEBUG_PACKET("Popping from read1_packets_queue. Current size: %d; Size after pop: %d", queue1Length, queue1Length - 1);
+        packetTrip = pq_pop_packetTrip(&read1_packets_queue);
     }
-    
-    LOG_DEBUG("Packet trip info: %p; Packet to eval: %p (size: %d)", currentPacketTrip, currentPacketTrip->packet, currentPacketTrip->entry->skb->len);
-    if(!currentPacketTrip->packet->headerProcessed && !currentPacketTrip->packet->dataProcessed){
+
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->packet, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry->skb, -EFAULT, stopProcessingPacket(packetTrip));
+
+    LOG_DEBUG_PACKET("Packet trip info: %p; Packet to eval: %p (size: %d)", packetTrip, packetTrip->entry->skb, packetTrip->entry->skb->len);
+    if(!packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
         s32 transactionSize = sizeof(s32)*3;
-        LOG_DEBUG("Neither header nor data has been processed. Processing header (%d bytes)...", transactionSize);
+        LOG_DEBUG_PACKET("Neither header nor data has been processed. Processing header (%d bytes)...", transactionSize);
         // Ensure user buffer has enough space
         if (len < transactionSize) {
             LOG_ERROR("User buffer is too small to hold packetTrip header %zu < %zu", len, transactionSize);
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EINVAL;
         }
 
         // Copy header to user space
-        LOG_DEBUG("Sending packetTrip header to user space; Version: %d; Length: %zu bytes", COMM_VERSION, transactionSize);
+        LOG_DEBUG_PACKET("Sending packetTrip header to user space; Version: %d; Length: %zu bytes", COMM_VERSION, transactionSize);
         unsigned char headerVersion[sizeof(s32)];
         int_to_bytes(COMM_VERSION, headerVersion);
 
         unsigned char headerLength[sizeof(s32)];
-        int_to_bytes(currentPacketTrip->entry->skb->len, headerLength);
+        int_to_bytes(packetTrip->entry->skb->len, headerLength);
 
         unsigned char headerRoutingType[sizeof(s32)];
-        int_to_bytes(currentPacketTrip->routingType, headerRoutingType);
+        int_to_bytes(packetTrip->routingType, headerRoutingType);
 
         unsigned char headerPayload[transactionSize];
         memcpy(headerPayload, headerRoutingType, sizeof(s32));
@@ -268,78 +241,97 @@ static ssize_t dev_usercomm_read(struct file *filep, char __user *buf, size_t le
         error_count = copy_to_user(buf, headerPayload, transactionSize);
         if (error_count){
             LOG_ERROR("Failed to copy packetTrip header to user space");
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EFAULT;
         }
 
-        currentPacketTrip->packet->headerProcessed = true;
-        LOG_DEBUG("... header has been processed");
+        packetTrip->packet->headerProcessed = true;
+        LOG_DEBUG_PACKET("... header has been processed");
+
+
+        int nextQueueLength = pq_len_packetTrip(&read2_packets_queue);
+        LOG_DEBUG_PACKET("Pushing to read2_packets_queue. Current size: %d; Size after push: %d", nextQueueLength, nextQueueLength + 1);
+        pq_push_packetTrip(&read2_packets_queue, packetTrip);
+        
         return transactionSize;
     }
-    else if(currentPacketTrip->packet->headerProcessed && !currentPacketTrip->packet->dataProcessed){
-        s32 transactionSize = currentPacketTrip->entry->skb->len;
-        LOG_DEBUG("Header has been processed but data has not been processed yet. Processing data (%d bytes)...", transactionSize);
+    else if(packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
+        s32 transactionSize = packetTrip->entry->skb->len;
+        LOG_DEBUG_PACKET("Header has been processed but data has not been processed yet. Processing data (%d bytes)...", transactionSize);
         if (len < transactionSize) {
             LOG_ERROR("User buffer is too small to hold packetTrip data %zu < %d", len, transactionSize);
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EINVAL;
         }
 
         // Copy packetTrip data to user space
         //error_count = copy_to_user(buf + sizeof(packetTrip->data), packetTrip->data, header.length);
-        LOG_DEBUG("Sending packetTrip data to user space; Version: %d; Length: %zu bytes", COMM_VERSION, transactionSize);
-        error_count = copy_to_user(buf, currentPacketTrip->entry->skb->data, transactionSize);
+        LOG_DEBUG_PACKET("Sending packetTrip data to user space; Version: %d; Length: %zu bytes", COMM_VERSION, transactionSize);
+        error_count = copy_to_user(buf, packetTrip->entry->skb->data, transactionSize);
         if (error_count){
             LOG_ERROR("Failed to copy packetTrip data to user space");
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EFAULT;
         }
 
-        currentPacketTrip->packet->dataProcessed = true;
-        LOG_DEBUG("... data has been processed");
+        packetTrip->packet->dataProcessed = true;
+        LOG_DEBUG_PACKET("... data has been processed");
+
+        
+        int writeQueueLength = pq_len_packetTrip(&write_packets_queue);
+        LOG_DEBUG_PACKET("Pushing to write_packets_queue. Current size: %d; Size after push: %d", writeQueueLength, writeQueueLength + 1);
+        pq_push_packetTrip(&write_packets_queue, packetTrip);
+        
         return transactionSize;
     }
-    else if(currentPacketTrip->packet->headerProcessed && currentPacketTrip->packet->dataProcessed){
+    else if(packetTrip->packet->headerProcessed && packetTrip->packet->dataProcessed){
         LOG_WARN("Packet was already processed");
     }
     else{
         LOG_ERROR("Packet is in an invalid state");
-        stopProcessingPacket();
+        stopProcessingPacket(packetTrip);
         return -EFAULT;
     }
 
-    LOG_DEBUG("Packet request sent to user space");
+    LOG_DEBUG_PACKET("Packet request sent to user space");
     
     return 0;
 }
 
 // This will receive directives from userspace
 static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer, size_t len, loff_t *offset) {
-    PendingPacketRoundTrip *packetTrip;
-    
+
     // Try to fetch a packetTrip from pending_packets_queue
     //todo: lock internally on queue?
     //packetTrip =  pq_peek_packetTrip(&pending_packets_queue);
-    if(processingPacketTrip == NULL){
+    if(processingPacketTrip == false){
         return 0;
     }
 
-    LOG_DEBUG("Write active for %s Processing packet: %d", DEVICE_NAME_ACK, processingPacketTrip);
+    int queueLength = pq_len_packetTrip(&write_packets_queue);
+    LOG_DEBUG_PACKET("Popping from write_packets_queue. Current size: %d; Size after peek: %d", queueLength, queueLength);
+    PendingPacketRoundTrip *packetTrip = pq_pop_packetTrip(&write_packets_queue);
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->packet, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry, -EFAULT, stopProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry->skb, -EFAULT, stopProcessingPacket(packetTrip));
 
-    if(!currentPacketTrip->responsePacket->headerProcessed && !currentPacketTrip->responsePacket->dataProcessed){
-        LOG_DEBUG("Neither response header nor data has been processed. Processing response header (%zu bytes)...", len);
+    LOG_DEBUG_PACKET("Write active for %s Processing packet: %d", DEVICE_NAME_ACK, packetTrip);
+
+    if(!packetTrip->responsePacket->headerProcessed && !packetTrip->responsePacket->dataProcessed){
+        LOG_DEBUG_PACKET("Neither response header nor data has been processed. Processing response header (%zu bytes)...", len);
         s32 responseVersion = 0;
         s32 responseLength = 0;
         int readBytes = 0;
         if (len < sizeof(s32) * 2){
             LOG_ERROR("Response packet header length is too small %zu < %zu", len, sizeof(s32));
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EINVAL;
         }
 
         if (copy_from_user(&responseVersion, buffer, sizeof(s32)) != 0){
             LOG_ERROR("Failed to copy response packet version from user space (%zu bytes)", len);
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EFAULT;
         }
 
@@ -348,55 +340,54 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
 
         if (copy_from_user(&responseLength, buffer, sizeof(s32)) != 0){
             LOG_ERROR("Failed to copy response packet length from user space (%zu bytes)", len);
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EFAULT;
         }
 
         buffer += sizeof(s32);
         readBytes += sizeof(s32);
 
-        LOG_DEBUG("Received response packet header from user space %zu bytes; Version: %d; Length: %d", sizeof(s32)*2, responseVersion, responseLength);
-        currentPacketTrip->responsePacket->headerProcessed = true;
+        LOG_DEBUG_PACKET("Received response packet header from user space %zu bytes; Version: %d; Length: %d", sizeof(s32)*2, responseVersion, responseLength);
+        packetTrip->responsePacket->headerProcessed = true;
 
         s32 decisionInt;
         if (copy_from_user(&decisionInt, buffer, responseLength) != 0){
             LOG_ERROR("Failed to copy response packet decision from user space (%zu bytes)", len);
-            stopProcessingPacket();
+            stopProcessingPacket(packetTrip);
             return -EFAULT;
         }
         buffer += sizeof(s32);
         readBytes += sizeof(s32);
 
-        LOG_DEBUG("Received response packet data from user space %zu bytes; Decision: %d", sizeof(s32), decisionInt);
-        currentPacketTrip->decision = (s64)decisionInt;
-        currentPacketTrip->responsePacket->dataProcessed = true;
+        LOG_DEBUG_PACKET("Received response packet data from user space %zu bytes; Decision: %d", sizeof(s32), decisionInt);
+        packetTrip->decision = (s64)decisionInt;
+        packetTrip->responsePacket->dataProcessed = true;
 
-        LOG_DEBUG("PACKET FULLY PROCESSED - USER SPACE (%d bytes)", readBytes);
-        stopProcessingPacket();
-
+        LOG_DEBUG_PACKET("PACKET FULLY PROCESSED - USER SPACE (%d bytes)", readBytes);
+        stopProcessingPacket(packetTrip);
         return readBytes;
     }
-    else if(currentPacketTrip->responsePacket->headerProcessed && !currentPacketTrip->responsePacket->dataProcessed){
-        // LOG_DEBUG("Response header has been processed data but has not been processed yet. Processing response data (%zu bytes)...", len);
+    else if(packetTrip->responsePacket->headerProcessed && !packetTrip->responsePacket->dataProcessed){
+        // LOG_DEBUG_PACKET("Response header has been processed data but has not been processed yet. Processing response data (%zu bytes)...", len);
         // s32 decisionInt;
         // if (copy_from_user(&decisionInt, buffer, len) != 0){
         //     LOG_ERROR("Failed to copy response packet data from user space (%zu bytes)", len);
-        //     complete(&userspace_item_processed);
+        //     complete(&userspace_item_processed_wait_queue);
         //     return -EFAULT;
         // }
         
         LOG_ERROR("Response packet was partially processed");
-        stopProcessingPacket();
+        stopProcessingPacket(packetTrip);
         return -EFAULT;
     }
-    else if (currentPacketTrip->responsePacket->headerProcessed && currentPacketTrip->responsePacket->dataProcessed){
+    else if (packetTrip->responsePacket->headerProcessed && packetTrip->responsePacket->dataProcessed){
          LOG_WARN("Response packet was already processed");
-         stopProcessingPacket();
+         stopProcessingPacket(packetTrip);
          return 0;
     }
     else{
         LOG_ERROR("Response packet is in an invalid state");
-        stopProcessingPacket();
+        stopProcessingPacket(packetTrip);
         return -EFAULT;
     }
     // Process the decision
@@ -405,7 +396,7 @@ static ssize_t dev_usercomm_write(struct file *filep, const char __user *buffer,
 
     // Wake up the waiting task(s)
     //wake_up_interruptible(&userspace_item_ready);
-    stopProcessingPacket();
+    stopProcessingPacket(packetTrip);
     return 0;
 }
 
@@ -439,12 +430,6 @@ static struct file_operations fops_netmod_from_user = {
 };
 
 bool fired = false;
-void packet_processor(void) {
-    LOG_DEBUG("Processing new packet trip");
-    
-    data_needs_processing = true;
-    complete(&queue_item_added);
-}
 
 int setup_user_space_comm(void) {
     processingPacketTrip= false;
@@ -484,6 +469,7 @@ int setup_user_space_comm(void) {
     mutex_init(&netmod_to_mutex);
     mutex_init(&netmod_from_mutex);
     init_waitqueue_head(&pending_packet_queue);
+    init_waitqueue_head(&user_read_wait_queue);
 
     // Error handling: if either device fails to initialize, cleanup everything and exit
     if(IS_ERR(netmodDevice) || IS_ERR(netmodDeviceAck)) {
@@ -492,9 +478,9 @@ int setup_user_space_comm(void) {
         return IS_ERR(netmodDevice) ? PTR_ERR(netmodDevice) : PTR_ERR(netmodDeviceAck); 
     }
 
-    register_packet_processing_callback(packet_processor);
-    init_completion(&userspace_item_ready);
-    init_completion(&userspace_item_processed);
+    // register_packet_processing_callback(packet_processor);
+    // init_completion(&userspace_item_ready);
+    //init_completion(&userspace_item_processed_wait_queue);
     int thread_reg = register_queue_processor_thread_handler(packet_processor_thread);
     if(IS_ERR(thread_reg)){
         LOG_ERROR("Failed to register queue processor thread handler");
