@@ -33,10 +33,6 @@ extern PacketQueue _pendingPacketsQueue;
 extern PacketQueue _read1PacketsQueue;
 extern PacketQueue _read2PacketsQueue;
 extern PacketQueue _writePacketsQueue;
-extern DECLARE_WAIT_QUEUE_HEAD(_queueItemProcessedWaitQueue);
-extern DECLARE_WAIT_QUEUE_HEAD(_queueProcessorExitedWaitQueue);
-extern DECLARE_WAIT_QUEUE_HEAD(_readQueueItemAddedWaitQueue);
-extern DECLARE_WAIT_QUEUE_HEAD(_userspaceItemProcessedWaitQueue);
 extern bool _queueItemProcessed;
 extern bool _queueProcessorExited;
 extern bool _readQueueItemAdded;
@@ -50,5 +46,6 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback);
 int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler);
 int SetupNetfilterHooks(void);
+
 
 #endif // NETFILTER_HOOKS

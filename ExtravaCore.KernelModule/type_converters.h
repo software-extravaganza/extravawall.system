@@ -9,6 +9,9 @@
 #define IP_DSCP_MASK 0xFC  // 11111100
 #define IP_ECN_MASK  0x03  // 00000011
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define DSCP_TOS_STRING(tos) ({ \
     u8 _dscp_val = (tos) & IP_DSCP_MASK; \
     const char* _dscp_str; \
@@ -52,8 +55,10 @@
     _tos_combined; \
 })
 
-const char* ip_protocol_to_string(unsigned int proto);
-const char* hook_to_string(unsigned int hooknum);
-const char* route_type_to_string(unsigned int route_type);
+const char* ipProtocolToString(unsigned int proto);
+const char* hookToString(unsigned int hooknum);
+const char* routeTypeToString(unsigned int route_type);
+void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]);
+void ipToString(const unsigned int ip, char *buffer, size_t buf_len);
 
 #endif // TYPE_CONVERTERS_H

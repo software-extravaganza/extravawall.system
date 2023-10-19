@@ -9,7 +9,13 @@
 #include <net/netfilter/nf_queue.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
+#include <linux/ktime.h>
 #include "logger.h"
+
+// Constants
+#define IP_BUFFER_SIZE 16  // for IPv4, 16 chars: 255.255.255.255 + a NULL terminator
+#define ZERO_MEMORY_BEFORE_FREE 1  // 1 to zero out memory before freeing, 0 otherwise
+#define PACKET_HEADER_VERSION 1 // Version of the packet header
 
 /* Enumerations for Routing Types and Decisions */
 typedef enum {
@@ -54,6 +60,7 @@ typedef struct {
 } PendingPacket;
 
 typedef struct {
+    ktime_t createdTime;
     struct nf_queue_entry *entry;
     PendingPacket *packet;
     PendingPacket *responsePacket;
@@ -62,17 +69,14 @@ typedef struct {
 } PendingPacketRoundTrip;
 
 /* Function Declarations */
-void conditional_memory_zero(void* ptr, size_t size);
-PendingPacketRoundTrip* create_pending_packetTrip(struct nf_queue_entry *entry, RoutingType type);
-void free_pending_packetTrip(PendingPacketRoundTrip *packetTrip);
-PendingPacket* create_pending_packet(RoundTripPacketType type);
-void free_pending_packet(PendingPacket *packet);
-bool add_data_to_packet(PendingPacket *packet, struct sk_buff *skb);
-void to_human_readable_ip(const unsigned int ip, char *buffer, size_t buf_len);
-char* get_reason_text(DecisionReason reason);
-void int_to_bytes(int value, unsigned char bytes[4]);
-char* createPacketTypeString(PendingPacket *packet);
-char* createPacketTypeStringFromType(RoundTripPacketType type);
-struct nf_queue_entry *create_queue_entry(struct sk_buff *skb, const struct nf_hook_state *state);
+void ConditionalMemoryZero(void* ptr, size_t size);
+PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, RoutingType type);
+void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip);
+PendingPacket* CreatePendingPacket(RoundTripPacketType type);
+void FreePendingPacket(PendingPacket *packet);
+bool AddDataToPacket(PendingPacket *packet, struct sk_buff *skb);
+char* GetReasonText(DecisionReason reason);
+char* CreatePacketTypeString(PendingPacket *packet);
+
 
 #endif // DATA_STRUCTURES

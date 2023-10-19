@@ -1,6 +1,6 @@
 #include "type_converters.h"
 
-const char* hook_to_string(unsigned int hooknum) {
+const char* hookToString(unsigned int hooknum) {
     switch (hooknum) {
         case NF_INET_PRE_ROUTING:
             return "PRE_ROUTING";
@@ -17,7 +17,7 @@ const char* hook_to_string(unsigned int hooknum) {
     }
 }
 
-const char* route_type_to_string(unsigned int route_type) {
+const char* routeTypeToString(unsigned int route_type) {
     switch (route_type) {
         case PRE_ROUTING:
             return "PRE_ROUTING";
@@ -30,7 +30,7 @@ const char* route_type_to_string(unsigned int route_type) {
     }
 }
 
-const char* ip_protocol_to_string(unsigned int proto) {
+const char* ipProtocolToString(unsigned int proto) {
     switch (proto) {
         case 0: return "HOPOPT (IPv6 Hop-by-Hop Option)";
         case 1: return "ICMP (Internet Control Message)";
@@ -183,7 +183,7 @@ const char* ip_protocol_to_string(unsigned int proto) {
     }
 }
 
-const char* dscp_to_string(u8 dscp) {
+const char* dscpToString(u8 dscp) {
     switch (dscp) {
         case 0x00: return "CS0 (Default)";
         case 0x08: return "CS1";
@@ -198,7 +198,7 @@ const char* dscp_to_string(u8 dscp) {
     }
 }
 
-const char* ecn_to_string(u8 ecn) {
+const char* ecnToString(u8 ecn) {
     switch (ecn) {
         case 0x00: return "Not-ECT";
         case 0x01: return "ECT(1)";
@@ -206,4 +206,29 @@ const char* ecn_to_string(u8 ecn) {
         case 0x03: return "CE";
         default: return "Unknown ECN";  // This shouldn't happen as ECN is 2 bits
     }
+}
+
+void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]) {
+    for (size_t i = 0; i < sizeof(s32); i++) {
+        bytes[i] = (value >> (8 * (sizeof(s32) - 1 - i))) & 0xFF;
+    }
+}
+
+/* 
+ * Converts an IP address to a human-readable format and stores it in the provided buffer 
+ * Ensures that the buffer size is at least IP_BUFFER_SIZE for safe snprintf operation 
+ */
+void ipToString(const unsigned int ip, char *buffer, size_t buf_len) {
+    if (!buffer) {
+        LOG_ERROR("Buffer provided is NULL.");
+        return;
+    }
+
+    if (buf_len < IP_BUFFER_SIZE) {  
+        LOG_ERROR("Buffer size is incorrect. Expected at least %d, got %zu.", IP_BUFFER_SIZE, buf_len);
+        return;  // added this line
+    }
+
+    snprintf(buffer, buf_len, "%pI4", &ip);
+    buffer[IP_BUFFER_SIZE - 1] = '\0';  // Ensure null termination (safety measure)
 }

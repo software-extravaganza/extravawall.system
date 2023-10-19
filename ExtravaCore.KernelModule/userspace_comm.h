@@ -13,14 +13,16 @@
 #define USERSPACE_COMM
 extern bool processingPacketTrip;
 
-extern wait_queue_head_t queue_item_processed_wait_queue;
-extern wait_queue_head_t userspace_item_ready;
-extern wait_queue_head_t userspace_item_processed_wait_queue;
-extern wait_queue_head_t read_queue_item_added_wait_queue;
-extern wait_queue_head_t user_read_wait_queue;
-extern wait_queue_head_t queue_processor_exited_wait_queue;
+// Public fields
+extern wait_queue_head_t QueueItemProcessedWaitQueue; 
+extern wait_queue_head_t UserspaceItemReady; 
+extern wait_queue_head_t UserspaceItemProcessedWaitQueue; 
+extern wait_queue_head_t ReadQueueItemAddedWaitQueue; 
+extern wait_queue_head_t UserReadWaitQueue; 
+extern wait_queue_head_t QueueProcessorExitedWaitQueue; 
 
-int setup_user_space_comm(void);
-void cleanup_user_space_comm(void);
+int SetupUserSpaceCommunication(void);
+void CleanupUserSpaceCommunication(void);
+int _packetProcessorThread(void *data);
 
 #endif // USERSPACE_COMM

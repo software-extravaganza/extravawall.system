@@ -285,8 +285,8 @@ public class KernelClient {
         const int intSize = sizeof(int);
         while (true) {
             try {
-                using FileStream fsRead = new FileStream("/dev/extrava_to_user", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using FileStream fsAck = new FileStream("/dev/extrava_from_user", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+                using FileStream fsRead = new FileStream("/dev/extrava_to_process", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using FileStream fsAck = new FileStream("/dev/extrava_from_process", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
                 //using MemoryStream readMem = new MemoryStream();
                 while (true) {
                     Console.WriteLine("Waiting for data...");

@@ -1,3 +1,4 @@
+CFLAGS=-isystem /lib/modules/$(shell uname -r) -std=gnu99
 basedir = $(PWD)
 srcdir = $(basedir)/src
 incdir = $(basedir)/include
@@ -10,7 +11,8 @@ obj-m += extrava.o
 extrava-objs := main_extrava.o logger.o helpers.o type_converters.o packet_queue.o data_structures.o netfilter_hooks.o userspace_comm.o
 
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(basedir) modules
+	make -C /lib/modules/$(shell uname -r)/build M=$(basedir) CFLAGS_MODULE="$(CFLAGS)" modules
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(basedir) clean
+

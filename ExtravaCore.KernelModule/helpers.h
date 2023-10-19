@@ -2,100 +2,175 @@
 #define HELPERS_H
 
 #include <linux/kernel.h>
+#include <linux/ktime.h>
 #include "logger.h"
+
+// Define a function type for functions that take no arguments and return void
+typedef void (*func_ptr_t)(void);
+
+s64 elapsedMilliseconds(ktime_t *timestamp);
+// static inline void check_null_helper(const char* ptr_name, void* generic_ptr, LogType log_type_enum, void (*code_func)(void)) {
+//     typeof(generic_ptr) value = generic_ptr;
+//     log_func_t log_func = log_functions[log_type_enum];
+//     log_func("%s is NULL.", ptr_name);
+//     (void)value;
+//     code_func();
+// }
+
+#define TOKENPASTE(x, y) x ## y
+#define TOKENPASTE2(x, y) TOKENPASTE(x, y)
+#define TOKENPASTE3(x, y) TOKENPASTE2(x, y)
+#define UNIQUE_FUNC_NAME(base) TOKENPASTE2(base, __LINE__)
+#define DEFINE_VALUE_FROM_PTR(ptr) \
+    typeof(ptr) value = (ptr); \
+    (void)value;
+
+#define DEFINE_FUNC(prefix, ptr, code) \
+    void TOKENPASTE3(auto_func_, prefix)(void) { \
+        DEFINE_VALUE_FROM_PTR(ptr) \
+        code; \
+    }
+
+#define IS_POINTER(p) ((void)sizeof((p) - (p)))
+
+#define CALL_FUNC(prefix) \
+    TOKENPASTE3(auto_func_, prefix)()
+
+#define CALL_FUNC_WITH_PREFIX(prefix) \
+    CALL_FUNC(prefix)
+
+#define RETURN_FUNC(prefix) \
+    TOKENPASTE3(auto_func_, prefix)
+
+#define RETURN_FUNC_WITH_PREFIX(prefix) \
+    RETURN_FUNC(prefix)
+
+#define DEFINE_AND_CALL_FUNC(code) \
+    void UNIQUE_FUNC_NAME(auto_func)(void) { code; } \
+    UNIQUE_FUNC_NAME(auto_func)();
+
+#define DEFINE_FUNC_WITH_PREFIX(prefix, ptr, code) \
+    void TOKENPASTE3(auto_func_, prefix)(void) { \
+        DEFINE_VALUE_FROM_PTR(ptr) \
+        code; \
+    }
+
+#define DEFINE_FUNC_WITH_PREFIX_AND_RETURN_TYPE(prefix, ptr, code) \
+    DEFINE_FUNC_WITH_PREFIX(__LINE__, ptr, code); \
+    RETURN_FUNC_WITH_PREFIX(__LINE__)
+
+// This macro returns the function's address
+#define RETURN_FUNC_ADDRESS(prefix) \
+    &TOKENPASTE3(auto_func_, prefix)
+
+// The original DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE macro will now define the function and return its address
+#define DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code) \
+    ({ \
+        DEFINE_FUNC_WITH_PREFIX(__LINE__, ptr, code); \
+        RETURN_FUNC_ADDRESS(__LINE__); \
+    })
 
 #define NAME_OF(x) #x
 
-#define CHECK_NULL(log_type, ptr, ret_val) \
+#define CHECK_NULL(log_type_enum, ptr, ret_val) \
     do { \
+        log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
+            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
             return ret_val; \
         } \
     } while(0)
 
-#define CHECK_NULL_SUCCESS_EXEC(log_type, ptr, ret_val, code) \
+#define CHECK_NULL_SUCCESS_EXEC(log_type_enum, ptr, ret_val, code) \
     do { \
+        func_ptr_t code_func = DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code); \
+        log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
-            return ret_val; \
-        } \
-        else { \
-            typeof(ptr) value = (ptr); \
-            code; \
-        } \
-    } while(0)
-
-#define CHECK_NULL_FAIL_EXEC(log_type, ptr, ret_val, code) \
-    do { \
-        if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
-            typeof(ptr) value = (ptr); \
-            code; \
-            return ret_val; \
-        } \
-    } while(0)
-
-#define CHECK_NULL_ALWAYS_EXEC(log_type, ptr, ret_val, code) \
-    do { \
-        if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
-        } \
-        typeof(ptr) value = (ptr); \
-        code; \
-        if ((ptr) == NULL) { \
-            return ret_val; \
-        } \
-    } while(0)
-
-#define CHECK_NULL_AND_LOG(fail_log_type, ptr, ret_val, success_log_type, fmt, ...) \
-    do { \
-        if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(fail_log_type)("%s is NULL.", #ptr); \
+            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
             return ret_val; \
         } \
         else { \
-            CONCAT_LOG_FUNC(success_log_type)(fmt, ##__VA_ARGS__); \
+            code_func(); \
         } \
     } while(0)
 
-#define CHECK_NULL_DESC(log_type, ptr, ret_val, description) \
+#define CHECK_NULL_FAIL_EXEC(log_type_enum, ptr, ret_val, code) \
     do { \
+        func_ptr_t code_func = DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code); \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL. (%s)", #ptr, description); \
+            code_func(); \
             return ret_val; \
         } \
     } while(0)
 
-#define TEST_NULL(log_type, ptr) \
+#define CHECK_NULL_ALWAYS_EXEC(log_type_enum, ptr, ret_val, code) \
     do { \
+        func_ptr_t code_func = DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code); \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
+            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+        } \
+        if ((ptr) == NULL) { \
+            code_func(); \
+            return ret_val; \
         } \
     } while(0)
 
-#define TEST_AND_MAKE_STRING_OR_EMPTY(log_type, ptr, code) \
+#define CHECK_NULL_AND_LOG(fail_log_type_enum, ptr, ret_val, success_log_type_enum, fmt, ...) \
+    do { \
+        log_func_t log_func_success = log_functions[success_log_type_enum]; \
+        log_func_t log_func_fail = log_functions[fail_log_type_enum]; \
+        if ((ptr) == NULL) { \
+            log_func_fail("%s is NULL.", #ptr, __func__, __LINE__); \
+            return ret_val; \
+        } \
+        else { \
+            log_func_success(fmt, #ptr, __func__, __LINE__, ##__VA_ARGS__); \
+        } \
+    } while(0)
+
+#define CHECK_NULL_DESC(log_type_enum, ptr, ret_val, description) \
+    do { \
+        log_func_t log_func = log_functions[log_type_enum]; \
+        if ((ptr) == NULL) { \
+            log_func("%s is NULL. (%s)", #ptr, __func__, __LINE__, description); \
+            return ret_val; \
+        } \
+    } while(0)
+
+#define TEST_NULL(log_type_enum, ptr) \
+    do { \
+        log_func_t log_func = log_functions[log_type_enum]; \
+        if ((ptr) == NULL) { \
+            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+        } \
+    } while(0)
+
+#define TEST_AND_MAKE_STRING_OR_EMPTY(log_type_enum, ptr, code) \
     ((ptr) ? ({ \
         typeof(ptr) value = (ptr); \
         code; \
     }) : ""); \
     do { \
+        log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL.", #ptr); \
+            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
         } \
     } while(0)
 
 #define MAKE_STRING_OR_EMPTY(ptr, code) \
     ((ptr) ? ({ \
         typeof(ptr) value = (ptr); \
+        IS_POINTER(ptr); \
         code; \
     }) : "")
 
-#define TEST_NULL_DESC(log_type, ptr, ret_val, description) \
+#define TEST_NULL_DESC(log_type_enum, ptr, ret_val, description) \
     do { \
+        log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            CONCAT_LOG_FUNC(log_type)("%s is NULL. (%s)", #ptr, description); \
+            log_func("%s is NULL. (%s)", #ptr, __func__, __LINE__, description); \
         } \
     } while(0)
+
 
 #endif // HELPERS_H
