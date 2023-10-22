@@ -64,7 +64,7 @@ cd "$CURRENT_DIR" || exit 1
 {
   echo "Starting Extrava Kernel Module in 5 seconds" | tee "$TEE_DEST"
   sleep 5
-  insmod "$CURRENT_DIR"/extrava.ko log_level=0 | tee "$TEE_DEST"
+  insmod "$CURRENT_DIR"/extrava.ko log_level=0 default_packet_response=1 | tee "$TEE_DEST"
   echo "Started Extrava Kernel Module" | tee "$TEE_DEST"
 } &
 

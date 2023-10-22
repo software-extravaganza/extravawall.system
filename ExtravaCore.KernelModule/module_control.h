@@ -2,8 +2,12 @@
 #define _MODULE_CONTROL_H_
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include "logger.h"
 #include "helpers.h"
+
+extern int default_packet_response;
+
 typedef void (*captureEventHandler)(bool shouldCapture);
 
 bool ShouldCapture(void);

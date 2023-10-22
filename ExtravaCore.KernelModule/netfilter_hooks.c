@@ -53,6 +53,8 @@ static void _hookDrop(struct net *net);
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum);
 static struct nf_queue_handler* _setupQueueHandlerHook(void);
 static void _cleanCompletedPacketTrips(void);
+static int _nfDecisionFromExtravaDecision(RoutingDecision decision);
+static int _nfDecisionFromExtravaDefaultDecision(void);
 
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
@@ -84,19 +86,9 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
         LOG_WARNING("Packet trip is null. Ignoring decision.");
         return;
     }
-
-    if(packetTrip->decision == ACCEPT){
-        nf_reinject(packetTrip->entry, NF_ACCEPT);
-        PacketsAcceptCounter++;
-    }
-    else if(packetTrip->decision == MANIPULATE){
-        nf_reinject(packetTrip->entry, NF_ACCEPT);
-        PacketsManipulateCounter++;
-    }
-    else {
-        nf_reinject(packetTrip->entry, NF_DROP);
-        PacketsDropCounter++;
-    }
+    
+    int nfDecision = _nfDecisionFromExtravaDecision(decision);
+    nf_reinject(packetTrip->entry, nfDecision);
 
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[decision], GetReasonText(reason));
     LOG_DEBUG_ICMP("%s", logMessage);
@@ -108,6 +100,32 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
 
 static void _cleanCompletedPacketTrips(void){
     CLEANUP_STALE_ITEMS_ON_QUEUE(_completedQueue);
+}
+
+static int _nfDecisionFromExtravaDefaultDecision(void){
+    if(default_packet_response == UNDECIDED){
+        default_packet_response = DROP;
+    }
+
+    return _nfDecisionFromExtravaDecision(default_packet_response);
+}
+
+static int _nfDecisionFromExtravaDecision(RoutingDecision decision){
+    if(decision == ACCEPT){
+        return NF_ACCEPT;
+        PacketsAcceptCounter++;
+    }
+    else if(decision == MANIPULATE){
+        return NF_ACCEPT;
+        PacketsManipulateCounter++;
+    }
+    else if(decision == UNDECIDED){
+        return _nfDecisionFromExtravaDefaultDecision();
+    }
+    else {
+        PacketsDropCounter++;
+        return NF_DROP;
+    }
 }
 
 void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName){
@@ -152,7 +170,7 @@ static unsigned int _nfRoutingHandlerCommon(RoutingType type, void *priv, struct
 
     if(!ShouldCapture()){
         LOG_DEBUG_ICMP("Extrava is not capturing. Dropping packet. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
-        return NF_DROP;
+        return _nfDecisionFromExtravaDefaultDecision();
     }
 
     struct ethhdr *ethHeader;

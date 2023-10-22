@@ -6,6 +6,7 @@ MODULE_DESCRIPTION("ExtravaCore Kernel Module");
 MODULE_VERSION("0.1");
 
 int log_level = 1;
+int default_packet_response = 1;
 
 // Make sure you have linux-headers installed on your system
 // Fedora Silverblue: sudo rpm-ostree install kernel-devel-$(uname -r) --apply-live

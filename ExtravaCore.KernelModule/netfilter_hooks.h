@@ -29,6 +29,7 @@ typedef void (*packet_processing_callback_t)(void);
 typedef int (*packet_processor_thread_handler_t)(void *data);
 
 // Extern Variables (alphabetically ordered)
+extern int default_packet_response;
 extern PacketQueue _injectionPacketsQueue;
 extern PacketQueue _pendingPacketsQueue;
 extern PacketQueue _read1PacketsQueue;

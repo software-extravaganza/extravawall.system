@@ -1,5 +1,10 @@
 #include "module_control.h"
 
+extern int default_packet_response;
+module_param(default_packet_response, int, 0644);
+MODULE_PARM_DESC(default_packet_response, "Default packet response (when user space isn't connected): 1=DROP, 2=ACCEPT; default=1");
+
+
 static bool _shouldCapture = false;
 static bool _isInitialized = false;
 static bool _isActive = false;
