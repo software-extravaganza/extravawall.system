@@ -9,6 +9,8 @@
 #include <linux/kernel.h>
 #include <linux/kfifo.h>
 #include <linux/kthread.h>
+#include <linux/proc_fs.h>
+#include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -41,9 +43,11 @@ extern PacketQueue _write2PacketsQueue;
 extern PacketQueue _completedQueue;
 extern bool _queueItemProcessed;
 extern bool _queueProcessorExited;
-extern bool _readQueueItemAdded;
-extern bool _userRead;
+extern bool _reinjectionProcessorExited;
+extern atomic_t _pendingQueueItemAdded;
+extern atomic_t _userRead;
 extern bool _userspaceItemProcessed;
+extern bool _userspaceItemProcessedCleared;
 extern bool IsProcessingPacketTrip;
 extern long PacketsCapturedCounter;
 extern long PacketsProcessedCounter;
@@ -51,13 +55,23 @@ extern long PacketsAcceptCounter;
 extern long PacketsManipulateCounter;
 extern long PacketsDropCounter;
 extern long PacketsStaleCounter;
+extern long ReadWaitCounter;
+extern long ReadWokeCounter;
+extern long WriteWaitCounter;
+extern long WriteWokeCounter;
+extern long QueueProcessorWokeCounter;
+extern long QueueProcessorWaitCounter;
+extern long ReInjectionProcessorWokeCounter;
+extern long ReInjectionProcessorWaitCounter;
+
 extern struct task_struct *_queueProcessorThread;
+extern struct task_struct *_injectionProcessorThread;
 
 // Function Declarations (alphabetically ordered)
 void CleanupNetfilterHooks(void);
 void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason);
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback);
-int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler);
+int RegisterThreadHandlers(packet_processor_thread_handler_t packetHandler, packet_processor_thread_handler_t injectionHandler);
 int SetupNetfilterHooks(void);
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip);
 void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName);

@@ -414,7 +414,7 @@ public class KernelClient {
                         //}
 
                         if (packetsProcessed % 5000 == 0) {
-                            Console.Write($"Processed {packetsProcessed} packets.");
+                            Console.WriteLine($"Processed {packetsProcessed} packets.");
                         }
                         // byte[] responseData = new byte[intSize];
 
