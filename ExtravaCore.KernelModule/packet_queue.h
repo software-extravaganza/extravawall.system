@@ -2,7 +2,9 @@
 #define _PACKET_QUEUE_H_
 
 #include <linux/skbuff.h>
+#include <linux/kfifo.h>
 #include "data_structures.h"
+#include "data_factories.h"
 
 #define MAX_PENDING_PACKETS 100
 

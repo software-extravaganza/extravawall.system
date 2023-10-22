@@ -16,7 +16,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
 //     (void)value;
 //     code_func();
 // }
-
+#define ARRAY_SIZE_REASON(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define TOKENPASTE(x, y) x ## y
 #define TOKENPASTE2(x, y) TOKENPASTE(x, y)
 #define TOKENPASTE3(x, y) TOKENPASTE2(x, y)

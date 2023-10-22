@@ -1,5 +1,4 @@
 #include "packet_queue.h"
-#include <linux/kfifo.h>
 
 // Constants
 #define MAX_PENDING_PACKETS_SIZE (MAX_PENDING_PACKETS * sizeof(PendingPacketRoundTrip *))
@@ -53,10 +52,10 @@ int PacketQueueLength(PacketQueue *queue) {
 PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
     PendingPacketRoundTrip *packet = NULL;
     int length = PacketQueueLength(queue);
-    LOG_DEBUG_ICMP(MESSAGE_PEEKING_PACKET, length);
+    LOG_DEBUG_PACKET(MESSAGE_PEEKING_PACKET, length);
     if(length > 0){
         if (kfifo_peek(queue, &packet)) {
-            LOG_DEBUG_ICMP(MESSAGE_PEEK, length, 1); // 1 indicates success in peeking
+            LOG_DEBUG_PACKET(MESSAGE_PEEK, length, 1); // 1 indicates success in peeking
             return packet;
         }
     }
@@ -67,7 +66,7 @@ PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
 PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
     PendingPacketRoundTrip *packet = NULL;
     if(PacketQueueLength(queue) <= 0){
-        LOG_DEBUG_ICMP("Queue is empty");
+        LOG_DEBUG_PACKET("Queue is empty");
         return NULL;
     }
 
@@ -75,6 +74,6 @@ PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
         return packet;
     }
 
-    LOG_DEBUG_ICMP(MESSAGE_NULL_PACKET);
+    LOG_DEBUG_PACKET(MESSAGE_NULL_PACKET);
     return NULL;
 }

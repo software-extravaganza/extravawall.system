@@ -5,6 +5,7 @@
 #include <linux/completion.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
+#include <linux/tcp.h>
 #include <linux/kernel.h>
 #include <linux/kfifo.h>
 #include <linux/kthread.h>
@@ -30,6 +31,7 @@ typedef int (*packet_processor_thread_handler_t)(void *data);
 
 // Extern Variables (alphabetically ordered)
 extern int default_packet_response;
+extern bool force_icmp;
 extern PacketQueue _injectionPacketsQueue;
 extern PacketQueue _pendingPacketsQueue;
 extern PacketQueue _read1PacketsQueue;

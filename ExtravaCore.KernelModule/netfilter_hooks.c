@@ -13,6 +13,8 @@
 #define ACCEPT_ICON "📨"
 #define MANIPULATE_ICON "✂️"
 
+const char* MESSAGE_PACKETS_CAPTURED = "Packets captured: %ld; Packets processed: %ld; Packets accepted: %ld; Packets modified: %ld; Packets dropped: %ld; Packets Stale: %ld";
+
 const char *DECISION_ICONS[] = {
     UNDECIDED_ICON,  // UNDECIDED
     DROP_ICON,       // DROP
@@ -53,9 +55,9 @@ static void _hookDrop(struct net *net);
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum);
 static struct nf_queue_handler* _setupQueueHandlerHook(void);
 static void _cleanCompletedPacketTrips(void);
-static int _nfDecisionFromExtravaDecision(RoutingDecision decision);
-static int _nfDecisionFromExtravaDefaultDecision(void);
-
+static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count);
+static int _nfDecisionFromExtravaDefaultDecision(bool count);
+static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* routeTypeName, struct sk_buff *skb, const struct nf_hook_state *state, const char* hookName);
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
 }
@@ -87,12 +89,11 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
         return;
     }
     
-    int nfDecision = _nfDecisionFromExtravaDecision(decision);
+    int nfDecision = _nfDecisionFromExtravaDecision(decision, true);
     nf_reinject(packetTrip->entry, nfDecision);
 
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[decision], GetReasonText(reason));
-    LOG_DEBUG_ICMP("%s", logMessage);
-    PacketsProcessedCounter++;
+    LOG_DEBUG_ICMP(packetTrip, "%s", logMessage);
 
     DecommissionPacketTrip(packetTrip);
     _cleanCompletedPacketTrips();
@@ -102,28 +103,44 @@ static void _cleanCompletedPacketTrips(void){
     CLEANUP_STALE_ITEMS_ON_QUEUE(_completedQueue);
 }
 
-static int _nfDecisionFromExtravaDefaultDecision(void){
+static int _nfDecisionFromExtravaDefaultDecision(bool count){
     if(default_packet_response == UNDECIDED){
         default_packet_response = DROP;
     }
 
-    return _nfDecisionFromExtravaDecision(default_packet_response);
+    return _nfDecisionFromExtravaDecision(default_packet_response, count);
 }
 
-static int _nfDecisionFromExtravaDecision(RoutingDecision decision){
+static void increasePacketsProcessedCounter(void){
+    PacketsProcessedCounter++;
+    if(PacketsProcessedCounter % 5000 == 0){
+        LOG_INFO(MESSAGE_PACKETS_CAPTURED, PacketsCapturedCounter, PacketsProcessedCounter, PacketsAcceptCounter, PacketsManipulateCounter, PacketsDropCounter, PacketsStaleCounter);
+    }
+}
+
+static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count){
     if(decision == ACCEPT){
+        if(count){
+            PacketsAcceptCounter++;
+            increasePacketsProcessedCounter();
+        }
         return NF_ACCEPT;
-        PacketsAcceptCounter++;
     }
     else if(decision == MANIPULATE){
+        if(count){
+            PacketsManipulateCounter++;
+            increasePacketsProcessedCounter();
+        }
         return NF_ACCEPT;
-        PacketsManipulateCounter++;
     }
     else if(decision == UNDECIDED){
-        return _nfDecisionFromExtravaDefaultDecision();
+        return _nfDecisionFromExtravaDefaultDecision(count);
     }
     else {
-        PacketsDropCounter++;
+        if(count){
+            PacketsDropCounter++;
+            increasePacketsProcessedCounter();
+        }
         return NF_DROP;
     }
 }
@@ -146,50 +163,66 @@ void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName){
 
     if(numberCleaned>0){
         int newQueueLength = PacketQueueLength(queue);
-        LOG_DEBUG_ICMP("Cleaned %d packet trips from %s. Current size: %d;", numberCleaned, queueName, newQueueLength);
+        LOG_DEBUG_PACKET("Cleaned %d packet trips from %s. Current size: %d;", numberCleaned, queueName, newQueueLength);
     }
 }
 
 // Refactored function to handle nfRouting
 static unsigned int _nfRoutingHandlerCommon(RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     _lastRoutingType = NONE_ROUTING;
-    CHECK_NULL(LOG_TYPE_ERROR, state, NF_DROP);
+    int defaultDecision = _nfDecisionFromExtravaDefaultDecision(false);
+    CHECK_NULL(LOG_TYPE_ERROR, state, defaultDecision);
     const char* hookName = hookToString(state->hook);
     const char* routeTypeName = routeTypeToString(type);
-    CHECK_NULL_AND_LOG(LOG_TYPE_ERROR, skb, NF_DROP, LOG_TYPE_DEBUG_PACKET, "skb pointer: %p length: %u", skb, skb->len);
+    CHECK_NULL_AND_LOG(LOG_TYPE_ERROR, skb, defaultDecision, LOG_TYPE_DEBUG_PACKET, "skb pointer: %p length: %u", skb, skb->len);
     struct iphdr *ipHeader = ip_hdr(skb);
-    CHECK_NULL(LOG_TYPE_ERROR, ipHeader, NF_DROP);
-    const char* protocolName = ipProtocolToString(ipHeader->protocol);
-    const char* typeOfService = TOS_TO_STRING(ipHeader->tos);
-
-    if (ipHeader->protocol != IPPROTO_ICMP){ //} || type == LOCAL_ROUTING) {
-        return NF_ACCEPT;
-    }
-
-    LOG_DEBUG_ICMP("ICMP packet received. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
+    int response = defaultDecision;
 
     if(!ShouldCapture()){
-        LOG_DEBUG_ICMP("Extrava is not capturing. Dropping packet. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
-        return _nfDecisionFromExtravaDefaultDecision();
-    }
-
-    struct ethhdr *ethHeader;
-    int macHeaderSet = skb_mac_header_was_set(skb);
-    if (!macHeaderSet) {
-        LOG_DEBUG_ICMP("Ethernet (MAC) header pointer not set in skb. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
-    }
-    else {
-        ethHeader = (struct ethhdr *)skb_mac_header(skb);
-        if (!ethHeader) {
-            LOG_DEBUG_ICMP("No Ethernet (MAC) header found. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
-            return NF_DROP;
+        if(PacketsProcessedCounter % 10000 == 0 || PacketsProcessedCounter == 0){
+            LOG_DEBUG_PACKET("Extrava is not capturing. Default packet response (%d) Routing Type: %s, Hook Type: %s", defaultDecision, routeTypeName, hookName);
         }
 
-        LOG_DEBUG_ICMP("Ethernet (MAC) header found. Size: %zu bytes. Routing Type: %s, Protocol: %s, ToS: %u, Hook Type: %s", sizeof(struct ethhdr), routeTypeName, protocolName, typeOfService, hookName);
+        return _nfDecisionFromExtravaDefaultDecision(true);
+    }
+
+    if(ipHeader){
+        response = interceptIpv4(ipHeader, type, routeTypeName, skb, state, hookName);
+    }
+    else{
+        response = _nfDecisionFromExtravaDecision(ACCEPT, true);
     }
 
     _lastRoutingType = type;
-    return NF_QUEUE_NR(0);
+    return response;
+}
+
+static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* routeTypeName, struct sk_buff *skb, const struct nf_hook_state *state, const char* hookName){
+    if(!ipHeader){
+        LOG_WARNING("IP header is null. Ignoring intercept.");
+        return _nfDecisionFromExtravaDefaultDecision(true);
+    }
+
+    const char* protocolName = ipProtocolToString(ipHeader->protocol);
+    const char* typeOfService = TOS_TO_STRING(ipHeader->tos);
+    LOG_DEBUG_ICMP_PROTOCOL(ipHeader->protocol, "IP packet received. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
+
+    if (force_icmp == 1 && ipHeader->protocol != IPPROTO_ICMP){
+        return _nfDecisionFromExtravaDecision(ACCEPT, true);
+    }
+    else if(ipHeader->protocol == IPPROTO_ICMP){
+        LOG_DEBUG_ICMP_PROTOCOL(ipHeader->protocol, "ICMP packet received. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
+        return NF_QUEUE_NR(0);
+    }
+    else if(ipHeader->protocol == IPPROTO_TCP){
+        struct tcphdr *tcph = tcp_hdr(skb);
+        if (tcph){
+            LOG_DEBUG_ICMP_PROTOCOL(ipHeader->protocol, "IP header found. Size: %zu bytes. Routing Type: %s, Protocol: %s, ToS: %u, Hook Type: %s, Dst: %s, Src: %s", sizeof(struct tcphdr), routeTypeName, protocolName, typeOfService, hookName, tcph->dest, tcph->source);
+            return NF_QUEUE_NR(0);
+        }
+    }
+
+    return _nfDecisionFromExtravaDefaultDecision(true);
 }
 
 static unsigned int _nfPreRoutingHandler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
@@ -349,26 +382,26 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 
     int mac_header_set = skb_mac_header_was_set(skb);
     if (!mac_header_set) {
-        LOG_DEBUG_ICMP("Ethernet (MAC) header pointer not set in skb");
+        LOG_DEBUG_ICMP(packetTrip, "Ethernet (MAC) header pointer not set in skb");
     }
     else {
         eth_header = (struct ethhdr *)skb_mac_header(skb);
         if (!eth_header) {
-            LOG_DEBUG_ICMP("No Ethernet (MAC) header found");
+            LOG_DEBUG_ICMP(packetTrip, "No Ethernet (MAC) header found");
             return NF_DROP;
         }
 
-        LOG_DEBUG_ICMP("Ethernet (MAC) header found. Size: %zu bytes", sizeof(struct ethhdr));
+        LOG_DEBUG_ICMP(packetTrip, "Ethernet (MAC) header found. Size: %zu bytes", sizeof(struct ethhdr));
     }
 
   
     // enqueue the packet for further processing
     // int queueLength = pq_len_packetTrip(&pending_packets_queue);
-    // LOG_DEBUG_ICMP("Pushing to pending_packets_queue. Current size: %d; Size after push: %d", queueLength, queueLength + 1);
+    // LOG_DEBUG_ICMP(packetTrip, "Pushing to pending_packets_queue. Current size: %d; Size after push: %d", queueLength, queueLength + 1);
     // pq_push_packetTrip(&pending_packets_queue, packetTrip);
     
     int queueLength = PacketQueueLength(&_read1PacketsQueue);
-    LOG_DEBUG_ICMP("Pushing to _read1PacketsQueue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
+    LOG_DEBUG_ICMP(packetTrip, "Pushing to _read1PacketsQueue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
     PacketQueuePush(&_read1PacketsQueue, packetTrip);
     // Signal to userspace that there's a packet to process (e.g., via a char device or netlink).
     //registered_callback();

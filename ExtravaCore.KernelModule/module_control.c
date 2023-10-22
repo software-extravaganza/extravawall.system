@@ -4,6 +4,10 @@ extern int default_packet_response;
 module_param(default_packet_response, int, 0644);
 MODULE_PARM_DESC(default_packet_response, "Default packet response (when user space isn't connected): 1=DROP, 2=ACCEPT; default=1");
 
+extern bool force_icmp;
+module_param(force_icmp, bool, 0644);
+MODULE_PARM_DESC(force_icmp, "Forces only ICMP packet filtering (for testing): 0=ALL PACKETS, 1=ICMP PACKETS ONLY; default=0");
+
 
 static bool _shouldCapture = false;
 static bool _isInitialized = false;

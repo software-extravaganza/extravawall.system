@@ -7,6 +7,7 @@
 #include "helpers.h"
 
 extern int default_packet_response;
+extern bool force_icmp;
 
 typedef void (*captureEventHandler)(bool shouldCapture);
 

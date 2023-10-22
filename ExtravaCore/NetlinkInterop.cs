@@ -283,21 +283,17 @@ public class KernelClient {
 
     public static async Task StartAsync() {
         const int intSize = sizeof(int);
+        long packetsProcessed = 0;
         while (true) {
             try {
                 using FileStream fsRead = new FileStream("/dev/extrava_to_process", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using FileStream fsAck = new FileStream("/dev/extrava_from_process", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
                 //using MemoryStream readMem = new MemoryStream();
                 while (true) {
-                    Console.WriteLine("Waiting for data...");
-                    //fsRead.CopyTo(readMem);
-                    //Span<byte> readStream = new Span<byte>(readMem.GetBuffer());
+                    //Console.WriteLine("Waiting for data...");
 
-                    //Span<byte> headerSpan = stackalloc byte[intSize + intSize];
                     byte[] headerData = new byte[intSize * 4]; // Assuming 64-bit kernel
                     Task<int> headerReadTask = fsRead.ReadAsync(headerData, 0, headerData.Length);
-                    //Task headerDelayTask = Task.Delay(1000);
-                    //fsRead.Read(headerData, 0, headerData.Length);
                     Task headerCompletedTask = await Task.WhenAny(headerReadTask); //, headerDelayTask);
 
                     if (headerCompletedTask != headerReadTask) {
@@ -307,7 +303,7 @@ public class KernelClient {
                     }
 
                     (bool reset, int version, int dataLength, RoutingType routingType) ProcessHeader() {
-                        Console.WriteLine("Processing Header");
+                        //Console.WriteLine("Processing Header");
                         Span<byte> rawSpan = headerData.AsSpan();
                         Span<byte> resetByte = rawSpan.Slice(0, intSize);
                         Span<byte> headerSpan = rawSpan.Slice(0, headerData.Length);
@@ -331,8 +327,6 @@ public class KernelClient {
 
                     byte[] rawData = new byte[dataLength + intSize];
                     Task<int> dataReadTask = fsRead.ReadAsync(rawData, 0, rawData.Length);
-                    /// Task dataDelayTask = Task.Delay(1000);
-                    //fsRead.Read(headerData, 0, headerData.Length);
                     Task dataCompletedTask = await Task.WhenAny(dataReadTask); //, dataDelayTask);
                     if (dataCompletedTask != dataReadTask) {
                         fsRead.Close();
@@ -349,44 +343,40 @@ public class KernelClient {
                         continue;
                     }
 
-                    // if (BitConverter.IsLittleEndian) {
-                    //     packetData = packetData.Reverse().ToArray();
+                    var routingDecision = RoutingDecision.ACCEPT;
+                    // //EthernetHeader ethernetHeader = ParseEthernetHeader(packetData);
+                    // //if (ethernetHeader.Type == EtherType.IPv4) {
+                    // CreationResult<IPHeader> ipHeaderResult = ParseIPHeader(packetData); //.Skip(14).ToArray());
+                    // if (!ipHeaderResult.Success || ipHeaderResult.Value is null) {
+                    //     //Console.WriteLine(ipHeaderResult.Error);
+                    //     continue;
                     // }
 
-                    var routingDecision = RoutingDecision.UNDECIDED;
-                    //EthernetHeader ethernetHeader = ParseEthernetHeader(packetData);
-                    //if (ethernetHeader.Type == EtherType.IPv4) {
-                    CreationResult<IPHeader> ipHeaderResult = ParseIPHeader(packetData); //.Skip(14).ToArray());
-                    if (!ipHeaderResult.Success || ipHeaderResult.Value is null) {
-                        Console.WriteLine(ipHeaderResult.Error);
-                        continue;
-                    }
+                    // IPHeader ipHeader = ipHeaderResult.Value;
+                    // if (ipHeader.Protocol == IPProtocol.TCP) {
+                    //     TCPHeader tcpHeader = ParseTCPHeader(packetData.Skip(14 + (ipHeader.VersionAndHeaderLength & 0xF) * 4).ToArray());
+                    //     // Continue with further processing.
+                    // } else if (ipHeader.Protocol == IPProtocol.ICMP) {
+                    //     // var routeString = routingType switch {
+                    //     //     RoutingType.NONE => "None",
+                    //     //     RoutingType.PRE_ROUTING => "Pre-Routing",
+                    //     //     RoutingType.POST_ROUTING => "Post-Routing",
+                    //     //     RoutingType.LOCAL_ROUTING => "Local-Routing",
+                    //     //     _ => "Unknown"
+                    //     // };
 
-                    IPHeader ipHeader = ipHeaderResult.Value;
-                    if (ipHeader.Protocol == IPProtocol.TCP) {
-                        TCPHeader tcpHeader = ParseTCPHeader(packetData.Skip(14 + (ipHeader.VersionAndHeaderLength & 0xF) * 4).ToArray());
-                        // Continue with further processing.
-                    } else if (ipHeader.Protocol == IPProtocol.ICMP) {
-                        var routeString = routingType switch {
-                            RoutingType.NONE => "None",
-                            RoutingType.PRE_ROUTING => "Pre-Routing",
-                            RoutingType.POST_ROUTING => "Post-Routing",
-                            RoutingType.LOCAL_ROUTING => "Local-Routing",
-                            _ => "Unknown"
-                        };
-
-                        Console.WriteLine($"Ping! Source {ipHeader.SourceAddressString}, Destination {ipHeader.DestinationAddressString}, Routing Type {routeString}");
-                        if ((ipHeader.DestinationAddressString == "1.1.1.2" && routingType != RoutingType.PRE_ROUTING) || routingType == RoutingType.PRE_ROUTING) {
-                            routingDecision = RoutingDecision.ACCEPT;
-                        } else {
-                            routingDecision = RoutingDecision.DROP;
-                        }
-                    }
+                    //     // Console.WriteLine($"Ping! Source {ipHeader.SourceAddressString}, Destination {ipHeader.DestinationAddressString}, Routing Type {routeString}");
+                    //     // if ((ipHeader.DestinationAddressString == "1.1.1.2" && routingType != RoutingType.PRE_ROUTING) || routingType == RoutingType.PRE_ROUTING) {
+                    //     //     routingDecision = RoutingDecision.ACCEPT;
+                    //     // } else {
+                    //     //     routingDecision = RoutingDecision.DROP;
+                    //     // }
+                    // }
                     //}
                     //fsRead.Read(packetData, 0, dataLength);
 
                     void SendResponse(RoutingDecision decision) {
-                        Console.WriteLine("Processing Data");
+                        //Console.WriteLine("Processing Data");
                         // Inspect the packetData as needed
 
                         //Convert bytes to string
@@ -410,15 +400,22 @@ public class KernelClient {
                         responseLengthBytes.CopyTo(responseHeader, intSize);
                         fsAck.Write(responseHeader, 0, responseHeader.Length);
                         fsAck.Flush();
-                        Console.WriteLine("Response header sent.");
+                        //Console.WriteLine("Response header sent.");
 
                         byte[] responseData = new byte[intSize];
                         decisionBytes.CopyTo(responseData, 0);
                         fsAck.Write(responseData, 0, responseData.Length);
                         fsAck.Flush();
-                        Console.WriteLine("Response data sent.");
+                        //Console.WriteLine("Response data sent.");
                         //Console.WriteLine(responseHeader);
+                        packetsProcessed++;
+                        //if (packetsProcessed % 1000 == 0) {
+                        //Console.Write(".");
+                        //}
 
+                        if (packetsProcessed % 5000 == 0) {
+                            Console.Write($"Processed {packetsProcessed} packets.");
+                        }
                         // byte[] responseData = new byte[intSize];
 
                         // // if (BitConverter.IsLittleEndian) {

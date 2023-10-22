@@ -76,17 +76,7 @@ typedef struct {
     PendingPacket *responsePacket;
     RoutingDecision decision;
     RoutingType routingType;
+    unsigned char protocol;
 } PendingPacketRoundTrip;
-
-/* Function Declarations */
-void ConditionalMemoryZero(void* ptr, size_t size);
-PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, RoutingType type);
-void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip);
-PendingPacket* CreatePendingPacket(RoundTripPacketType type);
-void FreePendingPacket(PendingPacket *packet);
-bool AddDataToPacket(PendingPacket *packet, struct sk_buff *skb);
-char* GetReasonText(DecisionReason reason);
-char* CreatePacketTypeString(PendingPacket *packet);
-
 
 #endif // DATA_STRUCTURES

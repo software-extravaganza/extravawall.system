@@ -60,7 +60,18 @@ static inline void _logGenericFunc(int num_level, const char* kern_level, const 
     _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 #define LOG_DEBUG_PACKET(fmt, ...) LOG_HELPER(-2, KERN_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_DEBUG_ICMP(fmt, ...) LOG_HELPER(-1, KERN_DEBUG, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG_ICMP(packetTrip, fmt, ...) \
+    do { \
+        if(packetTrip && packetTrip->protocol == IPPROTO_ICMP){ \
+            LOG_HELPER(-1, KERN_DEBUG, fmt, ##__VA_ARGS__); \
+        } \
+    } while(0)
+#define LOG_DEBUG_ICMP_PROTOCOL(protocol, fmt, ...) \
+    do { \
+        if(protocol == IPPROTO_ICMP){ \
+            LOG_HELPER(-1, KERN_DEBUG, fmt, ##__VA_ARGS__); \
+        } \
+    } while(0)
 #define LOG_DEBUG(fmt, ...) LOG_HELPER(0, KERN_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) LOG_HELPER(1, KERN_INFO, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) LOG_HELPER(2, KERN_ERR, fmt, ##__VA_ARGS__)

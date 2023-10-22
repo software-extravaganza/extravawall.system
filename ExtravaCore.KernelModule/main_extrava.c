@@ -7,6 +7,7 @@ MODULE_VERSION("0.1");
 
 int log_level = 1;
 int default_packet_response = 1;
+bool force_icmp = false;
 
 // Make sure you have linux-headers installed on your system
 // Fedora Silverblue: sudo rpm-ostree install kernel-devel-$(uname -r) --apply-live
@@ -36,7 +37,12 @@ int default_packet_response = 1;
 // This will be a simulation of the network packet data
 char packet_data[512];
 
+#define SHOW_PARAMATER_VALUE(param) LOG_INFO("📌 %s %d", #param, param)
+
 static int __init Initialize(void) {
+    SHOW_PARAMATER_VALUE(log_level);
+    SHOW_PARAMATER_VALUE(default_packet_response);
+    SHOW_PARAMATER_VALUE(force_icmp);
     SetLogLevel(log_level);
     LOG_INFO("⌛️  Extrava module initializing  ⌛️");
     LOG_DEBUG("Initializing packet queue");
