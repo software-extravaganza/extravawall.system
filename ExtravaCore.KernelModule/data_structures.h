@@ -47,6 +47,14 @@ typedef enum {
     USER_DROP
 } DecisionReason;
 
+typedef enum{
+    STAGE_NEW,
+    STAGE_READ_1,
+    STAGE_READ_2,
+    STAGE_WRITE,
+    STAGE_COMPLETED
+} PacketStage;
+
 typedef struct {
     DecisionReason reason;        // Code to represent the reason
     char* text; // Description of the reason
@@ -56,11 +64,13 @@ typedef struct {
 typedef struct {
     bool dataProcessed;
     bool headerProcessed;
+    s32 size;
     RoundTripPacketType type;
 } PendingPacket;
 
 typedef struct {
     ktime_t createdTime;
+    int attempts;
     struct nf_queue_entry *entry;
     PendingPacket *packet;
     PendingPacket *responsePacket;

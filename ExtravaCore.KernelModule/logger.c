@@ -29,3 +29,7 @@ log_func_t log_functions[__LOG_TYPE_ENUM_COUNT] = {
 void log_special_event(const char *event_detail) {
     LOG_INFO("Special event occurred: %s", event_detail);
 }
+
+void __LoggerSetLevel(int level){
+    log_level = level;
+}

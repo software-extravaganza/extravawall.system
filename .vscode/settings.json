@@ -32,7 +32,8 @@
         "skbuff.h": "c",
         "compare": "c",
         "type_traits": "c",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "netfilter_ipv4.h": "c"
     },
     "cSpell.customDictionaries": {
         "custom-dictionary-workspace": {

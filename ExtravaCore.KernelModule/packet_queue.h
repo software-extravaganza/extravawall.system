@@ -15,6 +15,7 @@ void PacketQueueInitialize(PacketQueue *queue);
 bool PacketQueueIsFull(PacketQueue *queue);
 bool PacketQueueIsEmpty(PacketQueue *queue);
 void PacketQueueCleanup(PacketQueue *queue);
+void PacketQueueEmpty(PacketQueue *queue);
 int PacketQueueLength(PacketQueue *queue);
 
 #endif // _PACKET_QUEUE_H_

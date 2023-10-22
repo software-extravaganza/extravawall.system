@@ -294,7 +294,7 @@ public class KernelClient {
                     //Span<byte> readStream = new Span<byte>(readMem.GetBuffer());
 
                     //Span<byte> headerSpan = stackalloc byte[intSize + intSize];
-                    byte[] headerData = new byte[intSize * 3]; // Assuming 64-bit kernel
+                    byte[] headerData = new byte[intSize * 4]; // Assuming 64-bit kernel
                     Task<int> headerReadTask = fsRead.ReadAsync(headerData, 0, headerData.Length);
                     //Task headerDelayTask = Task.Delay(1000);
                     //fsRead.Read(headerData, 0, headerData.Length);
@@ -306,22 +306,31 @@ public class KernelClient {
                         throw new TimeoutException("Header read operation timed out.");
                     }
 
-                    (int version, int dataLength, RoutingType routingType) ProcessHeader() {
+                    (bool reset, int version, int dataLength, RoutingType routingType) ProcessHeader() {
                         Console.WriteLine("Processing Header");
-                        Span<byte> headerSpan = headerData.AsSpan().Slice(0, headerData.Length);
+                        Span<byte> rawSpan = headerData.AsSpan();
+                        Span<byte> resetByte = rawSpan.Slice(0, intSize);
+                        Span<byte> headerSpan = rawSpan.Slice(0, headerData.Length);
                         if (BitConverter.IsLittleEndian) {
                             headerSpan.Reverse();
                         }
 
+                        int flags = BitConverter.ToInt32(headerSpan.Slice(intSize * 3, intSize));
                         int dataLength = BitConverter.ToInt32(headerSpan.Slice(0, intSize));
                         int version = BitConverter.ToInt32(headerSpan.Slice(intSize, intSize));
                         RoutingType routingType = (RoutingType)BitConverter.ToInt32(headerSpan.Slice(intSize * 2, intSize));
-                        return (version, dataLength, routingType);
+
+                        bool shouldResetRead = flags == 1;
+                        return (shouldResetRead, version, dataLength, routingType);
                     }
 
-                    (int version, int dataLength, RoutingType routingType) = ProcessHeader();
-                    byte[] packetData = new byte[dataLength];
-                    Task<int> dataReadTask = fsRead.ReadAsync(packetData, 0, packetData.Length);
+                    (bool shouldResetRead, int version, int dataLength, RoutingType routingType) = ProcessHeader();
+                    if (shouldResetRead) {
+                        continue;
+                    }
+
+                    byte[] rawData = new byte[dataLength + intSize];
+                    Task<int> dataReadTask = fsRead.ReadAsync(rawData, 0, rawData.Length);
                     /// Task dataDelayTask = Task.Delay(1000);
                     //fsRead.Read(headerData, 0, headerData.Length);
                     Task dataCompletedTask = await Task.WhenAny(dataReadTask); //, dataDelayTask);
@@ -329,6 +338,15 @@ public class KernelClient {
                         fsRead.Close();
                         // The timeout elapsed before the read operation completed.
                         throw new TimeoutException("Data read operation timed out.");
+                    }
+
+                    var rawSpan = rawData.AsMemory();
+                    var flagsSpan = rawSpan.Slice(0, intSize);
+                    var packetData = rawSpan.Slice(intSize).ToArray();
+                    var flags = BitConverter.ToInt32(flagsSpan.Slice(0, intSize).ToArray());
+                    bool shouldResetWrite = flags == 1;
+                    if (shouldResetWrite) {
+                        continue;
                     }
 
                     // if (BitConverter.IsLittleEndian) {
@@ -349,7 +367,15 @@ public class KernelClient {
                         TCPHeader tcpHeader = ParseTCPHeader(packetData.Skip(14 + (ipHeader.VersionAndHeaderLength & 0xF) * 4).ToArray());
                         // Continue with further processing.
                     } else if (ipHeader.Protocol == IPProtocol.ICMP) {
-                        Console.WriteLine($"Ping! Source {ipHeader.SourceAddressString}, Destination {ipHeader.DestinationAddressString}, Routing Type {routingType}");
+                        var routeString = routingType switch {
+                            RoutingType.NONE => "None",
+                            RoutingType.PRE_ROUTING => "Pre-Routing",
+                            RoutingType.POST_ROUTING => "Post-Routing",
+                            RoutingType.LOCAL_ROUTING => "Local-Routing",
+                            _ => "Unknown"
+                        };
+
+                        Console.WriteLine($"Ping! Source {ipHeader.SourceAddressString}, Destination {ipHeader.DestinationAddressString}, Routing Type {routeString}");
                         if ((ipHeader.DestinationAddressString == "1.1.1.2" && routingType != RoutingType.PRE_ROUTING) || routingType == RoutingType.PRE_ROUTING) {
                             routingDecision = RoutingDecision.ACCEPT;
                         } else {
@@ -367,11 +393,11 @@ public class KernelClient {
                         // string str = Encoding.UTF8.GetString(packetData);
                         // Console.WriteLine(str);
                         // // Send back a directive
-                        byte[] responseHeader = new byte[intSize * 3];
+                        byte[] responseHeader = new byte[intSize * 2];
                         //BitConverter.GetBytes(pktId).CopyTo(directiveData, 0);
                         //BitConverter.GetBytes(1).CopyTo(directiveData, sizeof(long)); // For example, "1" for ACCEPT
                         var responseVersionBytes = BitConverter.GetBytes(1);
-                        var responseDataBytes = BitConverter.GetBytes(1);
+                        var responseLengthBytes = BitConverter.GetBytes(intSize);
                         var decisionBytes = BitConverter.GetBytes((int)decision);
                         // if (BitConverter.IsLittleEndian) {
                         //     responseVersionBytes = responseVersionBytes.Reverse().ToArray();
@@ -381,11 +407,16 @@ public class KernelClient {
                         // Console.WriteLine($"Alternate response: {PrintByteArray(responseVersionBytes.Reverse().ToArray())} {PrintByteArray(responseDataBytes.Reverse().ToArray())} {PrintByteArray(decisionBytes.Reverse().ToArray())}");
 
                         responseVersionBytes.CopyTo(responseHeader, 0);
-                        responseDataBytes.CopyTo(responseHeader, intSize);
-                        decisionBytes.CopyTo(responseHeader, intSize * 2);
+                        responseLengthBytes.CopyTo(responseHeader, intSize);
                         fsAck.Write(responseHeader, 0, responseHeader.Length);
                         fsAck.Flush();
-                        Console.WriteLine("Response sent.");
+                        Console.WriteLine("Response header sent.");
+
+                        byte[] responseData = new byte[intSize];
+                        decisionBytes.CopyTo(responseData, 0);
+                        fsAck.Write(responseData, 0, responseData.Length);
+                        fsAck.Flush();
+                        Console.WriteLine("Response data sent.");
                         //Console.WriteLine(responseHeader);
 
                         // byte[] responseData = new byte[intSize];

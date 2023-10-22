@@ -28,17 +28,16 @@ int log_level = 1;
 // Debian & Ubuntu: sudo apt install linux-headers-$(uname -r)
 #include <linux/kernel.h>
 #include "logger.h"
+#include "module_control.h"
 #include "netfilter_hooks.h"
 #include "userspace_comm.h"
-
-
 
 // This will be a simulation of the network packet data
 char packet_data[512];
 
-
 static int __init Initialize(void) {
-    LOG_INFO("Extrava module initializing ⌛️");
+    SetLogLevel(log_level);
+    LOG_INFO("⌛️  Extrava module initializing  ⌛️");
     LOG_DEBUG("Initializing packet queue");
     if(SetupUserSpaceCommunication() != 0){
         LOG_ERROR("Failed to setup user space communication");
@@ -51,17 +50,21 @@ static int __init Initialize(void) {
         return -1;
     }
 
-    LOG_INFO("Extrava module loaded ✔️");
+    SetInitialized();
+    LOG_INFO("✔️  Extrava module loaded  ✔️");
+    Activate();
 	return 0;
 }
 
 static void __exit Exit(void) {
-    LOG_INFO("Extrava module exiting ⌛️");
+    LOG_INFO("⌛️  Extrava module exiting  ⌛️");
+    Deactivate();
     LOG_DEBUG("Cleaning up netfilter hooks");
     CleanupNetfilterHooks();
     LOG_DEBUG("Cleaning up user space communication");
     CleanupUserSpaceCommunication();
-	LOG_INFO("Extrava module unloaded 🛑");
+	LOG_INFO("🛑  Extrava module unloaded  🛑");
+    SetUninitialized();
 }
 
 module_init(Initialize);

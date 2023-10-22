@@ -16,6 +16,7 @@
 #include "data_structures.h"
 #include "helpers.h"
 #include "logger.h"
+#include "module_control.h"
 #include "packet_queue.h"
 #include "type_converters.h"
 
@@ -32,12 +33,21 @@ extern PacketQueue _injectionPacketsQueue;
 extern PacketQueue _pendingPacketsQueue;
 extern PacketQueue _read1PacketsQueue;
 extern PacketQueue _read2PacketsQueue;
-extern PacketQueue _writePacketsQueue;
+extern PacketQueue _write1PacketsQueue;
+extern PacketQueue _write2PacketsQueue;
+extern PacketQueue _completedQueue;
 extern bool _queueItemProcessed;
 extern bool _queueProcessorExited;
 extern bool _readQueueItemAdded;
 extern bool _userRead;
 extern bool _userspaceItemProcessed;
+extern bool IsProcessingPacketTrip;
+extern long PacketsCapturedCounter;
+extern long PacketsProcessedCounter;
+extern long PacketsAcceptCounter;
+extern long PacketsManipulateCounter;
+extern long PacketsDropCounter;
+extern long PacketsStaleCounter;
 extern struct task_struct *_queueProcessorThread;
 
 // Function Declarations (alphabetically ordered)
@@ -46,6 +56,11 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback);
 int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler);
 int SetupNetfilterHooks(void);
+void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip);
+void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName);
+void NetFilterShouldCaptureChangeHandler(bool shouldCapture);
+//void StopQueueProcessorThread(void) ;
 
+#define CLEANUP_STALE_ITEMS_ON_QUEUE(queue) CleanUpStaleItemsOnQueue(&queue, #queue)
 
 #endif // NETFILTER_HOOKS

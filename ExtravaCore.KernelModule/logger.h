@@ -3,10 +3,13 @@
 
 #include <linux/kernel.h>
 #include <linux/stdarg.h>
+#include <linux/string.h>
 
 extern int log_level;
 typedef void (*log_func_t)(const char*, const char*, const char*, int, ...);
 
+void __LoggerSetLevel(int level);
+#define STRINGIFY(x) #x
 #define FORCE_EXPAND(macro) macro
 #define LOG_BASE(level, fmt, ...) \
     printk(fmt, ##__VA_ARGS__);
@@ -14,11 +17,36 @@ typedef void (*log_func_t)(const char*, const char*, const char*, int, ...);
 static inline void _logGenericFunc(int num_level, const char* kern_level, const char* fmt, const char* func, int line, ...) {
     va_list args;
     char buffer[1024];
-    char full_fmt[] = "%s[%s:%d] %s\n";
+    char full_fmt[] = "%s[%s:%d] %s: %s\n";
+    char* category;
+
+    //The statement I need help with
+    if(kern_level == NULL){
+        category = "";
+    }
+    else if(strcmp(kern_level, KERN_DEBUG) == 0){
+        category = "DEBUG";
+    }
+    else if(strcmp(kern_level, KERN_INFO) == 0){
+        category = "INFO";
+    }
+    else if(strcmp(kern_level, KERN_ERR) == 0){
+        category = "ERROR";
+    }
+    else if(strcmp(kern_level, KERN_WARNING) == 0){
+        category = "WARNING";
+    }
+    else if(strcmp(kern_level, KERN_ALERT) == 0){
+        category = "ALERT";
+    }
+    else{
+        category = "UNKNOWN";
+    }
+
     va_start(args, line);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
     va_end(args);
-    LOG_BASE(num_level, full_fmt, kern_level, func, line, buffer);
+    LOG_BASE(num_level, full_fmt, kern_level, func, line, category, buffer);
 }
 
 #define _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, func, line, ...) \

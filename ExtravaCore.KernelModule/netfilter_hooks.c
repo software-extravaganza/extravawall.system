@@ -23,8 +23,10 @@ const char *DECISION_ICONS[] = {
 PacketQueue _pendingPacketsQueue;
 PacketQueue _read1PacketsQueue;
 PacketQueue _read2PacketsQueue;
-PacketQueue _writePacketsQueue;
+PacketQueue _write1PacketsQueue;
+PacketQueue _write2PacketsQueue;
 PacketQueue _injectionPacketsQueue;
+PacketQueue _completedQueue;
 
 bool _readQueueItemAdded = false;
 bool _queueItemProcessed = false;
@@ -44,12 +46,13 @@ static struct nf_queue_handler *_queueHandlerOps = NULL;
 
 struct task_struct *_queueProcessorThread = NULL;
 static packet_processing_callback_t _registeredCallback = NULL;
-static bool _isActive = false;
+static bool _isInitialized = false;
 static RoutingType _lastRoutingType = NONE_ROUTING;
 
 static void _hookDrop(struct net *net);
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum);
 static struct nf_queue_handler* _setupQueueHandlerHook(void);
+static void _cleanCompletedPacketTrips(void);
 
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
@@ -66,15 +69,67 @@ int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handle
     return 0;
 }
 
-static void _handlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason) {
+// void StopQueueProcessorThread(void) {
+//     if(!_queueProcessorThread){
+//         LOG_WARNING("Queue processor thread is null. Ignoring stop.");
+//         return;
+//     }
+    
+//     kthread_stop(_queueProcessorThread);
+// }
+
+void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason) {
     char logMessage[256];
-    if(packetTrip){
-        FreePendingPacketTrip(packetTrip);
-        packetTrip = NULL;
+    if(!packetTrip){
+        LOG_WARNING("Packet trip is null. Ignoring decision.");
+        return;
+    }
+
+    if(packetTrip->decision == ACCEPT){
+        nf_reinject(packetTrip->entry, NF_ACCEPT);
+        PacketsAcceptCounter++;
+    }
+    else if(packetTrip->decision == MANIPULATE){
+        nf_reinject(packetTrip->entry, NF_ACCEPT);
+        PacketsManipulateCounter++;
+    }
+    else {
+        nf_reinject(packetTrip->entry, NF_DROP);
+        PacketsDropCounter++;
     }
 
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[decision], GetReasonText(reason));
     LOG_DEBUG_ICMP("%s", logMessage);
+    PacketsProcessedCounter++;
+
+    DecommissionPacketTrip(packetTrip);
+    _cleanCompletedPacketTrips();
+}
+
+static void _cleanCompletedPacketTrips(void){
+    CLEANUP_STALE_ITEMS_ON_QUEUE(_completedQueue);
+}
+
+void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName){
+    int queueLength = PacketQueueLength(queue);
+    int numberCleaned = 0;
+    while(queueLength > 0){
+        PendingPacketRoundTrip* popPacketTrip = PacketQueuePop(queue);
+        if(!popPacketTrip){
+            LOG_WARNING("Packet trip is null. Ignoring clean up.");
+            continue;
+        }
+
+        FreePendingPacketTrip(popPacketTrip);
+        numberCleaned++;
+        PacketsStaleCounter++;
+        queueLength = PacketQueueLength(queue);
+    }
+
+    if(numberCleaned>0){
+        int newQueueLength = PacketQueueLength(queue);
+        LOG_DEBUG_ICMP("Cleaned %d packet trips from %s. Current size: %d;", numberCleaned, queueName, newQueueLength);
+    }
 }
 
 // Refactored function to handle nfRouting
@@ -95,8 +150,8 @@ static unsigned int _nfRoutingHandlerCommon(RoutingType type, void *priv, struct
 
     LOG_DEBUG_ICMP("ICMP packet received. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
 
-    if(!_isActive){
-        LOG_DEBUG_ICMP("Extrava is not active. Dropping packet. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
+    if(!ShouldCapture()){
+        LOG_DEBUG_ICMP("Extrava is not capturing. Dropping packet. Routing Type: %s, Protocol: %s, ToS: %s, Hook Type: %s", routeTypeName, protocolName, typeOfService, hookName);
         return NF_DROP;
     }
 
@@ -146,8 +201,10 @@ int SetupNetfilterHooks(void) {
     PacketQueueInitialize(&_pendingPacketsQueue);
     PacketQueueInitialize(&_read1PacketsQueue);
     PacketQueueInitialize(&_read2PacketsQueue);
-    PacketQueueInitialize(&_writePacketsQueue);
+    PacketQueueInitialize(&_write1PacketsQueue);
+    PacketQueueInitialize(&_write2PacketsQueue);
     PacketQueueInitialize(&_injectionPacketsQueue);
+    PacketQueueInitialize(&_completedQueue);
 
     _preRoutingOps->hook = _nfPreRoutingHandler;
     _preRoutingOps->hooknum = NF_INET_PRE_ROUTING;
@@ -170,12 +227,12 @@ int SetupNetfilterHooks(void) {
     nf_register_net_hook(&init_net, _localRoutingOps);
     nf_register_queue_handler(_queueHandlerOps);
 
-    _isActive = true;
+    _isInitialized = true;
     return 0;
 }
 
 void CleanupNetfilterHooks(void) {
-    _isActive = false;
+    _isInitialized = false;
     if (_queueHandlerOps) {
         nf_unregister_queue_handler();
         kfree(_queueHandlerOps);
@@ -203,8 +260,19 @@ void CleanupNetfilterHooks(void) {
     PacketQueueCleanup(&_pendingPacketsQueue);
     PacketQueueCleanup(&_read1PacketsQueue);
     PacketQueueCleanup(&_read2PacketsQueue);
-    PacketQueueCleanup(&_writePacketsQueue);
+    PacketQueueCleanup(&_write1PacketsQueue);
+    PacketQueueCleanup(&_write2PacketsQueue);
     PacketQueueCleanup(&_injectionPacketsQueue);
+    PacketQueueCleanup(&_completedQueue);
+}
+
+void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
+    if(!packetTrip){
+        LOG_WARNING("Packet trip is null. Ignoring decommission.");
+        return;
+    }
+
+    PacketQueuePush(&_completedQueue, packetTrip);
 }
 
 static struct nf_queue_handler* _setupQueueHandlerHook(void) {
@@ -228,7 +296,7 @@ static void _hookDrop(struct net *net){
         _queueHandlerOps = NULL;
     }
 
-    if(_isActive){
+    if(_isInitialized){
         LOG_DEBUG("Initializing packet queue handler");
         _queueHandlerOps = _setupQueueHandlerHook();
         nf_register_queue_handler(_queueHandlerOps);
@@ -240,7 +308,7 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     PendingPacketRoundTrip *packetTrip = CreatePendingPacketTrip(entry, _lastRoutingType);
     if (!packetTrip || !packetTrip->packet) {
         LOG_ERROR("Failed to create pending packet trip.");
-        _handlePacketDecision(packetTrip, DROP, MEMORY_FAILURE_PACKET);
+        HandlePacketDecision(packetTrip, DROP, MEMORY_FAILURE_PACKET);
         packetTrip = NULL;
         return NF_DROP;
     }
@@ -291,7 +359,20 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     //wake_up_process(queue_processor_thread);
     _readQueueItemAdded = true;
     wake_up_interruptible(&ReadQueueItemAddedWaitQueue);
-
+ 
     //wake_up_process(queue_processor_thread);
     return 0;
+}
+
+void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
+    if(!shouldCapture){
+        LOG_DEBUG("Emptying queues");
+        PacketQueueEmpty(&_pendingPacketsQueue);
+        PacketQueueEmpty(&_read1PacketsQueue);
+        PacketQueueEmpty(&_read2PacketsQueue);
+        PacketQueueEmpty(&_write1PacketsQueue);
+        PacketQueueEmpty(&_write2PacketsQueue);
+        PacketQueueEmpty(&_injectionPacketsQueue);
+        PacketQueueEmpty(&_completedQueue);
+    }
 }

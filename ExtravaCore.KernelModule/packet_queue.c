@@ -5,7 +5,7 @@
 #define MAX_PENDING_PACKETS_SIZE (MAX_PENDING_PACKETS * sizeof(PendingPacketRoundTrip *))
 #define MESSAGE_INITIALIZATION_ERROR "Failed to initialize packet queue."
 #define MESSAGE_PEEKING_PACKET "Peeking packet trip from queue. Current queue length: %d"
-#define MESSAGE_PEEK "Peek"
+#define MESSAGE_PEEK "Peek Length: %d, Peeked: %d"
 #define MESSAGE_NULL_PACKET "Pop returning NULL packet trip."
 
 // Public function implementations
@@ -26,6 +26,12 @@ bool PacketQueueIsEmpty(PacketQueue *queue) {
 }
 
 void PacketQueueCleanup(PacketQueue *queue) {
+    PacketQueueEmpty(queue);
+    kfifo_free(queue);
+}
+
+
+void PacketQueueEmpty(PacketQueue *queue) {
     PendingPacketRoundTrip *packet;
     while (kfifo_out(queue, &packet, sizeof(packet))) {
         if (packet) {
@@ -33,16 +39,11 @@ void PacketQueueCleanup(PacketQueue *queue) {
             packet = NULL;
         }
     }
-    kfifo_free(queue);
 }
 
 // Private function implementations
 bool PacketQueuePush(PacketQueue *queue, PendingPacketRoundTrip *packet) {
     return kfifo_in(queue, &packet, sizeof(packet));
-}
-
-bool PacketQueueRemove(PacketQueue *queue, PendingPacketRoundTrip *packet) {
-    return kfifo_out(queue, &packet, sizeof(packet));
 }
 
 int PacketQueueLength(PacketQueue *queue) {
@@ -51,16 +52,16 @@ int PacketQueueLength(PacketQueue *queue) {
 
 PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
     PendingPacketRoundTrip *packet = NULL;
-    int result = -1;
-    LOG_DEBUG_ICMP(MESSAGE_PEEKING_PACKET, PacketQueueLength(queue));
-    result = kfifo_peek(queue, &packet);
-    if(result != 0){
-        LOG_DEBUG_ICMP("Peek failure");
-        return NULL;
+    int length = PacketQueueLength(queue);
+    LOG_DEBUG_ICMP(MESSAGE_PEEKING_PACKET, length);
+    if(length > 0){
+        if (kfifo_peek(queue, &packet)) {
+            LOG_DEBUG_ICMP(MESSAGE_PEEK, length, 1); // 1 indicates success in peeking
+            return packet;
+        }
     }
 
-    LOG_DEBUG_ICMP(MESSAGE_PEEK);
-    return packet;
+    return NULL;
 }
 
 PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
@@ -70,7 +71,7 @@ PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
         return NULL;
     }
 
-    if (kfifo_out(queue, &packet, sizeof(packet))){
+    if (kfifo_out(queue, &packet, sizeof(PendingPacketRoundTrip))){
         return packet;
     }
 

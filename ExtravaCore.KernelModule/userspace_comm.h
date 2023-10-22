@@ -4,7 +4,9 @@
 #include <linux/uaccess.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/limits.h>
 #include "logger.h"
+#include "module_control.h"
 #include "data_structures.h"
 #include "packet_queue.h"
 #include "netfilter_hooks.h"
