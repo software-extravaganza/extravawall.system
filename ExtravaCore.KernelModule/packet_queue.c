@@ -110,6 +110,9 @@ bool PacketQueuePush(PacketQueue *queue, PendingPacketRoundTrip *packet) {
 }
 
 int PacketQueueLength(PacketQueue *queue) {
+    if (!queue || !queue->queue) {
+        return 0; // or handle the error appropriately
+    }
     return LOCK_WHILE_RETURN_INT(queue, kfifo_len(queue->queue) / sizeof(PendingPacketRoundTrip *));
 }
 
