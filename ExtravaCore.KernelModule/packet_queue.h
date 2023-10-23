@@ -3,17 +3,21 @@
 
 #include <linux/skbuff.h>
 #include <linux/kfifo.h>
+#include <linux/semaphore.h>
 #include "data_structures.h"
 #include "data_factories.h"
 
 #define MAX_PENDING_PACKETS 100
 
-typedef struct kfifo PacketQueue;
+typedef struct {
+    struct kfifo *queue;
+    struct semaphore *semaphore;
+} PacketQueue;
 
 bool PacketQueuePush(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
 PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue);
 PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue);
-void PacketQueueInitialize(PacketQueue *queue);
+PacketQueue* PacketQueueCreate(void);
 bool PacketQueueIsFull(PacketQueue *queue);
 bool PacketQueueIsEmpty(PacketQueue *queue);
 void PacketQueueCleanup(PacketQueue *queue);

@@ -14,6 +14,7 @@
 #define MANIPULATE_ICON "✂️"
 
 const char* MESSAGE_PACKETS_CAPTURED = "Packets captured: %ld; Packets processed: %ld; Packets accepted: %ld; Packets modified: %ld; Packets dropped: %ld; Packets Stale: %ld";
+const char* MESSAGE_EVENTS_CAPTURED = "Read Wait: %ld; Read Woke: %ld; Write Wait: %ld; Write Woke: %ld; Queue Processor Wait: %ld; Queue Processor Woke: %ld;";
 
 const char *DECISION_ICONS[] = {
     UNDECIDED_ICON,  // UNDECIDED
@@ -22,23 +23,28 @@ const char *DECISION_ICONS[] = {
     MANIPULATE_ICON  // MANIPULATE
 };
 
-PacketQueue _pendingPacketsQueue;
-PacketQueue _read1PacketsQueue;
-PacketQueue _read2PacketsQueue;
-PacketQueue _write1PacketsQueue;
-PacketQueue _write2PacketsQueue;
-PacketQueue _injectionPacketsQueue;
-PacketQueue _completedQueue;
+struct semaphore newPacketSemaphore;
 
+PacketQueue *_pendingPacketsQueue;
+PacketQueue *_read1PacketsQueue;
+PacketQueue *_read2PacketsQueue;
+PacketQueue *_write1PacketsQueue;
+PacketQueue *_write2PacketsQueue;
+PacketQueue *_injectionPacketsQueue;
+PacketQueue *_completedQueue;
+
+bool _pendingQueueItemAdded = false;
 bool _readQueueItemAdded = false;
 bool _queueItemProcessed = false;
 bool _queueProcessorExited = false;
 bool _userspaceItemProcessed = false;
 bool _userRead = false;
+bool _userWrite = false;
 DECLARE_WAIT_QUEUE_HEAD(QueueProcessorExitedWaitQueue);
 DECLARE_WAIT_QUEUE_HEAD(_queueItemProcessedWaitQueue);
 DECLARE_WAIT_QUEUE_HEAD(UserspaceItemProcessedWaitQueue);
 DECLARE_WAIT_QUEUE_HEAD(ReadQueueItemAddedWaitQueue);
+DECLARE_WAIT_QUEUE_HEAD(PendingQueueItemAddedWaitQueue);
 
 // Declaration of the netfilter hooks
 static struct nf_hook_ops *_preRoutingOps = NULL;
@@ -115,6 +121,7 @@ static void increasePacketsProcessedCounter(void){
     PacketsProcessedCounter++;
     if(PacketsProcessedCounter % 5000 == 0){
         LOG_INFO(MESSAGE_PACKETS_CAPTURED, PacketsCapturedCounter, PacketsProcessedCounter, PacketsAcceptCounter, PacketsManipulateCounter, PacketsDropCounter, PacketsStaleCounter);
+        LOG_INFO(MESSAGE_EVENTS_CAPTURED, ReadWaitCounter, ReadWokeCounter, WriteWaitCounter, WriteWokeCounter, QueueProcessorWaitCounter, QueueProcessorWokeCounter);
     }
 }
 
@@ -249,13 +256,14 @@ int SetupNetfilterHooks(void) {
         return ERROR_MEMORY_ALLOC;
     }
 
-    PacketQueueInitialize(&_pendingPacketsQueue);
-    PacketQueueInitialize(&_read1PacketsQueue);
-    PacketQueueInitialize(&_read2PacketsQueue);
-    PacketQueueInitialize(&_write1PacketsQueue);
-    PacketQueueInitialize(&_write2PacketsQueue);
-    PacketQueueInitialize(&_injectionPacketsQueue);
-    PacketQueueInitialize(&_completedQueue);
+    sema_init(&newPacketSemaphore, 1);
+    _pendingPacketsQueue = PacketQueueCreate();
+    _read1PacketsQueue = PacketQueueCreate();
+    _read2PacketsQueue = PacketQueueCreate();
+    _write1PacketsQueue = PacketQueueCreate();
+    _write2PacketsQueue = PacketQueueCreate();
+    _injectionPacketsQueue = PacketQueueCreate();
+    _completedQueue = PacketQueueCreate();
 
     _preRoutingOps->hook = _nfPreRoutingHandler;
     _preRoutingOps->hooknum = NF_INET_PRE_ROUTING;
@@ -277,6 +285,11 @@ int SetupNetfilterHooks(void) {
     nf_register_net_hook(&init_net, _postRoutingOps);
     nf_register_net_hook(&init_net, _localRoutingOps);
     nf_register_queue_handler(_queueHandlerOps);
+
+    init_waitqueue_head(&QueueProcessorExitedWaitQueue);
+    init_waitqueue_head(&_queueItemProcessedWaitQueue);
+    init_waitqueue_head(&UserspaceItemProcessedWaitQueue);
+    init_waitqueue_head(&PendingQueueItemAddedWaitQueue);
 
     _isInitialized = true;
     return 0;
@@ -308,13 +321,13 @@ void CleanupNetfilterHooks(void) {
         _preRoutingOps = NULL;
     }
 
-    PacketQueueCleanup(&_pendingPacketsQueue);
-    PacketQueueCleanup(&_read1PacketsQueue);
-    PacketQueueCleanup(&_read2PacketsQueue);
-    PacketQueueCleanup(&_write1PacketsQueue);
-    PacketQueueCleanup(&_write2PacketsQueue);
-    PacketQueueCleanup(&_injectionPacketsQueue);
-    PacketQueueCleanup(&_completedQueue);
+    PacketQueueCleanup(_pendingPacketsQueue);
+    PacketQueueCleanup(_read1PacketsQueue);
+    PacketQueueCleanup(_read2PacketsQueue);
+    PacketQueueCleanup(_write1PacketsQueue);
+    PacketQueueCleanup(_write2PacketsQueue);
+    PacketQueueCleanup(_injectionPacketsQueue);
+    PacketQueueCleanup(_completedQueue);
 }
 
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
@@ -323,7 +336,7 @@ void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
         return;
     }
 
-    PacketQueuePush(&_completedQueue, packetTrip);
+    PacketQueuePush(_completedQueue, packetTrip);
 }
 
 static struct nf_queue_handler* _setupQueueHandlerHook(void) {
@@ -399,17 +412,20 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     // int queueLength = pq_len_packetTrip(&pending_packets_queue);
     // LOG_DEBUG_ICMP(packetTrip, "Pushing to pending_packets_queue. Current size: %d; Size after push: %d", queueLength, queueLength + 1);
     // pq_push_packetTrip(&pending_packets_queue, packetTrip);
+    down(&newPacketSemaphore);
+    int queueLength = PacketQueueLength(_pendingPacketsQueue);
+    LOG_DEBUG_ICMP(packetTrip, "Pushing to _pendingPacketsQueue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
+    PacketQueuePush(_pendingPacketsQueue, packetTrip);
+    //PacketQueuePush(_pendingPacketsQueue, packetTrip);
     
-    int queueLength = PacketQueueLength(&_read1PacketsQueue);
-    LOG_DEBUG_ICMP(packetTrip, "Pushing to _read1PacketsQueue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
-    PacketQueuePush(&_read1PacketsQueue, packetTrip);
     // Signal to userspace that there's a packet to process (e.g., via a char device or netlink).
     //registered_callback();
 
     // wake up your processing thread
     //wake_up_process(queue_processor_thread);
-    _readQueueItemAdded = true;
-    wake_up_interruptible(&ReadQueueItemAddedWaitQueue);
+    _pendingQueueItemAdded = true;
+    up(&newPacketSemaphore);
+    wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
  
     //wake_up_process(queue_processor_thread);
     return 0;
@@ -418,12 +434,12 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
     if(!shouldCapture){
         LOG_DEBUG("Emptying queues");
-        PacketQueueEmpty(&_pendingPacketsQueue);
-        PacketQueueEmpty(&_read1PacketsQueue);
-        PacketQueueEmpty(&_read2PacketsQueue);
-        PacketQueueEmpty(&_write1PacketsQueue);
-        PacketQueueEmpty(&_write2PacketsQueue);
-        PacketQueueEmpty(&_injectionPacketsQueue);
-        PacketQueueEmpty(&_completedQueue);
+        PacketQueueEmpty(_pendingPacketsQueue);
+        PacketQueueEmpty(_read1PacketsQueue);
+        PacketQueueEmpty(_read2PacketsQueue);
+        PacketQueueEmpty(_write1PacketsQueue);
+        PacketQueueEmpty(_write2PacketsQueue);
+        PacketQueueEmpty(_injectionPacketsQueue);
+        PacketQueueEmpty(_completedQueue);
     }
 }

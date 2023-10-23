@@ -2,6 +2,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
+#include <linux/atomic.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/limits.h>
@@ -14,13 +15,17 @@
 #ifndef USERSPACE_COMM
 #define USERSPACE_COMM
 extern bool processingPacketTrip;
+extern bool _userWrite;
+extern struct semaphore newPacketSemaphore;
 
 // Public fields
 extern wait_queue_head_t QueueItemProcessedWaitQueue; 
 extern wait_queue_head_t UserspaceItemReady; 
 extern wait_queue_head_t UserspaceItemProcessedWaitQueue; 
 extern wait_queue_head_t ReadQueueItemAddedWaitQueue; 
+extern wait_queue_head_t PendingQueueItemAddedWaitQueue; 
 extern wait_queue_head_t UserReadWaitQueue; 
+extern wait_queue_head_t UserWriteWaitQueue;
 extern wait_queue_head_t QueueProcessorExitedWaitQueue; 
 
 int SetupUserSpaceCommunication(void);

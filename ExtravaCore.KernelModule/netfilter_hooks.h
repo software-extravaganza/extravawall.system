@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/kfifo.h>
 #include <linux/kthread.h>
+#include <linux/semaphore.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -32,25 +33,31 @@ typedef int (*packet_processor_thread_handler_t)(void *data);
 // Extern Variables (alphabetically ordered)
 extern int default_packet_response;
 extern bool force_icmp;
-extern PacketQueue _injectionPacketsQueue;
-extern PacketQueue _pendingPacketsQueue;
-extern PacketQueue _read1PacketsQueue;
-extern PacketQueue _read2PacketsQueue;
-extern PacketQueue _write1PacketsQueue;
-extern PacketQueue _write2PacketsQueue;
-extern PacketQueue _completedQueue;
+extern PacketQueue *_injectionPacketsQueue;
+extern PacketQueue *_pendingPacketsQueue;
+extern PacketQueue *_read1PacketsQueue;
+extern PacketQueue *_read2PacketsQueue;
+extern PacketQueue *_write1PacketsQueue;
+extern PacketQueue *_write2PacketsQueue;
+extern PacketQueue *_completedQueue;
 extern bool _queueItemProcessed;
 extern bool _queueProcessorExited;
 extern bool _readQueueItemAdded;
+extern bool _pendingQueueItemAdded;
 extern bool _userRead;
 extern bool _userspaceItemProcessed;
-extern bool IsProcessingPacketTrip;
 extern long PacketsCapturedCounter;
 extern long PacketsProcessedCounter;
 extern long PacketsAcceptCounter;
 extern long PacketsManipulateCounter;
 extern long PacketsDropCounter;
 extern long PacketsStaleCounter;
+extern long ReadWaitCounter;
+extern long ReadWokeCounter;
+extern long WriteWaitCounter;
+extern long WriteWokeCounter;
+extern long QueueProcessorWokeCounter;
+extern long QueueProcessorWaitCounter;
 extern struct task_struct *_queueProcessorThread;
 
 // Function Declarations (alphabetically ordered)
@@ -64,6 +71,6 @@ void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName);
 void NetFilterShouldCaptureChangeHandler(bool shouldCapture);
 //void StopQueueProcessorThread(void) ;
 
-#define CLEANUP_STALE_ITEMS_ON_QUEUE(queue) CleanUpStaleItemsOnQueue(&queue, #queue)
+#define CLEANUP_STALE_ITEMS_ON_QUEUE(queue) CleanUpStaleItemsOnQueue(queue, #queue)
 
 #endif // NETFILTER_HOOKS

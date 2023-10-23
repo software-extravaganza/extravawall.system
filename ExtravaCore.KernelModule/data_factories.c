@@ -25,7 +25,7 @@ struct nf_queue_entry* CreateQueueEntry(struct sk_buff *skb, const struct nf_hoo
 static void addMetaDataToPacketTrip(PendingPacketRoundTrip *packetTrip, RoutingType type);
 
 // Private functions
-static void safeFree(void* ptr) {
+void safeFree(void* ptr) {
     if (!ptr){
         return;
     }

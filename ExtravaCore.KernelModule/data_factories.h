@@ -23,5 +23,6 @@ void FreePendingPacket(PendingPacket *packet);
 bool AddDataToPacket(PendingPacket *packet, struct sk_buff *skb);
 char* GetReasonText(DecisionReason reason);
 char* CreatePacketTypeString(PendingPacket *packet);
+void safeFree(void* ptr) ;
 
 #endif // DATA_FACTORIES_H

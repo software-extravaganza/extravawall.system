@@ -35,6 +35,8 @@ static struct device* _netmodDevice = NULL;
 static struct device* _netmodDeviceAck = NULL;
 static bool sendUserSpaceReset = false;
 static bool getUserSpaceReset = false;
+static atomic_t IsProcessingPacketTrip = ATOMIC_INIT(0); // 0 for false, 1 for true
+
 
 static int _processResponseHeader(const char __user* userBuffer, size_t length, PendingPacketRoundTrip* packetTrip);
 static int _processResponseData(const char __user* userBuffer, size_t length, PendingPacketRoundTrip* packetTrip);
@@ -61,15 +63,21 @@ static struct file_operations _operationsFromDeviceUser = {
 };
 
 // Public Fields
-bool IsProcessingPacketTrip = false;
 long PacketsCapturedCounter = 0;
 long PacketsProcessedCounter = 0;
 long PacketsAcceptCounter = 0;
 long PacketsManipulateCounter = 0;
 long PacketsDropCounter = 0;
 long PacketsStaleCounter = 0;
+long ReadWaitCounter = 0;
+long ReadWokeCounter = 0;
+long WriteWaitCounter = 0;
+long WriteWokeCounter = 0;
+long QueueProcessorWaitCounter = 0;
+long QueueProcessorWokeCounter = 0;
 
 DECLARE_WAIT_QUEUE_HEAD(UserReadWaitQueue);
+DECLARE_WAIT_QUEUE_HEAD(UserWriteWaitQueue);
 extern bool UserRead;
 
 // Private Functions
@@ -93,7 +101,7 @@ static int _openDevice(struct inode *inodep, struct file *filep, char* deviceNam
 
 // Public Functions
 int SetupUserSpaceCommunication(void) {
-    IsProcessingPacketTrip = false;
+    atomic_set(&IsProcessingPacketTrip, 0);
     SetShouldCaptureEventHandler(_shouldCaptureChangeHandler);
 
     _majorNumberToUser = register_chrdev(0, DEVICE_TO_USER_SPACE, &_operationsToDeviceUser);
@@ -131,6 +139,7 @@ int SetupUserSpaceCommunication(void) {
     mutex_init(&_deviceFromUserMutex);
     init_waitqueue_head(&_pendingPacketQueue);
     init_waitqueue_head(&UserReadWaitQueue);
+    init_waitqueue_head(&UserWriteWaitQueue);
 
     if (IS_ERR(_netmodDevice) || IS_ERR(_netmodDeviceAck)) {
         CleanupUserSpaceCommunication();
@@ -152,7 +161,7 @@ int SetupUserSpaceCommunication(void) {
 
 void CleanupUserSpaceCommunication(void) {
     _isLoaded = false;
-    IsProcessingPacketTrip = false;
+    atomic_set(&IsProcessingPacketTrip, 0);
     //_isDataPending = false;
 
     Deactivate();
@@ -188,22 +197,44 @@ int _packetProcessorThread(void *data) {
     LOG_INFO(MESSAGE_PACKET_PROCESSOR_STARTED);
     while (!kthread_should_stop()) {
         LOG_DEBUG_PACKET(MESSAGE_WAITING_NEW_PACKET);
-        long timeout = msecs_to_jiffies(PACKET_PROCESSING_TIMEOUT);
-        _readQueueItemAdded = false;
-        _userspaceItemProcessed = false;
+        _pendingQueueItemAdded = false;
         _userRead = false;
 
-        int read1QueueLength = PacketQueueLength(&_read1PacketsQueue);
-        wait_event_interruptible(ReadQueueItemAddedWaitQueue, _readQueueItemAdded == true || read1QueueLength > 0);
+        int pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
+        if(pendingQueueLength <= 0){
+            QueueProcessorWaitCounter++;
+            while (!_pendingQueueItemAdded && !atomic_read(&IsProcessingPacketTrip)) {
+                wait_event_interruptible(PendingQueueItemAddedWaitQueue, _pendingQueueItemAdded && !atomic_read(&IsProcessingPacketTrip));
+            }
+            QueueProcessorWokeCounter++;
+        }
+         
         if(!ShouldCapture()){
             continue;
         }
 
+        down(&newPacketSemaphore);
+        pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
+        PendingPacketRoundTrip* pendingPacketTrip = PacketQueuePop(_pendingPacketsQueue);
+        LOG_DEBUG_ICMP(pendingPacketTrip, "Popping from _pendingPacketsQueue. Current size: %d; Size after pop: %d", pendingQueueLength, pendingQueueLength - 1);
+        if(pendingPacketTrip == NULL){
+            LOG_ERROR("Processed packet trip is null from _pendingPacketsQueue");
+            continue;
+        }
+        up(&newPacketSemaphore);
+
+        atomic_set(&IsProcessingPacketTrip, 1);
+        int read1QueueLength = PacketQueueLength(_read1PacketsQueue);
+        LOG_DEBUG_ICMP(pendingPacketTrip, "Pushing to _read1PacketsQueue. Current size: %d; Size after push: %d", read1QueueLength, read1QueueLength + 1);
+        PacketQueuePush(_read1PacketsQueue, pendingPacketTrip);
+
         PacketsCapturedCounter++;
         _userRead = true;
+        _userspaceItemProcessed = false;
         wake_up_interruptible(&UserReadWaitQueue);
 
         LOG_DEBUG_PACKET(MESSAGE_WAITING_USER_PROCESS);
+        long timeout = msecs_to_jiffies(PACKET_PROCESSING_TIMEOUT);
         long ret = wait_event_interruptible_timeout(UserspaceItemProcessedWaitQueue, _userspaceItemProcessed == true, timeout);
         if(!ShouldCapture()){
             continue;
@@ -219,14 +250,14 @@ int _packetProcessorThread(void *data) {
             continue;
         }
 
-        int queueLength = PacketQueueLength(&_injectionPacketsQueue);
+        int queueLength = PacketQueueLength(_injectionPacketsQueue);
         if(queueLength <= 0){
             LOG_DEBUG_PACKET("No packets queued in _injectionPacketsQueue");
             continue;
         }
 
         LOG_DEBUG_PACKET(MESSAGE_POPPING_PACKET, queueLength, queueLength - 1);
-        PendingPacketRoundTrip *packetTrip = PacketQueuePop(&_injectionPacketsQueue);
+        PendingPacketRoundTrip *packetTrip = PacketQueuePop(_injectionPacketsQueue);
         if(packetTrip == NULL){
             LOG_ERROR("Processed packet trip is null from _injectionPacketsQueue");
             continue;
@@ -265,13 +296,14 @@ static void _stopProcessingPacket(PendingPacketRoundTrip* packetTrip) {
         LOG_ERROR("Invalid packetTrip structure");
         _resetPacketProcessing();
     } else {
-        int injectQueueLength = PacketQueueLength(&_injectionPacketsQueue);
+        int injectQueueLength = PacketQueueLength(_injectionPacketsQueue);
         LOG_DEBUG_ICMP(packetTrip, "Pushing to _injectionPacketsQueue. Current size: %d; Size after push: %d", injectQueueLength, injectQueueLength + 1);
-        PacketQueuePush(&_injectionPacketsQueue, packetTrip);
+        PacketQueuePush(_injectionPacketsQueue, packetTrip);
     }
 
     _userRead = false;
-    IsProcessingPacketTrip = false;
+    _userWrite = false;
+    atomic_set(&IsProcessingPacketTrip, 0);
     _userspaceItemProcessed = true;
     wake_up_interruptible(&UserspaceItemProcessedWaitQueue);
 }
@@ -279,11 +311,17 @@ static void _stopProcessingPacket(PendingPacketRoundTrip* packetTrip) {
 // Public functions
 static void _resetPacketProcessing(void) {
     sendUserSpaceReset = true;
-    _readQueueItemAdded = true;
-    wake_up_interruptible(&ReadQueueItemAddedWaitQueue);
-    _userspaceItemProcessed = true;
-    wake_up_interruptible(&UserspaceItemProcessedWaitQueue);
-    IsProcessingPacketTrip = false;
+    int pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
+    if(pendingQueueLength > 0){
+        _pendingQueueItemAdded = true;
+        wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
+    }
+    // sendUserSpaceReset = true;
+    // _readQueueItemAdded = true;
+    // wake_up_interruptible(&ReadQueueItemAddedWaitQueue);
+    // _userspaceItemProcessed = true;
+    // wake_up_interruptible(&UserspaceItemProcessedWaitQueue);
+    // IsProcessingPacketTrip = false;
 }
 
 static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length, loff_t* offset) {
@@ -293,7 +331,7 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
     PendingPacketRoundTrip* packetTrip = NULL;
     if(!ShouldCapture()){
         LOG_DEBUG_PACKET("Not capturing");
-        return 0;
+        return length;
     }
 
     LOG_DEBUG_PACKET("_readDeviceTo for %s", DEVICE_TO_USER_SPACE);
@@ -317,11 +355,19 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
     else{
         LOG_DEBUG_PACKET("Blocking read for %s. Waiting for new data...", DEVICE_TO_USER_SPACE);
     }
+
+    ReadWaitCounter++;
     // Using wait_event_interruptible to sleep until a packet is available
-    wait_event_interruptible(UserReadWaitQueue, _userRead);
+    int readWaitReturn = wait_event_interruptible(UserReadWaitQueue, _userRead);
+    if(readWaitReturn == -ERESTARTSYS){
+        LOG_DEBUG_PACKET("Wait event interrupted for %s", DEVICE_TO_USER_SPACE);
+        return length;
+    }
+
+    ReadWokeCounter++;
     if(!ShouldCapture()){
         LOG_DEBUG_PACKET("Stop capturing");
-        return 0;
+        return length;
     }
 
     if(!_userRead){
@@ -329,38 +375,36 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
     }
 
     if (filep->f_flags & O_NONBLOCK) {
-        LOG_DEBUG_PACKET("Non-blocking read, no packet found for %s", DEVICE_TO_USER_SPACE);
+        LOG_ERROR("Non-blocking read, no packet found for %s", DEVICE_TO_USER_SPACE);
         _stopProcessingPacket(NULL);
-        return -EAGAIN;
+        return length;
     }
 
-    IsProcessingPacketTrip = true;
-    queue1Length = PacketQueueLength(&_read1PacketsQueue);
-    queue2Length = PacketQueueLength(&_read2PacketsQueue);
+    atomic_set(&IsProcessingPacketTrip, 1);
+    queue1Length = PacketQueueLength(_read1PacketsQueue);
+    queue2Length = PacketQueueLength(_read2PacketsQueue);
     if(queue2Length > 0){
-        packetTrip = PacketQueuePop(&_read2PacketsQueue);
+        packetTrip = PacketQueuePop(_read2PacketsQueue);
         LOG_DEBUG_ICMP(packetTrip, "Popping from _read2PacketsQueue. Current size: %d; Size after pop: %d", queue2Length, queue2Length - 1);
     }
     else{
-        packetTrip = PacketQueuePop(&_read1PacketsQueue);
+        packetTrip = PacketQueuePop(_read1PacketsQueue);
         LOG_DEBUG_ICMP(packetTrip, "Popping from _read1PacketsQueue. Current size: %d; Size after pop: %d", queue1Length, queue1Length - 1);
-        if(packetTrip){
-            packetTrip->attempts++;
-            if(packetTrip->attempts > 3){
-                LOG_DEBUG_ICMP(packetTrip, "Packet trip took too many attempts (>3). Dropping...");
-                _stopAndResetProcessingPacket(packetTrip);
-                return 0;
-            }
-        }
     }
 
     if(!packetTrip){
         if(!ShouldCapture()){
             LOG_DEBUG_PACKET("Not capturing");
             _resetPacketProcessing();
-            return 0;
         }
-        return -EAGAIN;
+        return length;
+    }
+
+    packetTrip->attempts++;
+    if(packetTrip->attempts > 4){
+        LOG_DEBUG_ICMP(packetTrip, "Packet trip took too many attempts (2 >= x < 5). Dropping...");
+        _stopAndResetProcessingPacket(packetTrip);
+        return length;
     }
 
     LOG_DEBUG_ICMP(packetTrip, "Packet trip info: %p; Packet to eval: %p (size: %d)", packetTrip, packetTrip->entry->skb, packetTrip->entry->skb->len + S32_SIZE);
@@ -405,14 +449,13 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
         if(sendUserSpaceReset){
             packetTrip->packet->dataProcessed = false;
             packetTrip->packet->headerProcessed = false;
-            IsProcessingPacketTrip = false;
             sendUserSpaceReset = false;
-            PacketQueuePush(&_read1PacketsQueue, packetTrip);
+            PacketQueuePush(_read1PacketsQueue, packetTrip);
         }
         else{
-            nextQueueLength = PacketQueueLength(&_read2PacketsQueue);
+            nextQueueLength = PacketQueueLength(_read2PacketsQueue);
             LOG_DEBUG_ICMP(packetTrip, "Pushing to read2_packets_queue. Current size: %d; Size after push: %d", nextQueueLength, nextQueueLength + 1);
-            PacketQueuePush(&_read2PacketsQueue, packetTrip);
+            PacketQueuePush(_read2PacketsQueue, packetTrip);
         }
         
         return TRANSACTION_HEADER_SIZE;
@@ -450,15 +493,15 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
         if(sendUserSpaceReset){
             packetTrip->packet->dataProcessed = false;
             packetTrip->packet->headerProcessed = false;
-            IsProcessingPacketTrip = false;
-            _userRead = false;
             sendUserSpaceReset = false;
-            PacketQueuePush(&_read1PacketsQueue, packetTrip);
+            PacketQueuePush(_read1PacketsQueue, packetTrip);
         }
         else{
-            writeQueueLength = PacketQueueLength(&_write1PacketsQueue);
+            writeQueueLength = PacketQueueLength(_write1PacketsQueue);
             LOG_DEBUG_ICMP(packetTrip, "Pushing to _write1PacketsQueue. Current size: %d; Size after push: %d", writeQueueLength, writeQueueLength + 1);
-            PacketQueuePush(&_write1PacketsQueue, packetTrip);
+            PacketQueuePush(_write1PacketsQueue, packetTrip);
+            _userWrite = true;
+            wake_up_interruptible_all(&UserWriteWaitQueue);
         }
 
         return transactionSize;
@@ -475,7 +518,7 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
 
     LOG_DEBUG_ICMP(packetTrip, "Packet request sent to user space");
     
-    return 0;
+    return length;
 }
 
 static ssize_t _writeDeviceFrom(struct file* filep, const char __user* userBuffer, size_t length, loff_t* offset) {
@@ -487,6 +530,15 @@ static ssize_t _writeDeviceFrom(struct file* filep, const char __user* userBuffe
         return length;
     }
 
+
+    WriteWaitCounter++;
+    // Using wait_event_interruptible to sleep until a packet is available
+    int  writeWaitReturn = wait_event_interruptible(UserWriteWaitQueue, _userWrite == true);
+    if(writeWaitReturn == -ERESTARTSYS){
+        LOG_DEBUG_PACKET("Wait event interrupted for %s", DEVICE_FROM_USER_SPACE);
+    }
+
+    WriteWokeCounter++;
     // if(getUserSpaceReset){
     //     LOG_DEBUG_ICMP("User space reset");
     //     getUserSpaceReset = false;
@@ -494,25 +546,25 @@ static ssize_t _writeDeviceFrom(struct file* filep, const char __user* userBuffe
     // }
 
     // Check if processing a packet trip
-    if (!IsProcessingPacketTrip) {
+    if (!atomic_read(&IsProcessingPacketTrip)) {
         return length;
     }
 
-    queue1Length = PacketQueueLength(&_write1PacketsQueue);
-    queue2Length = PacketQueueLength(&_write2PacketsQueue);
+    queue1Length = PacketQueueLength(_write1PacketsQueue);
+    queue2Length = PacketQueueLength(_write2PacketsQueue);
     if(queue2Length > 0){
-        packetTrip = PacketQueuePop(&_write2PacketsQueue);
+        packetTrip = PacketQueuePop(_write2PacketsQueue);
         LOG_DEBUG_ICMP(packetTrip, "Popping from _write2PacketsQueue. Current size: %d; Size after pop: %d", queue2Length, queue2Length - 1);
     }else{
-        packetTrip = PacketQueuePop(&_write1PacketsQueue);
+        packetTrip = PacketQueuePop(_write1PacketsQueue);
         LOG_DEBUG_ICMP(packetTrip, "Popping from _write1PacketsQueue. Current size: %d; Size after peek: %d", queue1Length, queue1Length - 1);
     }
 
     // Check for null values and handle errors
-    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip, -EFAULT, _stopAndResetProcessingPacket(packetTrip));
-    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->packet, -EFAULT, _stopAndResetProcessingPacket(packetTrip));
-    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry, -EFAULT, _stopAndResetProcessingPacket(packetTrip));
-    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry->skb, -EFAULT, _stopAndResetProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip, length, _stopAndResetProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->packet, length, _stopAndResetProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry, length, _stopAndResetProcessingPacket(packetTrip));
+    CHECK_NULL_FAIL_EXEC(LOG_TYPE_ERROR, packetTrip->entry->skb, length, _stopAndResetProcessingPacket(packetTrip));
 
     LOG_DEBUG_ICMP(packetTrip, "Write active for %s Processing packet: %p", DEVICE_FROM_USER_SPACE, packetTrip);
 
@@ -591,9 +643,9 @@ static int _processResponseHeader(const char __user* userBuffer, size_t length, 
 
     // LOG_DEBUG_ICMP(packetTrip, "PACKET FULLY PROCESSED - USER SPACE (%d bytes)", readBytes);
     // _stopProcessingPacket(packetTrip);
-    int write2QueueLength = PacketQueueLength(&_write2PacketsQueue);
+    int write2QueueLength = PacketQueueLength(_write2PacketsQueue);
     LOG_DEBUG_ICMP(packetTrip, "Pushing to _write2PacketsQueue. Current size: %d; Size after push: %d", write2QueueLength, write2QueueLength + 1);
-    PacketQueuePush(&_write2PacketsQueue, packetTrip);
+    PacketQueuePush(_write2PacketsQueue, packetTrip);
     return readBytes;
 }
 
