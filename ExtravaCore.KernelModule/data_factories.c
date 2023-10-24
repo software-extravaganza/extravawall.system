@@ -9,6 +9,7 @@
 #define MESSAGE_USER_ACCEPT "Decided to accept a packet"
 #define MESSAGE_USER_DROP "Decided to drop a packet"
 
+
 // Private members
 static DecisionReasonInfo _reasonInfos[] = {
     { MEMORY_FAILURE_PACKET, MESSAGE_MEMORY_FAILURE_PACKET },
@@ -23,6 +24,11 @@ static DecisionReasonInfo _reasonInfos[] = {
 static char* createPacketTypeStringFromType(RoundTripPacketType type);
 struct nf_queue_entry* CreateQueueEntry(struct sk_buff *skb, const struct nf_hook_state *state);
 static void addMetaDataToPacketTrip(PendingPacketRoundTrip *packetTrip, RoutingType type);
+static int numSamples = 100000;
+static u64 *timeSamples = NULL;
+static u64 *sortedTimeSamples = NULL;
+
+static size_t currentSampleIndex = 0;
 
 // Private functions
 void safeFree(void* ptr) {
@@ -30,6 +36,67 @@ void safeFree(void* ptr) {
         return;
     }
     kfree(ptr);
+}
+
+
+int SetupTimeSamples(void) {
+    if (!timeSamples) {
+        timeSamples = kmalloc(numSamples * sizeof(u64), GFP_KERNEL);
+        if (!timeSamples) {
+            LOG_ERROR("Failed to allocate memory for timeSamples.");
+            return -1; 
+        }
+    }
+
+    if (!sortedTimeSamples) {
+        sortedTimeSamples = kmalloc(numSamples * sizeof(u64), GFP_KERNEL);
+        if (!sortedTimeSamples) {
+            LOG_ERROR("Failed to allocate memory for sortedTimeSamples.");
+            kfree(timeSamples);
+            return -1; 
+        }
+    }
+
+    return 0;
+}
+
+void CleanupTimeSamples(void) {
+    safeFree(timeSamples);
+    safeFree(timeSamples);
+}
+
+void recordSampleTime(u64 duration) {
+    timeSamples[currentSampleIndex] = duration;
+    currentSampleIndex = (currentSampleIndex + 1) % numSamples;
+}
+
+u64 calculateSampleAverage(void) {
+    u64 sum = 0;
+    for (size_t i = 0; i < numSamples; i++) {
+        sum += timeSamples[i];
+    }
+    return sum / numSamples;
+}
+
+int compareSamples(const void *a, const void *b) {
+    return *(u64 *)a - *(u64 *)b;
+}
+
+u64 calculateSamplePercentile(int percentile) {
+    memcpy(sortedTimeSamples, timeSamples, numSamples * sizeof(u64));
+    sort(sortedTimeSamples, numSamples, sizeof(u64), compareSamples, NULL);
+    size_t index = (percentile * numSamples) / 100;
+    return sortedTimeSamples[index];
+}
+
+char* calculateSamplePercentileToString(int percentile) {
+    u64 percentileValue = calculateSamplePercentile(percentile);
+    return nanosecondsToHumanizedString(percentileValue);
+}
+
+char* calculateSampleAverageToString(void) {
+    u64 percentileValue = calculateSampleAverage();
+    return nanosecondsToHumanizedString(percentileValue);
 }
 
 static char* createPacketTypeStringFromType(RoundTripPacketType type) {
@@ -112,10 +179,24 @@ struct nf_queue_entry* CreateQueueEntry(struct sk_buff *skb, const struct nf_hoo
     return entry;
 }
 
+static void _recordSampleTimeForPacketTrip(PendingPacketRoundTrip *packetTrip){
+    u64 startNanoseconds, endNanoseconds, duration;
+    if (!packetTrip){
+        return;
+    }
+
+    endNanoseconds = ktime_to_ns(ktime_get());
+    startNanoseconds = ktime_to_ns(packetTrip->createdTime);
+    duration = endNanoseconds - startNanoseconds;
+    recordSampleTime(duration);
+}
+
 void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
     if (!packetTrip){
         return;
     }
+
+    _recordSampleTimeForPacketTrip(packetTrip);
 
     if (packetTrip->packet) {
         FreePendingPacket(packetTrip->packet);
@@ -132,6 +213,43 @@ void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
     }
 
     safeFree(packetTrip);
+}
+
+void ResetPendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
+    if (packetTrip) {
+        _recordSampleTimeForPacketTrip(packetTrip);
+        // Reset the createdTime
+        packetTrip->createdTime = 0;
+
+        // Reset the attempts
+        packetTrip->attempts = 0;
+
+        // Reset the entry
+        packetTrip->entry = NULL;
+
+        // Reset the packet if it exists
+        if (packetTrip->packet) {
+            packetTrip->packet->dataProcessed = false;
+            packetTrip->packet->headerProcessed = false;
+            packetTrip->packet->size = 0;
+            packetTrip->packet->type = 0; // Assuming 0 is a default value for RoundTripPacketType
+        }
+
+        // Reset the responsePacket if it exists
+        if (packetTrip->responsePacket) {
+            packetTrip->responsePacket->dataProcessed = false;
+            packetTrip->responsePacket->headerProcessed = false;
+            packetTrip->responsePacket->size = 0;
+            packetTrip->responsePacket->type = 0; // Assuming 0 is a default value for RoundTripPacketType
+        }
+
+        // Reset the decision and routingType
+        packetTrip->decision = UNDECIDED;
+        packetTrip->routingType = NONE_ROUTING;
+
+        // Reset the protocol
+        packetTrip->protocol = 0; // Assuming 0 is a default value for protocol
+    }
 }
 
 PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, RoutingType type) {

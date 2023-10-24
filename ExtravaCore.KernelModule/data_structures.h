@@ -17,6 +17,25 @@
 #define ZERO_MEMORY_BEFORE_FREE 1  // 1 to zero out memory before freeing, 0 otherwise
 #define PACKET_HEADER_VERSION 1 // Version of the packet header
 
+
+
+typedef enum {
+    REQUEST_PACKET,
+    RESPONSE_PACKET
+} RoundTripPacketType;
+
+
+
+typedef enum{
+    STAGE_NEW,
+    STAGE_READ_1,
+    STAGE_READ_2,
+    STAGE_WRITE,
+    STAGE_COMPLETED
+} PacketStage;
+
+
+
 /* Enumerations for Routing Types and Decisions */
 typedef enum {
     NONE_ROUTING = 0,
@@ -31,12 +50,6 @@ typedef enum {
     ACCEPT = 2,       // Signifies that the packet should be accepted
     MANIPULATE = 3    // Signifies that the packet has been manipulated
 } RoutingDecision;
-
-typedef enum {
-    REQUEST_PACKET,
-    RESPONSE_PACKET
-} RoundTripPacketType;
-
 typedef enum {
     MEMORY_FAILURE_PACKET,
     MEMORY_FAILURE_PACKET_HEADER,
@@ -46,19 +59,6 @@ typedef enum {
     USER_ACCEPT,
     USER_DROP
 } DecisionReason;
-
-typedef enum{
-    STAGE_NEW,
-    STAGE_READ_1,
-    STAGE_READ_2,
-    STAGE_WRITE,
-    STAGE_COMPLETED
-} PacketStage;
-
-typedef struct {
-    DecisionReason reason;        // Code to represent the reason
-    char* text; // Description of the reason
-} DecisionReasonInfo;
 
 /* Pending Packet structure */
 typedef struct {
@@ -78,5 +78,16 @@ typedef struct {
     RoutingType routingType;
     unsigned char protocol;
 } PendingPacketRoundTrip;
+
+typedef struct {
+    DecisionReason reason;        // Code to represent the reason
+    char* text; // Description of the reason
+} DecisionReasonInfo;
+
+// Define a work structure
+struct packet_work {
+    struct work_struct work;
+    PendingPacketRoundTrip *packetTrip;
+};
 
 #endif // DATA_STRUCTURES

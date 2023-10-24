@@ -10,6 +10,7 @@
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/ktime.h>
+#include <linux/sort.h>
 #include "logger.h"
 #include "data_structures.h"
 #include "type_converters.h"
@@ -24,5 +25,8 @@ bool AddDataToPacket(PendingPacket *packet, struct sk_buff *skb);
 char* GetReasonText(DecisionReason reason);
 char* CreatePacketTypeString(PendingPacket *packet);
 void safeFree(void* ptr) ;
-
+char* calculateSamplePercentileToString(int percentile);
+char* calculateSampleAverageToString(void);
+int SetupTimeSamples(void);
+void CleanupTimeSamples(void);
 #endif // DATA_FACTORIES_H

@@ -42,14 +42,14 @@ cd "$CURRENT_DIR" || exit 1
 {
   echo "Starting Ping in 1 second" | tee "$TEE_DEST"
 
-  # n=0
-  # while [ $n -lt 15 ]
-  # do
-  #   #iptables -vL -n >> $LOGS_DIR/iptables_dump_$LOGS_FILE_RUN_TIMESTAMP.log
-  #   ping 1.1.1.1 -c 1 | tee -a "$LOGS_DIR"/iptables_dump_"$LOGS_FILE_RUN_TIMESTAMP".log | tee -a "$TEE_DEST"
-  #   sleep 1
-  #   n=$((n+1))
-  # done
+  n=0
+  while [ $n -lt 15 ]
+  do
+    #iptables -vL -n >> $LOGS_DIR/iptables_dump_$LOGS_FILE_RUN_TIMESTAMP.log
+    ping 1.1.1.1 -c 1 | tee -a "$LOGS_DIR"/iptables_dump_"$LOGS_FILE_RUN_TIMESTAMP".log | tee -a "$TEE_DEST"
+    sleep 1
+    n=$((n+1))
+  done
   echo "Stopped Ping" | tee "$TEE_DEST"
 } &
 

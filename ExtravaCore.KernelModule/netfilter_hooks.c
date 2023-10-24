@@ -6,6 +6,7 @@
 
 #define ERROR_HOOK_SETUP -1
 #define ERROR_MEMORY_ALLOC -2
+#define ERROR_WORKQUEUE_CREATION -3
 
 // Constants for decision icons
 #define UNDECIDED_ICON "❓"
@@ -13,7 +14,7 @@
 #define ACCEPT_ICON "📨"
 #define MANIPULATE_ICON "✂️"
 
-const char* MESSAGE_PACKETS_CAPTURED = "Packets captured: %ld; Packets processed: %ld; Packets accepted: %ld; Packets modified: %ld; Packets dropped: %ld; Packets Stale: %ld";
+const char* MESSAGE_PACKETS_CAPTURED = "(Packets stats) ingress: %ld, queued: %ld, captured: %ld; processed: %ld; accepted: %ld; modified: %ld; dropped: %ld; stale: %ld | (Time stats) average:%s; 90th percentile: %s";
 const char* MESSAGE_EVENTS_CAPTURED = "Read Wait: %ld; Read Woke: %ld; Write Wait: %ld; Write Woke: %ld; Queue Processor Wait: %ld; Queue Processor Woke: %ld;";
 
 const char *DECISION_ICONS[] = {
@@ -33,7 +34,7 @@ PacketQueue *_write2PacketsQueue;
 PacketQueue *_injectionPacketsQueue;
 PacketQueue *_completedQueue;
 
-bool _pendingQueueItemAdded = false;
+atomic_t _pendingQueueItemAdded = ATOMIC_INIT(0);
 bool _readQueueItemAdded = false;
 bool _queueItemProcessed = false;
 bool _queueProcessorExited = false;
@@ -57,6 +58,9 @@ static packet_processing_callback_t _registeredCallback = NULL;
 static bool _isInitialized = false;
 static RoutingType _lastRoutingType = NONE_ROUTING;
 
+// Define a workqueue
+static struct workqueue_struct *packet_wq;
+
 static void _hookDrop(struct net *net);
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum);
 static struct nf_queue_handler* _setupQueueHandlerHook(void);
@@ -66,6 +70,11 @@ static int _nfDecisionFromExtravaDefaultDecision(bool count);
 static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* routeTypeName, struct sk_buff *skb, const struct nf_hook_state *state, const char* hookName);
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
+}
+
+static void printCounters(void){
+    LOG_INFO(MESSAGE_PACKETS_CAPTURED, PacketsIngressCounter, PacketsQueuedCounter, PacketsCapturedCounter, PacketsProcessedCounter, PacketsAcceptCounter, PacketsManipulateCounter, PacketsDropCounter, PacketsStaleCounter, calculateSampleAverageToString(), calculateSamplePercentileToString(90));
+    LOG_INFO(MESSAGE_EVENTS_CAPTURED, ReadWaitCounter, ReadWokeCounter, WriteWaitCounter, WriteWokeCounter, QueueProcessorWaitCounter, QueueProcessorWokeCounter);
 }
 
 int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler) {
@@ -117,11 +126,10 @@ static int _nfDecisionFromExtravaDefaultDecision(bool count){
     return _nfDecisionFromExtravaDecision(default_packet_response, count);
 }
 
-static void increasePacketsProcessedCounter(void){
-    PacketsProcessedCounter++;
-    if(PacketsProcessedCounter % 5000 == 0){
-        LOG_INFO(MESSAGE_PACKETS_CAPTURED, PacketsCapturedCounter, PacketsProcessedCounter, PacketsAcceptCounter, PacketsManipulateCounter, PacketsDropCounter, PacketsStaleCounter);
-        LOG_INFO(MESSAGE_EVENTS_CAPTURED, ReadWaitCounter, ReadWokeCounter, WriteWaitCounter, WriteWokeCounter, QueueProcessorWaitCounter, QueueProcessorWokeCounter);
+static void increasePacketsIngressCounter(void){
+    PacketsIngressCounter++;
+    if(PacketsIngressCounter % 5000 == 0){
+        printCounters();
     }
 }
 
@@ -129,14 +137,14 @@ static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count){
     if(decision == ACCEPT){
         if(count){
             PacketsAcceptCounter++;
-            increasePacketsProcessedCounter();
+            PacketsProcessedCounter++;
         }
         return NF_ACCEPT;
     }
     else if(decision == MANIPULATE){
         if(count){
             PacketsManipulateCounter++;
-            increasePacketsProcessedCounter();
+            PacketsProcessedCounter++;
         }
         return NF_ACCEPT;
     }
@@ -146,7 +154,7 @@ static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count){
     else {
         if(count){
             PacketsDropCounter++;
-            increasePacketsProcessedCounter();
+            PacketsProcessedCounter++;
         }
         return NF_DROP;
     }
@@ -176,6 +184,7 @@ void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName){
 
 // Refactored function to handle nfRouting
 static unsigned int _nfRoutingHandlerCommon(RoutingType type, void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
+    increasePacketsIngressCounter();
     _lastRoutingType = NONE_ROUTING;
     int defaultDecision = _nfDecisionFromExtravaDefaultDecision(false);
     CHECK_NULL(LOG_TYPE_ERROR, state, defaultDecision);
@@ -233,30 +242,50 @@ static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* r
 }
 
 static unsigned int _nfPreRoutingHandler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    return _nfRoutingHandlerCommon(PRE_ROUTING, priv, skb, state);
+    int response = _nfRoutingHandlerCommon(PRE_ROUTING, priv, skb, state);
+    if(response < 0){
+        LOG_ERROR("Error in _nfPreRoutingHandler. Response: %d", response);
+    }
+
+    return response;
 }
 
 static unsigned int _nfPostRoutingHandler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    return _nfRoutingHandlerCommon(POST_ROUTING, priv, skb, state);
+    int response = _nfRoutingHandlerCommon(POST_ROUTING, priv, skb, state);
+    if(response < 0){
+        LOG_ERROR("Error in _nfPostRoutingHandler. Response: %d", response);
+    }
+
+    return response;
 }
 
 static unsigned int _nfLocalRoutingHandler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    return _nfRoutingHandlerCommon(LOCAL_ROUTING, priv, skb, state);
+    int response = _nfRoutingHandlerCommon(LOCAL_ROUTING, priv, skb, state);
+    if(response < 0){
+        LOG_ERROR("Error in _nfLocalRoutingHandler. Response: %d", response);
+    }
+
+    return response;
 }
 
 int SetupNetfilterHooks(void) {
+    LOG_INFO("Starting SetupNetfilterHooks");
     _preRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _postRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _localRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
-    _queueHandlerOps = kzalloc(sizeof(struct nf_queue_handler), GFP_KERNEL);
 
-    if (!_preRoutingOps || !_postRoutingOps || !_localRoutingOps || !_queueHandlerOps) {
-        printk(KERN_ERR "Failed to allocate memory for netfilter hooks.\n");
+    if (!_preRoutingOps || !_postRoutingOps || !_localRoutingOps) {
+        LOG_ERROR("Failed to allocate memory for netfilter hooks.");
         CleanupNetfilterHooks();
         return ERROR_MEMORY_ALLOC;
     }
 
     sema_init(&newPacketSemaphore, 1);
+    packet_wq = create_workqueue("packet_wq");
+    if (!packet_wq) {
+        LOG_ERROR("Failed to create workqueue 'packet_wq'");
+        return ERROR_WORKQUEUE_CREATION;
+    }
     _pendingPacketsQueue = PacketQueueCreate();
     _read1PacketsQueue = PacketQueueCreate();
     _read2PacketsQueue = PacketQueueCreate();
@@ -281,9 +310,16 @@ int SetupNetfilterHooks(void) {
     _localRoutingOps->priority = NF_IP_PRI_FIRST;
 
     _queueHandlerOps = _setupQueueHandlerHook();
+    LOG_INFO("Registering pre-routing hook");
     nf_register_net_hook(&init_net, _preRoutingOps);
+
+    LOG_INFO("Registering post-routing hook");
     nf_register_net_hook(&init_net, _postRoutingOps);
+
+    LOG_INFO("Registering local-routing hook");
     nf_register_net_hook(&init_net, _localRoutingOps);
+
+    LOG_INFO("Registering queue handler");
     nf_register_queue_handler(_queueHandlerOps);
 
     init_waitqueue_head(&QueueProcessorExitedWaitQueue);
@@ -292,10 +328,12 @@ int SetupNetfilterHooks(void) {
     init_waitqueue_head(&PendingQueueItemAddedWaitQueue);
 
     _isInitialized = true;
+    LOG_INFO("Completed SetupNetfilterHooks");
     return 0;
 }
 
 void CleanupNetfilterHooks(void) {
+    printCounters();
     _isInitialized = false;
     if (_queueHandlerOps) {
         nf_unregister_queue_handler();
@@ -321,6 +359,10 @@ void CleanupNetfilterHooks(void) {
         _preRoutingOps = NULL;
     }
 
+    if (packet_wq) {
+        flush_workqueue(packet_wq);
+        destroy_workqueue(packet_wq);
+    }
     PacketQueueCleanup(_pendingPacketsQueue);
     PacketQueueCleanup(_read1PacketsQueue);
     PacketQueueCleanup(_read2PacketsQueue);
@@ -349,11 +391,13 @@ static struct nf_queue_handler* _setupQueueHandlerHook(void) {
     ops->outfn = _packetQueueHandler;
     ops->nf_hook_drop = _hookDrop;
 
+
     return ops;
 }
 
 static void _hookDrop(struct net *net){
     LOG_DEBUG("Cleaning up netfilter queue hooks");
+    
     if(_queueHandlerOps){
         nf_unregister_queue_handler();
         kfree(_queueHandlerOps);
@@ -361,77 +405,105 @@ static void _hookDrop(struct net *net){
     }
 
     if(_isInitialized){
-        LOG_DEBUG("Initializing packet queue handler");
+        LOG_DEBUG("Re-initializing packet queue handler due to _isInitialized being true");
         _queueHandlerOps = _setupQueueHandlerHook();
+        if (!_queueHandlerOps) {
+            LOG_ERROR("Failed to set up queue handler during re-initialization");
+            return;
+        }
         nf_register_queue_handler(_queueHandlerOps);
     }
 }
 
+
+
+// Workqueue function
+static void packet_work_func(struct work_struct *work)
+{
+    if (IsUnloading()){  
+        return;
+    }
+
+    LOG_DEBUG("Entering packet_work_func.");
+
+    struct packet_work *pw = container_of(work, struct packet_work, work);
+    if (!pw) {
+        LOG_ERROR("Failed to retrieve packet_work from work_struct.");
+        return;
+    }
+
+    PendingPacketRoundTrip *packetTrip = pw->packetTrip;
+    if (!packetTrip) {
+        LOG_ERROR("packetTrip is NULL in packet_work_func.");
+        kfree(pw); // Free the work structure
+        return;
+    }
+
+    int lockTry = 0;
+    while(down_trylock(&newPacketSemaphore) && lockTry < 10) {
+        lockTry++;
+    }
+
+    if(lockTry >= 10){
+        LOG_WARNING("Failed to acquire semaphore in packet_work_func.");
+        kfree(pw); // Free the work structure
+        return;
+    }
+
+    int queueLength = PacketQueueLength(_pendingPacketsQueue);
+    if (queueLength < 0) {
+        LOG_ERROR("Error retrieving _pendingPacketsQueue length.");
+    } else {
+        LOG_DEBUG("Current _pendingPacketsQueue Size: %d", queueLength);
+    }
+
+    PacketQueuePush(_pendingPacketsQueue, packetTrip);
+    LOG_DEBUG_ICMP(packetTrip, "Pushed packetTrip to _pendingPacketsQueue.");
+    up(&newPacketSemaphore);
+
+    atomic_set(&_pendingQueueItemAdded, 1);
+    LOG_DEBUG_ICMP(packetTrip, "Released semaphore in packet_work_func.");
+    if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
+        wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
+        LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
+    }
+    
+
+    kfree(pw); // Free the work structure
+    LOG_DEBUG_ICMP(packetTrip, "Exiting packet_work_func.");
+}
+
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum)
 {
+    PacketsQueuedCounter++;
     PendingPacketRoundTrip *packetTrip = CreatePendingPacketTrip(entry, _lastRoutingType);
     if (!packetTrip || !packetTrip->packet) {
         LOG_ERROR("Failed to create pending packet trip.");
         HandlePacketDecision(packetTrip, DROP, MEMORY_FAILURE_PACKET);
         packetTrip = NULL;
-        return NF_DROP;
+        return _nfDecisionFromExtravaDefaultDecision(true);
     }
 
-    //bool is_processed = false;
-    // if (!registered_callback) {
-    //     LOG_ERROR("No callback registered.");
-    //     handle_packet_decision(packetTrip, DROP, ERROR);
-    //     packetTrip = NULL;
-    //     return NF_DROP;
-    // }
-
-    struct sk_buff *skb = entry->skb;
-    struct ethhdr *eth_header;
-
-    if (!skb) {
-        LOG_ERROR("No skb available");
-        return NF_DROP;
+    // Queue the work to the workqueue
+    struct packet_work *pw = kmalloc(sizeof(*pw), GFP_ATOMIC);
+    if (!pw) {
+        LOG_ERROR("Failed to allocate memory for packet work");
+        return _nfDecisionFromExtravaDefaultDecision(true);
+    } else {
+        LOG_DEBUG_ICMP(packetTrip, "Successfully allocated memory for packet work");
     }
 
-    int mac_header_set = skb_mac_header_was_set(skb);
-    if (!mac_header_set) {
-        LOG_DEBUG_ICMP(packetTrip, "Ethernet (MAC) header pointer not set in skb");
-    }
-    else {
-        eth_header = (struct ethhdr *)skb_mac_header(skb);
-        if (!eth_header) {
-            LOG_DEBUG_ICMP(packetTrip, "No Ethernet (MAC) header found");
-            return NF_DROP;
-        }
+    INIT_WORK(&pw->work, packet_work_func);
+    pw->packetTrip = packetTrip;
+    LOG_DEBUG_ICMP(packetTrip, "About to queue work to packet_wq");
+    queue_work(packet_wq, &pw->work);
+    LOG_DEBUG_ICMP(packetTrip, "Work queued to packet_wq");
 
-        LOG_DEBUG_ICMP(packetTrip, "Ethernet (MAC) header found. Size: %zu bytes", sizeof(struct ethhdr));
-    }
-
-  
-    // enqueue the packet for further processing
-    // int queueLength = pq_len_packetTrip(&pending_packets_queue);
-    // LOG_DEBUG_ICMP(packetTrip, "Pushing to pending_packets_queue. Current size: %d; Size after push: %d", queueLength, queueLength + 1);
-    // pq_push_packetTrip(&pending_packets_queue, packetTrip);
-    down(&newPacketSemaphore);
-    int queueLength = PacketQueueLength(_pendingPacketsQueue);
-    LOG_DEBUG_ICMP(packetTrip, "Pushing to _pendingPacketsQueue. Current Size: %d; Size after push: %d", queueLength, queueLength + 1);
-    PacketQueuePush(_pendingPacketsQueue, packetTrip);
-    //PacketQueuePush(_pendingPacketsQueue, packetTrip);
-    
-    // Signal to userspace that there's a packet to process (e.g., via a char device or netlink).
-    //registered_callback();
-
-    // wake up your processing thread
-    //wake_up_process(queue_processor_thread);
-    _pendingQueueItemAdded = true;
-    up(&newPacketSemaphore);
-    wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
- 
-    //wake_up_process(queue_processor_thread);
     return 0;
 }
 
 void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
+    printCounters();
     if(!shouldCapture){
         LOG_DEBUG("Emptying queues");
         PacketQueueEmpty(_pendingPacketsQueue);

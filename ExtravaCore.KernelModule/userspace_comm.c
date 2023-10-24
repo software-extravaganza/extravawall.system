@@ -35,7 +35,6 @@ static struct device* _netmodDevice = NULL;
 static struct device* _netmodDeviceAck = NULL;
 static bool sendUserSpaceReset = false;
 static bool getUserSpaceReset = false;
-static atomic_t IsProcessingPacketTrip = ATOMIC_INIT(0); // 0 for false, 1 for true
 
 
 static int _processResponseHeader(const char __user* userBuffer, size_t length, PendingPacketRoundTrip* packetTrip);
@@ -63,6 +62,8 @@ static struct file_operations _operationsFromDeviceUser = {
 };
 
 // Public Fields
+long PacketsIngressCounter = 0;
+long PacketsQueuedCounter = 0;
 long PacketsCapturedCounter = 0;
 long PacketsProcessedCounter = 0;
 long PacketsAcceptCounter = 0;
@@ -75,6 +76,9 @@ long WriteWaitCounter = 0;
 long WriteWokeCounter = 0;
 long QueueProcessorWaitCounter = 0;
 long QueueProcessorWokeCounter = 0;
+
+
+atomic_t IsProcessingPacketTrip = ATOMIC_INIT(0); // 0 for false, 1 for true
 
 DECLARE_WAIT_QUEUE_HEAD(UserReadWaitQueue);
 DECLARE_WAIT_QUEUE_HEAD(UserWriteWaitQueue);
@@ -195,21 +199,24 @@ void CleanupUserSpaceCommunication(void) {
 
 int _packetProcessorThread(void *data) {
     LOG_INFO(MESSAGE_PACKET_PROCESSOR_STARTED);
-    while (!kthread_should_stop()) {
+    while (!kthread_should_stop() || IsUnloading() ) {
         LOG_DEBUG_PACKET(MESSAGE_WAITING_NEW_PACKET);
-        _pendingQueueItemAdded = false;
+        atomic_set(&_pendingQueueItemAdded, 0);
         _userRead = false;
 
         int pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
         if(pendingQueueLength <= 0){
             QueueProcessorWaitCounter++;
-            while (!_pendingQueueItemAdded && !atomic_read(&IsProcessingPacketTrip)) {
-                wait_event_interruptible(PendingQueueItemAddedWaitQueue, _pendingQueueItemAdded && !atomic_read(&IsProcessingPacketTrip));
+            while (1) {
+                wait_event_interruptible(PendingQueueItemAddedWaitQueue, atomic_read(&_pendingQueueItemAdded) || !atomic_read(&IsProcessingPacketTrip) || IsUnloading() || kthread_should_stop());
+                if ((atomic_read(&_pendingQueueItemAdded) && !atomic_read(&IsProcessingPacketTrip)) || IsUnloading() || kthread_should_stop()) {
+                    break;
+                }
             }
             QueueProcessorWokeCounter++;
         }
-         
-        if(!ShouldCapture()){
+
+        if(!ShouldCapture() || IsUnloading() || kthread_should_stop()){
             continue;
         }
 
@@ -235,8 +242,8 @@ int _packetProcessorThread(void *data) {
 
         LOG_DEBUG_PACKET(MESSAGE_WAITING_USER_PROCESS);
         long timeout = msecs_to_jiffies(PACKET_PROCESSING_TIMEOUT);
-        long ret = wait_event_interruptible_timeout(UserspaceItemProcessedWaitQueue, _userspaceItemProcessed == true, timeout);
-        if(!ShouldCapture()){
+        long ret = wait_event_interruptible_timeout(UserspaceItemProcessedWaitQueue, _userspaceItemProcessed == true || IsUnloading() || kthread_should_stop(), timeout);
+        if(!ShouldCapture() || IsUnloading() || kthread_should_stop()){
             continue;
         }
 
@@ -313,7 +320,7 @@ static void _resetPacketProcessing(void) {
     sendUserSpaceReset = true;
     int pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
     if(pendingQueueLength > 0){
-        _pendingQueueItemAdded = true;
+        atomic_set(&_pendingQueueItemAdded, 1);
         wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
     }
     // sendUserSpaceReset = true;
@@ -463,13 +470,18 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
  else if(packetTrip->packet->headerProcessed && !packetTrip->packet->dataProcessed){
         s32 transactionSize = packetTrip->entry->skb->len + S32_SIZE;
         unsigned char headerFlags[S32_SIZE];
-        unsigned char dataPayload[transactionSize];
         int writeQueueLength = 0;
+        unsigned char *dataPayload = kmalloc(transactionSize, GFP_KERNEL);
+        if (dataPayload == NULL) {
+            LOG_ERROR("Failed to allocate memory for packetTrip data");
+            return length;
+        }
 
         LOG_DEBUG_ICMP(packetTrip, "Processing 🆗{📤}📥📥 (Sent header: yes / Sent body: no / Received header: no / Received body: no). Processing data (%d bytes) - Routing type: %d", transactionSize, packetTrip->routingType);
         if (length < transactionSize) {
             LOG_ERROR("User buffer is too small to hold packetTrip data %zu < %d", length, transactionSize);
             _stopAndResetProcessingPacket(packetTrip);
+            kfree(dataPayload);
             return length;
         }
 
@@ -480,6 +492,7 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
         memcpy(dataPayload, headerFlags, S32_SIZE);
         memcpy(dataPayload + S32_SIZE, packetTrip->entry->skb->data, packetTrip->entry->skb->len);
         errorCount = copy_to_user(buf, dataPayload, transactionSize);
+        kfree(dataPayload);
         if (errorCount){
             LOG_ERROR("Failed to copy packetTrip data to user space");
             LOG_ERROR("Failed     🆗{⚠}📥📥 (Sent header: yes / Sent body: failed / Received header: no / Received body: no).");

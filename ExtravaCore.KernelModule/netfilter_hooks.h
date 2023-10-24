@@ -43,9 +43,11 @@ extern PacketQueue *_completedQueue;
 extern bool _queueItemProcessed;
 extern bool _queueProcessorExited;
 extern bool _readQueueItemAdded;
-extern bool _pendingQueueItemAdded;
+extern atomic_t _pendingQueueItemAdded;
 extern bool _userRead;
 extern bool _userspaceItemProcessed;
+extern long PacketsIngressCounter;
+extern long PacketsQueuedCounter;
 extern long PacketsCapturedCounter;
 extern long PacketsProcessedCounter;
 extern long PacketsAcceptCounter;
@@ -59,6 +61,8 @@ extern long WriteWokeCounter;
 extern long QueueProcessorWokeCounter;
 extern long QueueProcessorWaitCounter;
 extern struct task_struct *_queueProcessorThread;
+
+extern atomic_t IsProcessingPacketTrip;
 
 // Function Declarations (alphabetically ordered)
 void CleanupNetfilterHooks(void);

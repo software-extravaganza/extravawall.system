@@ -9,6 +9,8 @@
 typedef void (*func_ptr_t)(void);
 
 s64 elapsedMilliseconds(ktime_t *timestamp);
+char* timeToHumanizedString(ktime_t kt);
+char* nanosecondsToHumanizedString(u64 ns);
 // static inline void check_null_helper(const char* ptr_name, void* generic_ptr, LogType log_type_enum, void (*code_func)(void)) {
 //     typeof(generic_ptr) value = generic_ptr;
 //     log_func_t log_func = log_functions[log_type_enum];
@@ -76,7 +78,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
             return ret_val; \
         } \
     } while(0)
@@ -86,7 +88,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
         func_ptr_t code_func = DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code); \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
             return ret_val; \
         } \
         else { \
@@ -107,7 +109,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         func_ptr_t code_func = DEFINE_UNIQUE_FUNC_AND_RETURN_TYPE(ptr, code); \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
         } \
         if ((ptr) == NULL) { \
             code_func(); \
@@ -120,11 +122,11 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
         log_func_t log_func_success = log_functions[success_log_type_enum]; \
         log_func_t log_func_fail = log_functions[fail_log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func_fail("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func_fail("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
             return ret_val; \
         } \
         else { \
-            log_func_success(fmt, #ptr, __func__, __LINE__, ##__VA_ARGS__); \
+            log_func_success(fmt, #ptr, __FILENAME_NO_EXT__, __func__, __LINE__, ##__VA_ARGS__); \
         } \
     } while(0)
 
@@ -132,7 +134,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL. (%s)", #ptr, __func__, __LINE__, description); \
+            log_func("%s is NULL. (%s)", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__, description); \
             return ret_val; \
         } \
     } while(0)
@@ -141,7 +143,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
         } \
     } while(0)
 
@@ -153,7 +155,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL.", #ptr, __func__, __LINE__); \
+            log_func("%s is NULL.", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__); \
         } \
     } while(0)
 
@@ -168,7 +170,7 @@ s64 elapsedMilliseconds(ktime_t *timestamp);
     do { \
         log_func_t log_func = log_functions[log_type_enum]; \
         if ((ptr) == NULL) { \
-            log_func("%s is NULL. (%s)", #ptr, __func__, __LINE__, description); \
+            log_func("%s is NULL. (%s)", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__, description); \
         } \
     } while(0)
 

@@ -6,6 +6,7 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/limits.h>
+#include <linux/slab.h> 
 #include "logger.h"
 #include "module_control.h"
 #include "data_structures.h"

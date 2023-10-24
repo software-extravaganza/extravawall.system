@@ -6,18 +6,21 @@
 #include <linux/string.h>
 
 extern int log_level;
-typedef void (*log_func_t)(const char*, const char*, const char*, int, ...);
+typedef void (*log_func_t)(const char*, const char*, const char*, const char*, int, ...);
+const char* filenameWithoutExtension(const char* path);
 
 void __LoggerSetLevel(int level);
 #define STRINGIFY(x) #x
 #define FORCE_EXPAND(macro) macro
+#define __FILENAME__ (strrchr("/"__FILE__, '/') + 1)
+#define __FILENAME_NO_EXT__ filenameWithoutExtension(__FILE__)
 #define LOG_BASE(level, fmt, ...) \
     printk(fmt, ##__VA_ARGS__);
 
-static inline void _logGenericFunc(int num_level, const char* kern_level, const char* fmt, const char* func, int line, ...) {
+static inline void _logGenericFunc(int num_level, const char* kern_level, const char* fmt, const char* file, const char* func, int line, ...) {
     va_list args;
     char buffer[1024];
-    char full_fmt[] = "%s[%s:%d] %s: %s\n";
+    char full_fmt[] = "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     char* category;
 
     //The statement I need help with
@@ -46,18 +49,18 @@ static inline void _logGenericFunc(int num_level, const char* kern_level, const 
     va_start(args, line);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
     va_end(args);
-    LOG_BASE(num_level, full_fmt, kern_level, func, line, category, buffer);
+    LOG_BASE(num_level, full_fmt, file, func, line, category, buffer);
 }
 
-#define _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, func, line, ...) \
+#define _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, file, func, line, ...) \
     do { \
         if (log_level <= num_level) { \
-            _logGenericFunc(num_level, kern_level, fmt, func, line, ##__VA_ARGS__); \
+            _logGenericFunc(num_level, kern_level, fmt, file, func, line, ##__VA_ARGS__); \
         } \
     } while(0)
 
 #define LOG_HELPER(num_level, kern_level, fmt, ...) \
-    _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, __func__, __LINE__, ##__VA_ARGS__)
+    _INTERNAL_LOG_HELPER(num_level, kern_level, fmt, __FILENAME_NO_EXT__, __func__, __LINE__, ##__VA_ARGS__)
 
 #define LOG_DEBUG_PACKET(fmt, ...) LOG_HELPER(-2, KERN_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_DEBUG_ICMP(packetTrip, fmt, ...) \
@@ -78,22 +81,22 @@ static inline void _logGenericFunc(int num_level, const char* kern_level, const 
 #define LOG_WARNING(fmt, ...) LOG_HELPER(3, KERN_WARNING, fmt, ##__VA_ARGS__)
 #define LOG_ALERT(fmt, ...) LOG_HELPER(4, KERN_ALERT, fmt, ##__VA_ARGS__)
 
-#define _INTERNAL_LOG_DEBUG_PACKET(fmt, func, line,...) _INTERNAL_LOG_HELPER(-2, KERN_DEBUG, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_DEBUG_ICMP(fmt, func, line,...) _INTERNAL_LOG_HELPER(-1, KERN_DEBUG, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_DEBUG(fmt, func, line,...) _INTERNAL_LOG_HELPER(0, KERN_DEBUG, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_INFO(fmt, func, line,...) _INTERNAL_LOG_HELPER(1, KERN_INFO, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_ERROR(fmt, func, line,...) _INTERNAL_LOG_HELPER(2, KERN_ERR, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_WARNING(fmt, func, line,...) _INTERNAL_LOG_HELPER(3, KERN_WARNING, fmt, func, line, ##__VA_ARGS__)
-#define _INTERNAL_LOG_ALERT(fmt, func, line,...) _INTERNAL_LOG_HELPER(4, KERN_ALERT, fmt, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_DEBUG_PACKET(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(-2, KERN_DEBUG, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_DEBUG_ICMP(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(-1, KERN_DEBUG, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_DEBUG(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(0, KERN_DEBUG, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_INFO(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(1, KERN_INFO, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_ERROR(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(2, KERN_ERR, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_WARNING(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(3, KERN_WARNING, fmt, file, func, line, ##__VA_ARGS__)
+#define _INTERNAL_LOG_ALERT(fmt, file, func, line,...) _INTERNAL_LOG_HELPER(4, KERN_ALERT, fmt, file, func, line, ##__VA_ARGS__)
 
 #define DEFINE_LOG_WRAPPER_FUNC(log_macro, log_name, log_enum) \
-    static void log_##log_name##_func(const char* format,  const char* name, const char* func, int line, ...) { \
+    static void log_##log_name##_func(const char* format,  const char* name, const char* file, const char* func, int line, ...) { \
         char buffer[1024]; /* or some appropriate size */ \
         va_list args; \
         va_start(args, line); \
         vsnprintf(buffer, sizeof(buffer), format, args); \
         va_end(args); \
-        log_macro("%s", func, line, buffer); \
+        log_macro("%s", file, func, line, buffer); \
     }
 
 typedef enum {

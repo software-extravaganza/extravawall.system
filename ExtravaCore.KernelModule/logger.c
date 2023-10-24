@@ -33,3 +33,12 @@ void log_special_event(const char *event_detail) {
 void __LoggerSetLevel(int level){
     log_level = level;
 }
+
+const char* filenameWithoutExtension(const char* path) {
+    const char* filename = strrchr(path, '/');
+    filename = (filename) ? filename + 1 : path;
+    static char buffer[256]; // Assuming max filename length of 255
+    strncpy(buffer, filename, strrchr(filename, '.') - filename);
+    buffer[strrchr(filename, '.') - filename] = '\0';
+    return buffer;
+}

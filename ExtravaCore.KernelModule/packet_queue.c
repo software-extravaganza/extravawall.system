@@ -121,9 +121,15 @@ PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
     int length = PacketQueueLength(queue);
     LOG_DEBUG_PACKET(MESSAGE_PEEKING_PACKET, length);
     if(length > 0){
-        LOCK_WHILE(queue, {
-            kfifo_peek(queue->queue, &packet);
+        int response = LOCK_WHILE_RETURN_INT(queue, {
+            kfifo_peek(queue->queue, &packet)
         });
+
+        if(response < 0){
+            LOG_DEBUG_PACKET("Failed to peek packet");
+            return NULL;
+        }
+
         if (packet) {
             LOG_DEBUG_PACKET(MESSAGE_PEEK, length, 1); // 1 indicates success in peeking
             return packet;
@@ -140,9 +146,15 @@ PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
         return NULL;
     }
 
-    LOCK_WHILE(queue, {
-        kfifo_out(queue->queue, &packet, sizeof(packet));
+    int response = LOCK_WHILE_RETURN_INT(queue, {
+        kfifo_out(queue->queue, &packet, sizeof(packet))
     });
+
+    if(response < 0){
+        LOG_DEBUG_PACKET("Failed to pop packet");
+        return NULL;
+    }
+
     if (packet){
         return packet;
     }

@@ -12,6 +12,7 @@ MODULE_PARM_DESC(force_icmp, "Forces only ICMP packet filtering (for testing): 0
 static bool _shouldCapture = false;
 static bool _isInitialized = false;
 static bool _isActive = false;
+static bool _isUnloading = false;
 static bool _isUserSpaceReadConnected = false;
 static bool _isUserSpaceWriteConnected = false;
 static bool _isUserSpaceConnected = false;
@@ -31,6 +32,11 @@ static void _userSpaceConnectionChangeHandler(void);
 bool IsActive(void){
     return _isActive;
 }
+
+bool IsUnloading(void){
+    return _isUnloading;
+}
+
 
 bool IsInitialized(void){
     return _isInitialized;
@@ -79,6 +85,11 @@ void SetInitialized(void){
 
     _oldIsInitialized = _isInitialized;
     _isInitialized = true;
+    _shouldCaptureChangeHandler();
+}
+
+void SetUnloading(void){
+    _isUnloading = true;
     _shouldCaptureChangeHandler();
 }
 
@@ -155,7 +166,7 @@ void SetShouldCaptureEventHandler(captureEventHandler handler){
 }
 
 static void _shouldCaptureChangeHandler(void){
-    bool _newShouldCapture = IsActive() && IsInitialized() && IsUserSpaceConnected();
+    bool _newShouldCapture = IsActive() && IsInitialized() && IsUserSpaceConnected() && !IsUnloading();
     if(_oldShouldCapture == _newShouldCapture){
         return;
     }

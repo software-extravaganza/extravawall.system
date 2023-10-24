@@ -12,6 +12,7 @@ extern bool force_icmp;
 typedef void (*captureEventHandler)(bool shouldCapture);
 
 bool ShouldCapture(void);
+bool IsUnloading(void);
 bool IsActive(void);
 void Activate(void);
 void Deactivate(void);
@@ -19,6 +20,7 @@ void SetInitialized(void);
 void SetUserSpaceReadConnected(void);
 void SetUserSpaceWriteConnected(void);
 bool IsInitialized(void);
+void SetUnloading(void);
 bool IsUserSpaceConnected(void);
 bool IsUserSpaceReadConnected(void);
 bool IsUserSpaceWriteConnected(void);

@@ -33,6 +33,7 @@ bool force_icmp = false;
 #include "module_control.h"
 #include "netfilter_hooks.h"
 #include "userspace_comm.h"
+#include "data_factories.h"
 
 // This will be a simulation of the network packet data
 char packet_data[512];
@@ -45,13 +46,16 @@ static int __init Initialize(void) {
     SHOW_PARAMATER_VALUE(force_icmp);
     SetLogLevel(log_level);
     LOG_INFO("⌛️  Extrava module initializing  ⌛️");
-    LOG_DEBUG("Initializing packet queue");
+    if(SetupTimeSamples() != 0){
+        LOG_ERROR("Failed to setup time samples");
+        return -1;
+    }
+
     if(SetupUserSpaceCommunication() != 0){
         LOG_ERROR("Failed to setup user space communication");
         return -1;
     }
 
-    LOG_DEBUG("Initializing netfilter hooks");
     if(SetupNetfilterHooks() != 0){
         LOG_ERROR("Failed to setup netfilter hooks");
         return -1;
@@ -70,6 +74,8 @@ static void __exit Exit(void) {
     CleanupNetfilterHooks();
     LOG_DEBUG("Cleaning up user space communication");
     CleanupUserSpaceCommunication();
+    LOG_DEBUG("Cleaning up statistical data");
+    CleanupTimeSamples();
 	LOG_INFO("🛑  Extrava module unloaded  🛑");
     SetUninitialized();
 }
