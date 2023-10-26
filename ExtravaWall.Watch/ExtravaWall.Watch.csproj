@@ -30,6 +30,7 @@
     <!-- <TrimmerRootDescriptor Include="TrimRoots.xml" /> -->
     <TrimMode>partial</TrimMode>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

@@ -10,7 +10,7 @@
 #define MAX_PENDING_PACKETS 100
 
 typedef struct {
-    struct kfifo *queue;
+    struct kfifo queue;
     struct semaphore *semaphore;
 } PacketQueue;
 
@@ -18,6 +18,7 @@ bool PacketQueuePush(PacketQueue *queue, PendingPacketRoundTrip *packetTrip);
 PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue);
 PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue);
 PacketQueue* PacketQueueCreate(void);
+int PacketQueueInitialize(PacketQueue *queue);
 bool PacketQueueIsFull(PacketQueue *queue);
 bool PacketQueueIsEmpty(PacketQueue *queue);
 void PacketQueueCleanup(PacketQueue *queue);

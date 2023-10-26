@@ -8,6 +8,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/netfilter/nf_queue.h>
 #include <linux/skbuff.h>
+#include <linux/types.h>
 #include <linux/ip.h>
 #include <linux/ktime.h>
 #include "logger.h"
@@ -16,7 +17,7 @@
 #define IP_BUFFER_SIZE 16  // for IPv4, 16 chars: 255.255.255.255 + a NULL terminator
 #define ZERO_MEMORY_BEFORE_FREE 1  // 1 to zero out memory before freeing, 0 otherwise
 #define PACKET_HEADER_VERSION 1 // Version of the packet header
-
+#define CLASS_NAME  "Extravaganza"
 
 
 typedef enum {
@@ -69,6 +70,7 @@ typedef struct {
 } PendingPacket;
 
 typedef struct {
+    bool available;
     ktime_t createdTime;
     int attempts;
     struct nf_queue_entry *entry;
@@ -89,5 +91,6 @@ struct packet_work {
     struct work_struct work;
     PendingPacketRoundTrip *packetTrip;
 };
+
 
 #endif // DATA_STRUCTURES

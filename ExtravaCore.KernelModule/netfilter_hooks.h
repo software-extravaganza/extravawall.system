@@ -20,11 +20,15 @@
 #include "logger.h"
 #include "module_control.h"
 #include "packet_queue.h"
+#include "packet_pool.h"
 #include "type_converters.h"
 
 // Constants
 #define MAX_PENDING_PACKETS 100
 #define PACKET_PROCESSING_TIMEOUT (5 * HZ)  // 5 seconds
+
+extern DEFINE_PER_CPU(PacketQueue, cpu_packet_queues);
+extern spinlock_t packet_queue_lock;
 
 // Typedefs
 typedef void (*packet_processing_callback_t)(void);

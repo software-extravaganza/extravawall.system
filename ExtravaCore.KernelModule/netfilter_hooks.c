@@ -34,6 +34,12 @@ PacketQueue *_write2PacketsQueue;
 PacketQueue *_injectionPacketsQueue;
 PacketQueue *_completedQueue;
 
+// Define a per-CPU queue
+DEFINE_PER_CPU(PacketQueue, cpu_packet_queues);
+
+// Spinlock for synchronization
+DEFINE_SPINLOCK(packet_queue_lock);
+
 atomic_t _pendingQueueItemAdded = ATOMIC_INIT(0);
 bool _readQueueItemAdded = false;
 bool _queueItemProcessed = false;
@@ -88,14 +94,14 @@ int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handle
     return 0;
 }
 
-// void StopQueueProcessorThread(void) {
-//     if(!_queueProcessorThread){
-//         LOG_WARNING("Queue processor thread is null. Ignoring stop.");
-//         return;
-//     }
+void StopQueueProcessorThread(void) {
+    if(!_queueProcessorThread){
+        LOG_WARNING("Queue processor thread is null. Ignoring stop.");
+        return;
+    }
     
-//     kthread_stop(_queueProcessorThread);
-// }
+    kthread_stop(_queueProcessorThread);
+}
 
 void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason) {
     char logMessage[256];
@@ -170,7 +176,7 @@ void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName){
             continue;
         }
 
-        FreePendingPacketTrip(popPacketTrip);
+        ReturnPacketTrip(popPacketTrip);
         numberCleaned++;
         PacketsStaleCounter++;
         queueLength = PacketQueueLength(queue);
@@ -268,8 +274,44 @@ static unsigned int _nfLocalRoutingHandler(void *priv, struct sk_buff *skb, cons
     return response;
 }
 
+int packet_queue_init(void)
+{
+    int cpu;
+
+    spin_lock_init(&packet_queue_lock);
+
+    for_each_possible_cpu(cpu) {
+        PacketQueue *queue = per_cpu_ptr(&cpu_packet_queues, cpu);
+        int initResponse = PacketQueueInitialize(queue);
+        if(initResponse < 0){
+            LOG_ERROR("Error initializing packet queue. Response: %d", initResponse);
+            safeFree(queue);
+            return NULL;
+        }
+    }
+
+    return 0; // Success
+}
+
+
+void packet_queue_cleanup(void)
+{
+    int cpu;
+    for_each_possible_cpu(cpu) {
+        PacketQueue *queue = per_cpu_ptr(&cpu_packet_queues, cpu);
+        PacketQueueCleanup(queue);
+    }
+}
+
 int SetupNetfilterHooks(void) {
     LOG_INFO("Starting SetupNetfilterHooks");
+    InitializeAllPools(2000);
+    int ret = packet_queue_init();
+    if (ret) {
+        printk(KERN_ERR "Failed to initialize packet queues.\n");
+        return ret;
+    }
+    
     _preRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _postRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _localRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
@@ -363,6 +405,10 @@ void CleanupNetfilterHooks(void) {
         flush_workqueue(packet_wq);
         destroy_workqueue(packet_wq);
     }
+
+    packet_queue_cleanup();
+    FreeAllPools();
+    
     PacketQueueCleanup(_pendingPacketsQueue);
     PacketQueueCleanup(_read1PacketsQueue);
     PacketQueueCleanup(_read2PacketsQueue);
@@ -370,6 +416,7 @@ void CleanupNetfilterHooks(void) {
     PacketQueueCleanup(_write2PacketsQueue);
     PacketQueueCleanup(_injectionPacketsQueue);
     PacketQueueCleanup(_completedQueue);
+    StopQueueProcessorThread();
 }
 
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
@@ -475,30 +522,30 @@ static void packet_work_func(struct work_struct *work)
 
 static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuenum)
 {
-    PacketsQueuedCounter++;
-    PendingPacketRoundTrip *packetTrip = CreatePendingPacketTrip(entry, _lastRoutingType);
+    PendingPacketRoundTrip *packetTrip = GetFreePacketTrip(entry, _lastRoutingType);
     if (!packetTrip || !packetTrip->packet) {
         LOG_ERROR("Failed to create pending packet trip.");
         HandlePacketDecision(packetTrip, DROP, MEMORY_FAILURE_PACKET);
         packetTrip = NULL;
-        return _nfDecisionFromExtravaDefaultDecision(true);
+        return NF_DROP;
     }
 
-    // Queue the work to the workqueue
-    struct packet_work *pw = kmalloc(sizeof(*pw), GFP_ATOMIC);
-    if (!pw) {
-        LOG_ERROR("Failed to allocate memory for packet work");
-        return _nfDecisionFromExtravaDefaultDecision(true);
-    } else {
-        LOG_DEBUG_ICMP(packetTrip, "Successfully allocated memory for packet work");
-    }
+    
+    // Get the current CPU's packet queue
+    PacketQueue *queue = this_cpu_ptr(&cpu_packet_queues);
 
-    INIT_WORK(&pw->work, packet_work_func);
-    pw->packetTrip = packetTrip;
     LOG_DEBUG_ICMP(packetTrip, "About to queue work to packet_wq");
-    queue_work(packet_wq, &pw->work);
-    LOG_DEBUG_ICMP(packetTrip, "Work queued to packet_wq");
-
+    // Lock, push to queue, and unlock
+    spin_lock(&packet_queue_lock);
+    PacketQueuePush(queue, packetTrip);
+    spin_unlock(&packet_queue_lock);
+    LOG_DEBUG_ICMP(packetTrip, "Work queued to cpu queue %p", packetTrip);
+    // Signal or process further as needed
+    atomic_set(&_pendingQueueItemAdded, 1);
+    if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
+        wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
+        LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
+    }
     return 0;
 }
 

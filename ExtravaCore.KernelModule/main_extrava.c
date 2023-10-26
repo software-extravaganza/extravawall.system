@@ -34,11 +34,35 @@ bool force_icmp = false;
 #include "netfilter_hooks.h"
 #include "userspace_comm.h"
 #include "data_factories.h"
+#include "ringbuffer_comm.h"
 
 // This will be a simulation of the network packet data
 char packet_data[512];
 
 #define SHOW_PARAMATER_VALUE(param) LOG_INFO("📌 %s %d", #param, param)
+
+
+static struct task_struct *test_thread;
+
+int test_thread_function(void *data) {
+    msleep(5000);
+    LOG_INFO("Size of RingBuffer: %d", sizeof(RingBuffer));
+     LOG_INFO("Size of RingBufferSlot: %d", sizeof(RingBufferSlot));
+    while (!kthread_should_stop()) {
+        LOG_INFO("Writing in 3");
+        msleep(1000); 
+        LOG_INFO("Writing in 2");
+        msleep(1000); 
+        LOG_INFO("Writing in 1");
+        msleep(1000); 
+        LOG_INFO("Writing...");
+        TestWriteToRingBuffer();
+        LOG_INFO("Done");
+        msleep(7000);
+    }
+    return 0;
+}
+
 
 static int __init Initialize(void) {
     SHOW_PARAMATER_VALUE(log_level);
@@ -46,39 +70,57 @@ static int __init Initialize(void) {
     SHOW_PARAMATER_VALUE(force_icmp);
     SetLogLevel(log_level);
     LOG_INFO("⌛️  Extrava module initializing  ⌛️");
-    if(SetupTimeSamples() != 0){
-        LOG_ERROR("Failed to setup time samples");
-        return -1;
-    }
+    // if(SetupTimeSamples() != 0){
+    //     LOG_ERROR("Failed to setup time samples");
+    //     return -1;
+    // }
 
-    if(SetupUserSpaceCommunication() != 0){
-        LOG_ERROR("Failed to setup user space communication");
-        return -1;
-    }
+    // if(SetupUserSpaceCommunication() != 0){
+    //     LOG_ERROR("Failed to setup user space communication");
+    //     return -1;
+    // }
 
-    if(SetupNetfilterHooks() != 0){
-        LOG_ERROR("Failed to setup netfilter hooks");
+    // if(SetupNetfilterHooks() != 0){
+    //     LOG_ERROR("Failed to setup netfilter hooks");
+    //     return -1;
+    // }
+
+    if(InitializeRingBuffers() != 0){
+        LOG_ERROR("Failed to setup buffer rings");
         return -1;
     }
 
     SetInitialized();
     LOG_INFO("✔️  Extrava module loaded  ✔️");
     Activate();
+
+
+    test_thread = kthread_run(test_thread_function, NULL, "test_thread");
+    if (IS_ERR(test_thread)) {
+        printk(KERN_ALERT "Failed to create test thread.\n");
+        return PTR_ERR(test_thread);
+    }
+
+
 	return 0;
 }
 
 static void __exit Exit(void) {
     LOG_INFO("⌛️  Extrava module exiting  ⌛️");
     Deactivate();
-    LOG_DEBUG("Cleaning up netfilter hooks");
-    CleanupNetfilterHooks();
-    LOG_DEBUG("Cleaning up user space communication");
-    CleanupUserSpaceCommunication();
-    LOG_DEBUG("Cleaning up statistical data");
-    CleanupTimeSamples();
+    //LOG_DEBUG("Cleaning up netfilter hooks");
+    // CleanupNetfilterHooks();
+    // LOG_DEBUG("Cleaning up user space communication");
+    // CleanupUserSpaceCommunication();
+    // LOG_DEBUG("Cleaning up statistical data");
+    // CleanupTimeSamples();
+    LOG_DEBUG("Cleaning up buffer rings");
+    FreeRingBuffers();
+    kthread_stop(test_thread);
 	LOG_INFO("🛑  Extrava module unloaded  🛑");
     SetUninitialized();
 }
 
 module_init(Initialize);
 module_exit(Exit);
+

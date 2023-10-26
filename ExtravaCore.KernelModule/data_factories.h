@@ -17,7 +17,7 @@
 
 /* Function Declarations */
 void ConditionalMemoryZero(void* ptr, size_t size);
-PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, RoutingType type);
+PendingPacketRoundTrip* CreatePendingPacketTrip(void);
 void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip);
 PendingPacket* CreatePendingPacket(RoundTripPacketType type);
 void FreePendingPacket(PendingPacket *packet);
@@ -29,4 +29,6 @@ char* calculateSamplePercentileToString(int percentile);
 char* calculateSampleAverageToString(void);
 int SetupTimeSamples(void);
 void CleanupTimeSamples(void);
+void AddMetaDataToPacketTrip(PendingPacketRoundTrip *packetTrip, RoutingType type);
+void ResetPendingPacketTrip(PendingPacketRoundTrip *packetTrip);
 #endif // DATA_FACTORIES_H

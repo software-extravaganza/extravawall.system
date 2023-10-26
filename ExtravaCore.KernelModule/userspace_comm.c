@@ -6,7 +6,6 @@
 #define COMMUNICATION_VERSION 2
 #define DEVICE_TO_USER_SPACE "extrava_to_process"
 #define DEVICE_FROM_USER_SPACE "extrava_from_process"
-#define CLASS_NAME  "Extravaganza"
 #define S32_SIZE (sizeof(s32))
 #define TRANSACTION_HEADER_SIZE (S32_SIZE * 4)
 
@@ -201,7 +200,7 @@ int _packetProcessorThread(void *data) {
     LOG_INFO(MESSAGE_PACKET_PROCESSOR_STARTED);
     while (!kthread_should_stop() || IsUnloading() ) {
         LOG_DEBUG_PACKET(MESSAGE_WAITING_NEW_PACKET);
-        atomic_set(&_pendingQueueItemAdded, 0);
+        
         _userRead = false;
 
         int pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
@@ -214,11 +213,32 @@ int _packetProcessorThread(void *data) {
                 }
             }
             QueueProcessorWokeCounter++;
+
+            int cpu;
+             // Iterate over all possible CPU cores
+            for_each_possible_cpu(cpu) {
+                PacketQueue *queue = per_cpu_ptr(&cpu_packet_queues, cpu);
+                PendingPacketRoundTrip *packetTrip;
+
+                // Lock the queue for this CPU
+                spin_lock(&packet_queue_lock);
+
+                // Process or pop elements from the queue
+                while ((packetTrip = PacketQueuePop(queue)) != NULL) {
+                    PacketQueuePush(_pendingPacketsQueue, packetTrip);
+                }
+
+                atomic_set(&_pendingQueueItemAdded, 0);
+                // Unlock the queue for this CPU
+                spin_unlock(&packet_queue_lock);
+            }
         }
 
         if(!ShouldCapture() || IsUnloading() || kthread_should_stop()){
             continue;
         }
+
+        
 
         down(&newPacketSemaphore);
         pendingQueueLength = PacketQueueLength(_pendingPacketsQueue);
@@ -229,6 +249,13 @@ int _packetProcessorThread(void *data) {
             continue;
         }
         up(&newPacketSemaphore);
+
+        bool bypassUserSpace = true;
+        if(bypassUserSpace){
+            pendingPacketTrip->decision = default_packet_response;
+            HandlePacketDecision(pendingPacketTrip, pendingPacketTrip->decision, (pendingPacketTrip->decision == ACCEPT || pendingPacketTrip->decision == MANIPULATE) ? USER_ACCEPT : USER_DROP);
+            continue;
+        }
 
         atomic_set(&IsProcessingPacketTrip, 1);
         int read1QueueLength = PacketQueueLength(_read1PacketsQueue);

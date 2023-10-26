@@ -252,12 +252,12 @@ void ResetPendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
     }
 }
 
-PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, RoutingType type) {
+PendingPacketRoundTrip* CreatePendingPacketTrip() {
     PendingPacketRoundTrip *packetTrip = NULL;
-    if (!entry) {
-        LOG_DEBUG("Entry provided is NULL.");
-        return NULL;
-    }
+    // if (!entry) {
+    //     LOG_DEBUG("Entry provided is NULL.");
+    //     return NULL;
+    // }
 
     packetTrip = kzalloc(sizeof(PendingPacketRoundTrip), GFP_KERNEL);
     if (!packetTrip) {
@@ -266,10 +266,10 @@ PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, Ro
     }
 
     packetTrip->createdTime = ktime_get();
-    packetTrip->entry = entry;
     packetTrip->decision = UNDECIDED;
-    packetTrip->routingType = type;
-    addMetaDataToPacketTrip(packetTrip, type);
+    // packetTrip->entry = entry;
+    // packetTrip->routingType = type;
+    // addMetaDataToPacketTrip(packetTrip, type);
     if (!setupPendingPacketTripMainPacket(packetTrip) ||
         !setupPendingPacketTripResponsePacket(packetTrip)) {
         FreePendingPacketTrip(packetTrip);
@@ -277,11 +277,13 @@ PendingPacketRoundTrip* CreatePendingPacketTrip(struct nf_queue_entry *entry, Ro
         return NULL;
     }
 
-    LOG_DEBUG("Successfully created PendingPacketRoundTrip.");
+    packetTrip->available = true;
+
+    //LOG_DEBUG("Successfully created PendingPacketRoundTrip.");
     return packetTrip;
 }
 
-static void addMetaDataToPacketTrip(PendingPacketRoundTrip *packetTrip, RoutingType type) {
+void AddMetaDataToPacketTrip(PendingPacketRoundTrip *packetTrip, RoutingType type) {
     if (!packetTrip || !packetTrip->entry) {
         LOG_DEBUG("Packet trip provided is NULL.");
         return;

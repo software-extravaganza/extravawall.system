@@ -10,45 +10,48 @@
 // Public function implementations
 PacketQueue* PacketQueueCreate(void) {
     PacketQueue *queue = kzalloc(sizeof(PacketQueue), GFP_KERNEL);
+    int initResponse = PacketQueueInitialize(queue);
+    if(initResponse < 0){
+        LOG_ERROR(MESSAGE_INITIALIZATION_ERROR);
+        safeFree(queue);
+        return NULL;
+    }
+    
+    return queue;
+}
+
+int PacketQueueInitialize(PacketQueue *queue) {
     if (!queue) {
         LOG_ERROR(MESSAGE_INITIALIZATION_ERROR);
-        return NULL;
+        return -1;
     }
 
     queue->semaphore = kzalloc(sizeof(struct semaphore), GFP_KERNEL);
     if (!queue->semaphore) {
         LOG_ERROR(MESSAGE_INITIALIZATION_ERROR);
         safeFree(queue);
-        return NULL;
+        return -2;
     }
 
-    queue->queue = kzalloc(sizeof(struct kfifo), GFP_KERNEL);
-    if (!queue->queue) {
-        LOG_ERROR(MESSAGE_INITIALIZATION_ERROR);
-        safeFree(queue->semaphore);
-        safeFree(queue);
-        return NULL;
-    }
-
-    int queueResult = kfifo_alloc(queue->queue, MAX_PENDING_PACKETS_SIZE, GFP_KERNEL);
+    int queueResult = kfifo_alloc(&queue->queue, MAX_PENDING_PACKETS_SIZE, GFP_KERNEL);
     if (queueResult) {
         LOG_ERROR(MESSAGE_INITIALIZATION_ERROR);
-        safeFree(queue->queue);
+        kfifo_free(&queue->queue);
         safeFree(queue->semaphore);
         safeFree(queue);
-        return NULL;
+        return -4;
     }
 
     sema_init(queue->semaphore, 1);
-    return queue;
+    return 0;
 }
 
 static void lock(PacketQueue *queue){
-    down(queue->semaphore);
+    //down(queue->semaphore);
 }
 
 static void unlock(PacketQueue *queue){
-    up(queue->semaphore);
+    //up(queue->semaphore);
 }
 
 #define LOCK_WHILE(queue, operation) \
@@ -66,31 +69,38 @@ static void unlock(PacketQueue *queue){
 
 bool PacketQueueIsFull(PacketQueue *queue) {
     lock(queue);
-    bool result = kfifo_is_full(queue->queue);
+    bool result = kfifo_is_full(&queue->queue);
     unlock(queue);
     return result;
 }
 
 bool PacketQueueIsEmpty(PacketQueue *queue) {
     lock(queue);
-    bool result = kfifo_is_empty(queue->queue);
+    bool result = kfifo_is_empty(&queue->queue);
     unlock(queue);
     return result;
 }
 
 void PacketQueueCleanup(PacketQueue *queue) {
-    LOCK_WHILE(queue, {
-        kfifo_free(queue->queue);
-        safeFree(queue->semaphore);
-        safeFree(queue->queue);
-    });
-    safeFree(queue);
+    if (!queue) {
+        return;
+    }
+
+    PacketQueueEmpty(queue);
+    // Free the internal buffer of the kfifo
+    kfifo_free(&queue->queue);
+
+    // Free the dynamically allocated semaphore
+    if (queue->semaphore) {
+        kfree(queue->semaphore);
+        queue->semaphore = NULL;  // Set to NULL to prevent double freeing
+    }
 }
 
 void PacketQueueEmpty(PacketQueue *queue) {
     PendingPacketRoundTrip *packet;
     LOCK_WHILE(queue, {
-        while (kfifo_out(queue->queue, &packet, sizeof(packet))) {
+        while (kfifo_out(&queue->queue, &packet, sizeof(packet))) {
             if (packet) {
                 FreePendingPacketTrip(packet);
                 packet = NULL;
@@ -101,19 +111,24 @@ void PacketQueueEmpty(PacketQueue *queue) {
 
 // Private function implementations
 bool PacketQueuePush(PacketQueue *queue, PendingPacketRoundTrip *packet) {
+    if(!packet){
+        LOG_DEBUG_PACKET("Packet is NULL");
+        return false;
+    }
+
     if(PacketQueueIsFull(queue)){
         LOG_DEBUG_PACKET("Queue is full");
         return false;
     }
     
-    return LOCK_WHILE_RETURN_BOOL(queue, kfifo_in(queue->queue, &packet, sizeof(packet)));
+    return LOCK_WHILE_RETURN_BOOL(queue, kfifo_in(&queue->queue, &packet, sizeof(packet)));
 }
 
 int PacketQueueLength(PacketQueue *queue) {
-    if (!queue || !queue->queue) {
+    if (!queue) {
         return 0; // or handle the error appropriately
     }
-    return LOCK_WHILE_RETURN_INT(queue, kfifo_len(queue->queue) / sizeof(PendingPacketRoundTrip *));
+    return LOCK_WHILE_RETURN_INT(queue, kfifo_len(&queue->queue) / sizeof(PendingPacketRoundTrip *));
 }
 
 PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
@@ -122,7 +137,7 @@ PendingPacketRoundTrip* PacketQueuePeek(PacketQueue *queue) {
     LOG_DEBUG_PACKET(MESSAGE_PEEKING_PACKET, length);
     if(length > 0){
         int response = LOCK_WHILE_RETURN_INT(queue, {
-            kfifo_peek(queue->queue, &packet)
+            kfifo_peek(&queue->queue, &packet)
         });
 
         if(response < 0){
@@ -147,7 +162,7 @@ PendingPacketRoundTrip* PacketQueuePop(PacketQueue *queue) {
     }
 
     int response = LOCK_WHILE_RETURN_INT(queue, {
-        kfifo_out(queue->queue, &packet, sizeof(packet))
+        kfifo_out(&queue->queue, &packet, sizeof(packet))
     });
 
     if(response < 0){

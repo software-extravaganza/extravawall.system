@@ -8,7 +8,7 @@ builddir = $(basedir)/bin
 obj-m += extrava.o
 
 # Individual object files that make up the extrava module.
-extrava-objs := main_extrava.o logger.o module_control.o helpers.o type_converters.o packet_queue.o data_structures.o data_factories.o netfilter_hooks.o userspace_comm.o
+extrava-objs := main_extrava.o logger.o module_control.o helpers.o type_converters.o packet_queue.o data_structures.o data_factories.o packet_pool.o netfilter_hooks.o ringbuffer_comm.o userspace_comm.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(basedir) CFLAGS_MODULE="$(CFLAGS)" modules
