@@ -7,10 +7,42 @@ static void *shared_memory = NULL;
 
 static void _initRingBuffer(RingBuffer *buffer);
 
+// static int device_mmap(struct file *filp, struct vm_area_struct *vma) {
+//     return remap_pfn_range(vma, vma->vm_start,
+//                            virt_to_phys(shared_memory) >> PAGE_SHIFT,
+//                            vma->vm_end - vma->vm_start, vma->vm_page_prot);
+// }
+
 static int device_mmap(struct file *filp, struct vm_area_struct *vma) {
-    return remap_pfn_range(vma, vma->vm_start,
-                           virt_to_phys(shared_memory) >> PAGE_SHIFT,
-                           vma->vm_end - vma->vm_start, vma->vm_page_prot);
+    unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;  
+    unsigned long shared_memory_size = sizeof(RingBuffer);
+    if (offset >= shared_memory_size) {
+        return -EINVAL; 
+    }
+
+    unsigned long size = vma->vm_end - vma->vm_start; 
+    if (size > (shared_memory_size - offset)) {
+        return -EINVAL;
+    }
+
+    unsigned long pfn; 
+    /* we can use page_to_pfn on the struct page structure 
+    * returned by virt_to_page 
+    */ 
+    /* pfn = page_to_pfn (virt_to_page (shared_memory + offset)); */ 
+    
+    /* Or make PAGE_SHIFT bits right-shift on the physical 
+    * address returned by virt_to_phys 
+    */       
+    pfn = virt_to_phys(shared_memory + offset) >> PAGE_SHIFT; 
+
+    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+    vm_flags_set(vma, VM_IO);
+    vm_flags_set(vma, (VM_DONTEXPAND | VM_DONTDUMP));
+    if (remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot)) { 
+        return -EAGAIN; 
+    } 
+    return 0; 
 }
 
 // static int device_mmap(struct file *filp, struct vm_area_struct *vma) {
@@ -36,9 +68,35 @@ static int device_mmap(struct file *filp, struct vm_area_struct *vma) {
 static struct class *device_class = NULL;
 static struct device *device_obj = NULL;
 static struct file_operations fops = {
+    .owner = THIS_MODULE, 
     .mmap = device_mmap,
     // ... other file operations if needed
 };
+
+
+// void alloc_mmap_pages(int npages)
+// {
+//     int i;
+//     char *mem = kmalloc(PAGE_SIZE * npages);
+
+//     if (!mem)
+//         return mem;
+
+//     for(i = 0; i < npages * PAGE_SIZE; i += PAGE_SIZE) {
+//         SetPageReserved(virt_to_page(((unsigned long)mem) + i));
+
+//     return mem;
+// }
+
+// void free_mmap_pages(void *mem, int npages)
+// {
+//     int i;
+
+//     for(i = 0; i < npages * PAGE_SIZE; i += PAGE_SIZE) {
+//         ClearPageReserved(virt_to_page(((unsigned long)mem) + i));
+
+//     kfree(mem);
+// }
 
 int InitializeRingBuffers(void){
     major_num = register_chrdev(0, "ringbuffer_device", &fops);

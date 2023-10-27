@@ -33,4 +33,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+   <ItemGroup>
+    <!-- Include ringbuffer_client.so and copy it to the output directory -->
+    <Content Include="lib\ringbuffer_client.so">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>ringbuffer_client.so</Link>
+    </Content>
+  </ItemGroup>
+
 </Project>
