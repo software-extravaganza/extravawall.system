@@ -16,7 +16,6 @@
 
 const char* MESSAGE_PACKETS_CAPTURED = "(Packets stats) ingress: %ld, queued: %ld, captured: %ld; processed: %ld; accepted: %ld; modified: %ld; dropped: %ld; stale: %ld | (Time stats) average:%s; 90th percentile: %s";
 const char* MESSAGE_EVENTS_CAPTURED = "Read Wait: %ld; Read Woke: %ld; Write Wait: %ld; Write Woke: %ld; Queue Processor Wait: %ld; Queue Processor Woke: %ld;";
-
 const char *DECISION_ICONS[] = {
     UNDECIDED_ICON,  // UNDECIDED
     DROP_ICON,       // DROP
@@ -78,7 +77,7 @@ void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
 }
 
-static void printCounters(void){
+static void printRingBufferCounters(void){
     LOG_INFO(MESSAGE_PACKETS_CAPTURED, PacketsIngressCounter, PacketsQueuedCounter, PacketsCapturedCounter, PacketsProcessedCounter, PacketsAcceptCounter, PacketsManipulateCounter, PacketsDropCounter, PacketsStaleCounter, calculateSampleAverageToString(), calculateSamplePercentileToString(90));
     LOG_INFO(MESSAGE_EVENTS_CAPTURED, ReadWaitCounter, ReadWokeCounter, WriteWaitCounter, WriteWokeCounter, QueueProcessorWaitCounter, QueueProcessorWokeCounter);
 }
@@ -135,7 +134,7 @@ static int _nfDecisionFromExtravaDefaultDecision(bool count){
 static void increasePacketsIngressCounter(void){
     PacketsIngressCounter++;
     if(PacketsIngressCounter % 5000 == 0){
-        printCounters();
+        printRingBufferCounters();
     }
 }
 
@@ -375,7 +374,7 @@ int SetupNetfilterHooks(void) {
 }
 
 void CleanupNetfilterHooks(void) {
-    printCounters();
+    printRingBufferCounters();
     _isInitialized = false;
     if (_queueHandlerOps) {
         nf_unregister_queue_handler();
@@ -550,7 +549,7 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 }
 
 void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
-    printCounters();
+    printRingBufferCounters();
     if(!shouldCapture){
         LOG_DEBUG("Emptying queues");
         PacketQueueEmpty(_pendingPacketsQueue);

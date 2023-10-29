@@ -9,18 +9,18 @@ Console.WriteLine("ExtavaWall Watch");
 //NfqnlTest.Main();
 //await KernelClient.StartAsync();
 
-SharedMemoryManager.open_shared_memory("/dev/ringbuffer_device");
 
-// Read from slot
-RingBufferSlot slot = SharedMemoryManager.read_slot(5);
+SharedMemory2 sharedMemory = new SharedMemory2("/dev/ringbuffer_device");
+RingBufferReader reader = new RingBufferReader(sharedMemory);
+//SharedMemoryManager.open_shared_memory("/dev/ringbuffer_device");
+while (true) {
+    byte[] data = reader.Read();
+    // RingBufferSlot slot = SharedMemoryManager.read_slot(0);
+    // //slot.ClearanceStartIndex = 100;
+    //Console.WriteLine("Data found:");
+    //Console.WriteLine(Encoding.ASCII.GetString(data));
+    // await Task.Delay(3000);
+}
 
-// Modify and write back to slot
-slot.ClearanceStartIndex = 100; // Example modification
-//SharedMemoryManager.write_slot(0, slot);
 
-
-SharedMemoryManager.close_shared_memory();
-
-// Print the read data (for demonstration purposes, assuming it's ASCII text)
-Console.WriteLine("Data found:");
-Console.WriteLine(Encoding.ASCII.GetString(slot.Data));
+//SharedMemoryManager.close_shared_memory();

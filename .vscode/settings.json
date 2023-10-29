@@ -33,7 +33,9 @@
         "compare": "c",
         "type_traits": "c",
         "typeinfo": "cpp",
-        "netfilter_ipv4.h": "c"
+        "netfilter_ipv4.h": "c",
+        "ringbuffer_types.h": "c",
+        "ringbuffer_client.h": "c"
     },
     "cSpell.customDictionaries": {
         "custom-dictionary-workspace": {

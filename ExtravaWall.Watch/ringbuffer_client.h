@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 #include "../ExtravaCore.KernelModule/ringbuffer_types.h"
 
 #endif // _RINGBUFFER_CLIENT_H_

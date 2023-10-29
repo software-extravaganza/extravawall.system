@@ -29,6 +29,7 @@ bool force_icmp = false;
 // Red Hat Enterprise Linux & CentOS: sudo yum install kernel-devel-$(uname -r)
 // Debian & Ubuntu: sudo apt install linux-headers-$(uname -r)
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include "logger.h"
 #include "module_control.h"
 #include "netfilter_hooks.h"
@@ -45,20 +46,15 @@ char packet_data[512];
 static struct task_struct *test_thread;
 
 int test_thread_function(void *data) {
-    msleep(5000);
-    LOG_INFO("Size of RingBuffer: %d", sizeof(RingBuffer));
-     LOG_INFO("Size of RingBufferSlot: %d", sizeof(RingBufferSlot));
+    // sleeping for 10 seconds
+    msleep(10000);
+
+    LOG_INFO("Size of DuplexRingBuffer: %d", DUPLEX_RING_BUFFER_SIZE);
+    LOG_INFO("Size of DuplexRingBuffer page aligned: %d", DUPLEX_RING_BUFFER_ALIGNED_SIZE);
+    LOG_INFO("Size of RingBuffer: %d", RING_BUFFER_SIZE);
+    LOG_INFO("Size of RingBufferSlot: %d", SLOT_SIZE);
     while (!kthread_should_stop()) {
-        LOG_INFO("Writing in 3");
-        msleep(1000); 
-        LOG_INFO("Writing in 2");
-        msleep(1000); 
-        LOG_INFO("Writing in 1");
-        msleep(1000); 
-        LOG_INFO("Writing...");
         TestWriteToRingBuffer();
-        LOG_INFO("Done");
-        msleep(7000);
     }
     return 0;
 }

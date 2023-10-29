@@ -22,6 +22,7 @@
 #include "packet_queue.h"
 #include "packet_pool.h"
 #include "type_converters.h"
+#include "ringbuffer_types.h"
 
 // Constants
 #define MAX_PENDING_PACKETS 100
@@ -64,6 +65,12 @@ extern long WriteWaitCounter;
 extern long WriteWokeCounter;
 extern long QueueProcessorWokeCounter;
 extern long QueueProcessorWaitCounter;
+
+extern long SystemBufferSlotsUsedCounter;
+extern long SystemBufferSlotsClearedCounter;
+extern long SystemBufferActiveUsedSlots;
+extern long SystemBufferActiveFreeSlots;
+
 extern struct task_struct *_queueProcessorThread;
 
 extern atomic_t IsProcessingPacketTrip;

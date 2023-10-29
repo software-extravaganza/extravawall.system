@@ -3,6 +3,7 @@
 
 #include <linux/kernel.h>
 #include <linux/ktime.h>
+#include <linux/slab.h> // For kmalloc/kfree
 #include "logger.h"
 
 // Define a function type for functions that take no arguments and return void
@@ -11,6 +12,12 @@ typedef void (*func_ptr_t)(void);
 s64 elapsedMilliseconds(ktime_t *timestamp);
 char* timeToHumanizedString(ktime_t kt);
 char* nanosecondsToHumanizedString(u64 ns);
+int is_little_endian(void);
+uint16_t to_little_endian_16(uint16_t value);
+uint32_t to_little_endian_32(uint32_t value);
+char* bytes_to_ascii(const unsigned char *data, size_t len);
+void get_random_ascii_chars(char *buf, size_t num_chars);
+void get_random_keyboard_chars(char *buf, size_t num_chars) ;
 // static inline void check_null_helper(const char* ptr_name, void* generic_ptr, LogType log_type_enum, void (*code_func)(void)) {
 //     typeof(generic_ptr) value = generic_ptr;
 //     log_func_t log_func = log_functions[log_type_enum];
