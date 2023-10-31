@@ -194,7 +194,7 @@ public class KernelClient {
         }
     }
 
-    public static CreationResult<IPHeader> ParseIPHeader(byte[] data) {
+    public static CreationResult<IPHeader> ParseIPHeader(Span<byte> data) {
         if (data.Length < 20) {
             return new CreationResult<IPHeader>(null, false, "Data is too short to be a valid IP header.");
         }
@@ -208,42 +208,42 @@ public class KernelClient {
         var ipHeader = new IPHeader {
             VersionAndHeaderLength = data[0],
             TypeOfService = data[1],
-            TotalLength = ConvertFromBytes<ushort>(data.Skip(2).Take(2).ToArray()),
-            Identification = ConvertFromBytes<ushort>(data.Skip(4).Take(2).ToArray()),
-            FlagsAndOffset = ConvertFromBytes<ushort>(data.Skip(6).Take(2).ToArray()),
+            TotalLength = ConvertFromBytes<ushort>(data.Slice(2, 2).ToArray()),
+            Identification = ConvertFromBytes<ushort>(data.Slice(4, 2).ToArray()),
+            FlagsAndOffset = ConvertFromBytes<ushort>(data.Slice(6, 2).ToArray()),
             TTL = data[8],
             Protocol = (IPProtocol)data[9],
-            HeaderChecksum = ConvertFromBytes<ushort>(data.Skip(10).Take(2).ToArray()),
-            SourceAddress = data.Skip(12).Take(4).ToArray(),
-            DestinationAddress = data.Skip(16).Take(4).ToArray()
+            HeaderChecksum = ConvertFromBytes<ushort>(data.Slice(10, 2).ToArray()),
+            SourceAddress = data.Slice(12, 4).ToArray(),
+            DestinationAddress = data.Slice(16, 4).ToArray()
         };
 
         // Parse IP options if they exist.
         int ihl = ipHeader.VersionAndHeaderLength & 0x0F;  // Grabbing last 4 bits.
         if (ihl > 5) {
-            ipHeader.Options = ParseIPOptions(data.Skip(20).Take((ihl - 5) * 4).ToArray());
+            ipHeader.Options = ParseIPOptions(data.Slice(20, (ihl - 5) * 4).ToArray());
         }
 
         return new CreationResult<IPHeader>(ipHeader, true, null);
     }
 
-    public static TCPHeader ParseTCPHeader(byte[] data) {
+    public static TCPHeader ParseTCPHeader(Span<byte> data) {
         int tcpHeaderLength = (data[12] >> 4) * 4; // Extract header length from data offset field
         return new TCPHeader {
-            SourcePort = ConvertFromBytes<ushort>(data.Skip(0).Take(2).ToArray()),
-            DestinationPort = ConvertFromBytes<ushort>(data.Skip(2).Take(2).ToArray()),
-            SequenceNumber = ConvertFromBytes<uint>(data.Skip(4).Take(4).ToArray()),
-            AcknowledgmentNumber = ConvertFromBytes<uint>(data.Skip(8).Take(4).ToArray()),
+            SourcePort = ConvertFromBytes<ushort>(data.Slice(0, 2).ToArray()),
+            DestinationPort = ConvertFromBytes<ushort>(data.Slice(2, 2).ToArray()),
+            SequenceNumber = ConvertFromBytes<uint>(data.Slice(4, 4).ToArray()),
+            AcknowledgmentNumber = ConvertFromBytes<uint>(data.Slice(8, 4).ToArray()),
             DataOffsetAndReserved = data[12],
             Flags = (TCPFlags)data[13],
-            Window = ConvertFromBytes<ushort>(data.Skip(14).Take(2).ToArray()),
-            Checksum = ConvertFromBytes<ushort>(data.Skip(16).Take(2).ToArray()),
-            UrgentPointer = ConvertFromBytes<ushort>(data.Skip(18).Take(2).ToArray()),
+            Window = ConvertFromBytes<ushort>(data.Slice(14, 2).ToArray()),
+            Checksum = ConvertFromBytes<ushort>(data.Slice(16, 2).ToArray()),
+            UrgentPointer = ConvertFromBytes<ushort>(data.Slice(18, 2).ToArray()),
             Options = ParseTCPOptions(data, tcpHeaderLength)
         };
     }
 
-    public static List<TCPOption> ParseTCPOptions(byte[] data, int dataOffset) {
+    public static List<TCPOption> ParseTCPOptions(Span<byte> data, int dataOffset) {
         var options = new List<TCPOption>();
         int index = dataOffset;
 
@@ -257,7 +257,7 @@ public class KernelClient {
             }
 
             var optionLength = data[index + 1];
-            var optionData = data.Skip(index + 2).Take(optionLength - 2).ToArray();
+            var optionData = data.Slice(index + 2, optionLength - 2).ToArray();
 
             options.Add(new TCPOption { Kind = kind, Length = optionLength, Data = optionData });
             index += optionLength;

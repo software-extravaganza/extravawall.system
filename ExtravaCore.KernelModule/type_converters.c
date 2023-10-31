@@ -214,6 +214,25 @@ void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]) {
     }
 }
 
+s32 bytesToInt(uint8_t *bytes, size_t num_bytes) {
+    s32 result = 0;
+    if (num_bytes > sizeof(result)) {
+        num_bytes = sizeof(result);
+    }
+    for (size_t i = 0; i < num_bytes; ++i) {
+        result |= ((s32)bytes[i]) << (i * 8);
+    }
+    return result;
+}
+
+__u32 bytesToUint(uint8_t *bytes) {
+    __u32 result = 0;
+    for (size_t i = 0; i < sizeof(__u32); ++i) {
+        result |= ((__u32)bytes[i]) << (i * 8);
+    }
+    return result;
+}
+
 /* 
  * Converts an IP address to a human-readable format and stores it in the provided buffer 
  * Ensures that the buffer size is at least IP_BUFFER_SIZE for safe snprintf operation 
@@ -232,5 +251,6 @@ void ipToString(const unsigned int ip, char *buffer, size_t buf_len) {
     snprintf(buffer, buf_len, "%pI4", &ip);
     buffer[IP_BUFFER_SIZE - 1] = '\0';  // Ensure null termination (safety measure)
 }
+
 
 

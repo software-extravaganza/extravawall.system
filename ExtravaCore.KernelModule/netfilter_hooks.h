@@ -10,6 +10,7 @@
 #include <linux/kfifo.h>
 #include <linux/kthread.h>
 #include <linux/semaphore.h>
+#include <linux/list.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -23,6 +24,7 @@
 #include "packet_pool.h"
 #include "type_converters.h"
 #include "ringbuffer_types.h"
+#include "ringbuffer_comm.h"
 
 // Constants
 #define MAX_PENDING_PACKETS 100

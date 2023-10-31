@@ -81,6 +81,10 @@ __u16 get_number_of_slots() {
     return NUM_SLOTS;
 }
 
+__u16 get_size_for_slot_header_id(){
+    return SLOT_HEADER_ID_SIZE;
+}
+
 
 // void* open_shared_memory(const char* path) {
 //     fd = open(path, O_RDWR | O_SYNC, 0600);

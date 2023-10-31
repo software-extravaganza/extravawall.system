@@ -14,6 +14,8 @@
 #define ACCEPT_ICON "📨"
 #define MANIPULATE_ICON "✂️"
 
+//DECLARE_WAIT_QUEUE_HEAD(wq);
+
 const char* MESSAGE_PACKETS_CAPTURED = "(Packets stats) ingress: %ld, queued: %ld, captured: %ld; processed: %ld; accepted: %ld; modified: %ld; dropped: %ld; stale: %ld | (Time stats) average:%s; 90th percentile: %s";
 const char* MESSAGE_EVENTS_CAPTURED = "Read Wait: %ld; Read Woke: %ld; Write Wait: %ld; Write Woke: %ld; Queue Processor Wait: %ld; Queue Processor Woke: %ld;";
 const char *DECISION_ICONS[] = {
@@ -38,6 +40,7 @@ DEFINE_PER_CPU(PacketQueue, cpu_packet_queues);
 
 // Spinlock for synchronization
 DEFINE_SPINLOCK(packet_queue_lock);
+LIST_HEAD(packetQueueListHead);
 
 atomic_t _pendingQueueItemAdded = ATOMIC_INIT(0);
 bool _readQueueItemAdded = false;
@@ -73,6 +76,8 @@ static void _cleanCompletedPacketTrips(void);
 static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count);
 static int _nfDecisionFromExtravaDefaultDecision(bool count);
 static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* routeTypeName, struct sk_buff *skb, const struct nf_hook_state *state, const char* hookName);
+int _netFilterPacketProcessorThread(void *data);
+
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
 }
@@ -108,15 +113,20 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
         LOG_WARNING("Packet trip is null. Ignoring decision.");
         return;
     }
+
+    if(!packetTrip->entry){
+        LOG_WARNING("Packet trip entry is null. Ignoring decision.");
+        return;
+    }
     
     int nfDecision = _nfDecisionFromExtravaDecision(decision, true);
     nf_reinject(packetTrip->entry, nfDecision);
 
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[decision], GetReasonText(reason));
-    LOG_DEBUG_ICMP(packetTrip, "%s", logMessage);
+    LOG_DEBUG_ICMP(packetTrip, "%s", logMessage); 
 
-    DecommissionPacketTrip(packetTrip);
-    _cleanCompletedPacketTrips();
+    //DecommissionPacketTrip(packetTrip);
+    //_cleanCompletedPacketTrips();
 }
 
 static void _cleanCompletedPacketTrips(void){
@@ -195,7 +205,7 @@ static unsigned int _nfRoutingHandlerCommon(RoutingType type, void *priv, struct
     CHECK_NULL(LOG_TYPE_ERROR, state, defaultDecision);
     const char* hookName = hookToString(state->hook);
     const char* routeTypeName = routeTypeToString(type);
-    CHECK_NULL_AND_LOG(LOG_TYPE_ERROR, skb, defaultDecision, LOG_TYPE_DEBUG_PACKET, "skb pointer: %p length: %u", skb, skb->len);
+    //CHECK_NULL_AND_LOG(LOG_TYPE_ERROR, skb, defaultDecision, LOG_TYPE_DEBUG_PACKET, "skb pointer: %p length: %u", skb, skb->len);
     struct iphdr *ipHeader = ip_hdr(skb);
     int response = defaultDecision;
 
@@ -369,6 +379,7 @@ int SetupNetfilterHooks(void) {
     init_waitqueue_head(&PendingQueueItemAddedWaitQueue);
 
     _isInitialized = true;
+    RegisterQueueProcessorThreadHandler(_netFilterPacketProcessorThread);
     LOG_INFO("Completed SetupNetfilterHooks");
     return 0;
 }
@@ -416,6 +427,15 @@ void CleanupNetfilterHooks(void) {
     PacketQueueCleanup(_injectionPacketsQueue);
     PacketQueueCleanup(_completedQueue);
     StopQueueProcessorThread();
+
+    struct PacketTripListNode *listNodeToCleanUp;
+    struct list_head *pos, *q;
+
+    list_for_each_safe(pos, q, &packetQueueListHead) {
+        listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
+        list_del(pos);
+        kfree(listNodeToCleanUp);
+    }
 }
 
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
@@ -531,22 +551,124 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 
     
     // Get the current CPU's packet queue
-    PacketQueue *queue = this_cpu_ptr(&cpu_packet_queues);
+    //PacketQueue *queue = this_cpu_ptr(&cpu_packet_queues);
 
     LOG_DEBUG_ICMP(packetTrip, "About to queue work to packet_wq");
-    // Lock, push to queue, and unlock
-    spin_lock(&packet_queue_lock);
-    PacketQueuePush(queue, packetTrip);
-    spin_unlock(&packet_queue_lock);
-    LOG_DEBUG_ICMP(packetTrip, "Work queued to cpu queue %p", packetTrip);
-    // Signal or process further as needed
-    atomic_set(&_pendingQueueItemAdded, 1);
-    if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
-        wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
-        LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
+    struct PacketTripListNode *node;
+    node = kmalloc(sizeof(*node), GFP_KERNEL); // GFP_KERNEL for normal kernel allocation
+    if (node) {
+        node->data = packetTrip;
+        list_add_tail(&node->list, &packetQueueListHead); // Add new node to the list
     }
+    // Lock, push to queue, and unlock
+    // spin_lock(&packet_queue_lock);
+    // PacketQueuePush(queue, packetTrip);
+    // spin_unlock(&packet_queue_lock);
+    LOG_DEBUG_ICMP(packetTrip, "Work queued to cpu queue %p", packetTrip);
+
+    s32 transactionSize = packetTrip->entry->skb->len + S32_SIZE * 6;
+    int writeQueueLength = 0;
+    unsigned char *dataPayload = kmalloc(transactionSize, GFP_KERNEL);
+    unsigned char headerFlags[S32_SIZE];
+    unsigned char headerVersion[S32_SIZE];
+    unsigned char headerLength[S32_SIZE];
+    unsigned char headerRoutingType[S32_SIZE];
+    unsigned char packetId[S32_SIZE];
+    unsigned char packetQueueNumber[S32_SIZE];
+    intToBytes(0, headerFlags);
+    intToBytes(3, headerVersion);
+    intToBytes(packetTrip->entry->skb->len, headerLength);
+    intToBytes(packetTrip->routingType, headerRoutingType);
+    intToBytes(packetTrip->entry->id, packetId);
+    intToBytes(queuenum, packetQueueNumber);
+    memcpy(dataPayload, headerFlags, S32_SIZE);
+    memcpy(dataPayload + S32_SIZE, headerRoutingType, S32_SIZE);
+    memcpy(dataPayload + (S32_SIZE*2), headerVersion, S32_SIZE);
+    memcpy(dataPayload + (S32_SIZE*3), headerLength, S32_SIZE);
+    memcpy(dataPayload + (S32_SIZE*4), packetId, S32_SIZE);
+    memcpy(dataPayload + (S32_SIZE*5), packetQueueNumber, S32_SIZE);
+
+    memcpy(dataPayload + (S32_SIZE*6), packetTrip->entry->skb->data, packetTrip->entry->skb->len);
+
+    int slotAssigned = WriteToSystemRingBuffer(dataPayload, transactionSize);
+    if(slotAssigned >= 0){
+        packetTrip->slotAssigned = slotAssigned;
+    }
+    // Signal or process further as needed
+    // atomic_set(&_pendingQueueItemAdded, 1);
+    // if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
+    //     wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
+    //     LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
+    // }
     return 0;
 }
+
+ktime_t last_time;
+bool processed_packet_last_round = false;
+int _netFilterPacketProcessorThread(void *data) {
+    __u32 last_ring_buffer_position = -1;
+    last_time = ktime_get();
+    while (!kthread_should_stop() || IsUnloading() ) {
+        if(!processed_packet_last_round && ktime_get() - last_time < ktime_set(0, 1000000)){ // Less than 1ms and now new packets processed, wait a millisecond
+            msleep(1);
+            continue;
+        }
+
+        last_time = ktime_get();
+        // Clean stale packets
+        struct PacketTripListNode *current_node = NULL;
+        struct list_head *stalePacketToRemove = NULL;
+        struct list_head *pos, *q;
+        list_for_each_safe(pos, q, &packetQueueListHead) {
+            current_node = list_entry(pos, struct PacketTripListNode, list);
+            if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && current_node->data->slotAssigned >= 0){ // Greater than 1000ms then it's stale
+                write_system_ring_buffer_slot_status(current_node->data->slotAssigned, EMPTY);
+                HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
+                list_del(pos);
+                SystemBufferSlotsClearedCounter++;
+                SystemBufferActiveFreeSlots++;
+                SystemBufferActiveUsedSlots--;
+                SlotStatus slotStatus = read_system_ring_buffer_slot_status(current_node->data->slotAssigned);
+                LOG_DEBUG_ICMP(current_node->data, "Removed stale packet trip from queue. Slot status: %d", slotStatus);
+            }
+        }
+       
+        //LOG_DEBUG_PACKET("Reading from user space ring buffer.");
+        last_ring_buffer_position = read_system_ring_buffer_position();
+        DataBuffer* response = ReadFromUserRingBuffer();
+        processed_packet_last_round = response != NULL && response->size > 0 && response->data != NULL;
+        if(!processed_packet_last_round){
+            continue;
+        }
+
+        __u32 packetId = bytesToUint(response->data);
+        __u32 packetQueueNumber = bytesToUint(response->data + S32_SIZE);
+        __u32 routingDecision = bytesToUint(response->data + S32_SIZE*2);
+        free_data_buffer(response);
+        LOG_DEBUG_PACKET("Received response. Decision: %d, Packet Id: %d, Queue Number: %d", routingDecision, packetId, packetQueueNumber);
+
+        current_node = NULL;
+        struct PacketTripListNode *nodeFound = NULL;
+        list_for_each_entry(current_node, &packetQueueListHead, list) {
+           if(current_node->data->entry->id == packetId){
+                nodeFound = current_node;
+                break;
+           }
+        }
+
+        if(nodeFound == NULL){
+            continue;
+        }
+
+        LOG_DEBUG_ICMP(current_node->data, "Received decision on packet. Decision: %d", routingDecision);
+        list_del(&nodeFound->list);
+        nodeFound->data->decision = routingDecision;
+        HandlePacketDecision(nodeFound->data, routingDecision, USER_ACCEPT);
+    }
+
+    return 0;
+}
+
 
 void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
     printRingBufferCounters();

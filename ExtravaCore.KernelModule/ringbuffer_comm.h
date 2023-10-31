@@ -18,10 +18,17 @@
 #include "module_control.h"
 #include "helpers.h"
 
+#define S32_SIZE (sizeof(s32))
 
 int InitializeRingBuffers(void);
 void FreeRingBuffers(void);
 void TestWriteToRingBuffer(void);
+DataBuffer *ReadFromUserRingBuffer(void) ;
+int WriteToSystemRingBuffer(const char *data, size_t size);
+__u32 read_system_ring_buffer_position(void);
+void write_system_ring_buffer_slot_status(int slot_index, SlotStatus slot_status);
+SlotStatus read_system_ring_buffer_slot_status(int slot_index);
+void free_data_buffer(DataBuffer *buffer);
 
 extern long SystemBufferSlotsUsedCounter;
 extern long SystemBufferSlotsClearedCounter;

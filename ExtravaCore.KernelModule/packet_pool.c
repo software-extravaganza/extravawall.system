@@ -62,6 +62,9 @@ PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, RoutingT
             packetTrip->available = false;
             packetTrip->entry = entry;
             packetTrip->routingType = type;
+            packetTrip->createdTime = ktime_get();
+            packetTrip->attempts = 0;
+            packetTrip->slotAssigned = -2;
             AddMetaDataToPacketTrip(packetTrip, type);
             return packetTrip;
         }

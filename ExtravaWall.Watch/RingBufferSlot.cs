@@ -141,6 +141,8 @@ public unsafe struct RingBufferSlotHeader {
     [MarshalAs(UnmanagedType.U1)]
     public SlotStatus Status;
 
+    public ulong Id;
+
     // private fixed byte Data[RingBufferConstants.MAX_PAYLOAD_SIZE];
 
     // public Span<byte> DataSpan {

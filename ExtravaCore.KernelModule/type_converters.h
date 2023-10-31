@@ -61,6 +61,8 @@ const char* ipProtocolToString(unsigned int proto);
 const char* hookToString(unsigned int hooknum);
 const char* routeTypeToString(unsigned int route_type);
 void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]);
+int32_t bytesToInt(uint8_t *bytes, size_t num_bytes);
+__u32 bytesToUint(uint8_t *bytes) ;
 void ipToString(const unsigned int ip, char *buffer, size_t buf_len);
 
 #endif // TYPE_CONVERTERS_H

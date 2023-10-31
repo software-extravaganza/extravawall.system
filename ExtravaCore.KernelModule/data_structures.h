@@ -20,10 +20,6 @@
 #define CLASS_NAME  "Extravaganza"
 
 
-typedef enum {
-    REQUEST_PACKET,
-    RESPONSE_PACKET
-} RoundTripPacketType;
 
 
 
@@ -61,7 +57,11 @@ typedef enum {
     USER_DROP
 } DecisionReason;
 
-/* Pending Packet structure */
+typedef enum {
+    REQUEST_PACKET,
+    RESPONSE_PACKET
+} RoundTripPacketType;
+
 typedef struct {
     bool dataProcessed;
     bool headerProcessed;
@@ -72,6 +72,7 @@ typedef struct {
 typedef struct {
     bool available;
     ktime_t createdTime;
+    __u32 slotAssigned;
     int attempts;
     struct nf_queue_entry *entry;
     PendingPacket *packet;
@@ -80,6 +81,11 @@ typedef struct {
     RoutingType routingType;
     unsigned char protocol;
 } PendingPacketRoundTrip;
+
+typedef struct PacketTripListNode {
+    PendingPacketRoundTrip* data;
+    struct list_head list; 
+};
 
 typedef struct {
     DecisionReason reason;        // Code to represent the reason

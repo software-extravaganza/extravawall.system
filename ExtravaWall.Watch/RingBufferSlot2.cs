@@ -7,6 +7,7 @@ using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Buffers.Binary;
 
 namespace ExtravaWall.Watch;
 
@@ -135,6 +136,9 @@ public static class NativeMethods2 {
     [DllImport(LibName)]
     public static extern ushort get_number_of_slots();
 
+    [DllImport(LibName)]
+    public static extern ushort get_size_for_slot_header_id();
+
 
     public static uint GetPageSize() {
         return (uint)sysconf(_SC_PAGESIZE);
@@ -150,6 +154,7 @@ public static class NativeMethods2 {
 public unsafe class SharedMemory2 : IDisposable {
     private readonly IntPtr sharedMemoryPtr;
     private uint sharedMemorySize;
+    private ulong UserRingBufferSentCount;
     public readonly byte* DuplexBuffer;
 
     public int SLOT_HEADER_STATUS_SIZE { get; }
@@ -171,7 +176,10 @@ public unsafe class SharedMemory2 : IDisposable {
 
     public ushort NUM_SLOTS { get; }
 
+    public ushort SLOT_HEADER_ID_SIZE { get; }
+
     unsafe void ReadFromBuffer(byte* dest, long offset, long length) {
+        Thread.MemoryBarrier();
         if (DuplexBuffer != null && dest != null) {
             for (int i = 0; i < length; i++) {
                 dest[i] = DuplexBuffer[offset + i];
@@ -198,6 +206,7 @@ public unsafe class SharedMemory2 : IDisposable {
         for (long i = 0; i < length; i++) {
             DuplexBuffer[offset + i] = src[i];
         }
+        Thread.MemoryBarrier();
     }
 
     unsafe RingBufferHeader ReadRingBufferHeader(uint offset) {
@@ -215,14 +224,15 @@ public unsafe class SharedMemory2 : IDisposable {
     }
 
     unsafe void WriteRingBufferHeader(uint offset, RingBufferHeader header) {
-        Span<byte> buffer = stackalloc byte[5]; // Buffer to hold data
+        ProcessUInt32AsBytes(header.Position, false, span => {
+            Span<byte> buffer = stackalloc byte[5]; // Buffer to hold data
+            buffer[0] = (byte)header.Status;
+            span.CopyTo(buffer.Slice(1, RING_BUFFER_HEADER__POSITION_SIZE));
 
-        buffer[0] = (byte)header.Status;
-        BitConverter.GetBytes(header.Position).CopyTo(buffer.Slice(1, RING_BUFFER_HEADER__POSITION_SIZE));
-
-        fixed (byte* bufferPtr = buffer) {
-            WriteToBuffer(bufferPtr, offset, 5);
-        }
+            ByteSpanAsPointer(buffer, bufferPtr => {
+                WriteToBuffer(bufferPtr, offset, 5);
+            });
+        });
     }
 
     unsafe RingBufferStatus ReadRingBufferStatus(uint offset) {
@@ -265,8 +275,29 @@ public unsafe class SharedMemory2 : IDisposable {
 
     public int ReadRingBufferPosition(uint offset) {
         int position = 0;
-        ReadFromBuffer((byte*)&position, offset + (uint)RING_BUFFER_HEADER_STATUS_SIZE, (uint)RING_BUFFER_HEADER__POSITION_SIZE);
+        byte* positionBytes = (byte*)&position;
+        ReadFromBuffer(positionBytes, offset + (uint)RING_BUFFER_HEADER_STATUS_SIZE, (uint)RING_BUFFER_HEADER__POSITION_SIZE);
+        ReverseBytesForPointerIfNeeded(positionBytes, RING_BUFFER_HEADER__POSITION_SIZE, true);
         return position;
+    }
+
+    public bool IsLittleEndian(bool reading) {
+        if (reading) {
+            return BitConverter.IsLittleEndian;
+        } else {
+            return false;
+        }
+    }
+
+    private void ReverseBytesForPointerIfNeeded(byte* positionBytes, int size, bool reading) {
+        if (IsLittleEndian(reading)) // Adjust this according to your buffer's endianness
+                {
+            for (int i = 0; i < size / 2; i++) {
+                byte temp = positionBytes[i];
+                positionBytes[i] = positionBytes[size - i - 1];
+                positionBytes[size - i - 1] = temp;
+            }
+        }
     }
 
     public int ReadSystemRingBufferPosition() {
@@ -277,8 +308,72 @@ public unsafe class SharedMemory2 : IDisposable {
         return ReadRingBufferPosition(RING_BUFFER_SIZE);
     }
 
+    public void ByteSpanAsPointer(Span<byte> span, BytePointerAction action) {
+        fixed (byte* bytePtr = span) {
+            action(bytePtr);
+        }
+    }
+
+    public delegate void ByteAction(Span<byte> span);
+    public delegate void ByteWithBufferAction(Span<byte> buffer, Span<byte> span);
+    public void ProcessUInt32AsBytes(uint value, bool reading, ByteAction action) {
+        Span<byte> uintBytes = stackalloc byte[4];
+        if (IsLittleEndian(reading)) {
+            BinaryPrimitives.WriteUInt32LittleEndian(uintBytes, value);
+        } else {
+            BinaryPrimitives.WriteUInt32BigEndian(uintBytes, value);
+        }
+
+        action(uintBytes);
+    }
+
+
+    public void ProcessUInt64AsBytesWithBuffer(Span<byte> buffer, ulong value, bool reading, ByteWithBufferAction action) {
+        Span<byte> uintBytes = stackalloc byte[8];
+        if (IsLittleEndian(reading)) {
+            BinaryPrimitives.WriteUInt64LittleEndian(uintBytes, value);
+        } else {
+            BinaryPrimitives.WriteUInt64BigEndian(uintBytes, value);
+        }
+
+        action(buffer, uintBytes);
+    }
+
+    public void ProcessUInt32AsBytesWithBuffer(Span<byte> buffer, uint value, bool reading, ByteWithBufferAction action) {
+        Span<byte> uintBytes = stackalloc byte[4];
+        if (IsLittleEndian(reading)) {
+            BinaryPrimitives.WriteUInt32LittleEndian(uintBytes, value);
+        } else {
+            BinaryPrimitives.WriteUInt32BigEndian(uintBytes, value);
+        }
+
+        action(buffer, uintBytes);
+    }
+
+    public void ProcessUShortAsBytesWithBuffer(Span<byte> buffer, ushort value, bool reading, ByteWithBufferAction action) {
+        Span<byte> uintBytes = stackalloc byte[2];
+        if (IsLittleEndian(reading)) {
+            BinaryPrimitives.WriteUInt16LittleEndian(uintBytes, value);
+        } else {
+            BinaryPrimitives.WriteUInt16BigEndian(uintBytes, value);
+        }
+
+        action(buffer, uintBytes);
+    }
+
+    public delegate void BytePointerAction(byte* pointer);
+    public delegate void BytePointerWithBufferAction(Span<byte> buffer, byte* pointer);
+    public void ProcessUInt32AsBytePointer(uint value, bool reading, BytePointerAction action) {
+        ProcessUInt32AsBytes(value, reading, uintBytes => {
+            fixed (byte* bytePtr = uintBytes) {
+                action(bytePtr);
+            }
+        });
+    }
     public void WriteRingBufferPosition(uint offset, uint position) {
-        WriteToBuffer((byte*)&position, offset + (uint)RING_BUFFER_HEADER_STATUS_SIZE, (uint)RING_BUFFER_HEADER__POSITION_SIZE);
+        ProcessUInt32AsBytePointer(position, false, (byte* pointer) => {
+            WriteToBuffer(pointer, offset + (uint)RING_BUFFER_HEADER_STATUS_SIZE, (uint)RING_BUFFER_HEADER__POSITION_SIZE);
+        });
     }
 
     public void WriteSystemRingBufferPosition(int position) {
@@ -298,11 +393,12 @@ public unsafe class SharedMemory2 : IDisposable {
             ReadFromBuffer(bufferPtr, baseOffset, SLOT_HEADER_SIZE);
 
             header.Status = (SlotStatus)buffer[0];
-            header.TotalDataSize = BitConverter.ToUInt32(buffer.Slice(1, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE));
-            header.CurrentDataSize = BitConverter.ToUInt16(buffer.Slice(5, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE));
-            header.SequenceNumber = buffer[7];
-            header.ClearanceStartIndex = BitConverter.ToUInt16(buffer.Slice(8, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE));
-            header.ClearanceEndIndex = BitConverter.ToUInt16(buffer.Slice(10, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE));
+            header.Id = BitConverter.ToUInt64(buffer.Slice(1, SLOT_HEADER_ID_SIZE));
+            header.TotalDataSize = BitConverter.ToUInt32(buffer.Slice(9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE));
+            header.CurrentDataSize = BitConverter.ToUInt16(buffer.Slice(13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE));
+            header.SequenceNumber = buffer[15];
+            header.ClearanceStartIndex = BitConverter.ToUInt16(buffer.Slice(16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE));
+            header.ClearanceEndIndex = BitConverter.ToUInt16(buffer.Slice(18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE));
         }
 
         return header;
@@ -319,17 +415,33 @@ public unsafe class SharedMemory2 : IDisposable {
     public void WriteRingBufferSlotHeader(uint offset, int slotIndex, RingBufferSlotHeader slot_header) {
         Span<byte> buffer = stackalloc byte[SLOT_HEADER_SIZE]; // Buffer to hold data
 
-        buffer[0] = (byte)slot_header.Status;
-        BitConverter.GetBytes(slot_header.TotalDataSize).CopyTo(buffer.Slice(1, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE));
-        BitConverter.GetBytes(slot_header.CurrentDataSize).CopyTo(buffer.Slice(5, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE));
-        buffer[7] = slot_header.SequenceNumber;
-        BitConverter.GetBytes(slot_header.ClearanceStartIndex).CopyTo(buffer.Slice(8, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE));
-        BitConverter.GetBytes(slot_header.ClearanceEndIndex).CopyTo(buffer.Slice(10, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE));
+        ProcessUInt64AsBytesWithBuffer(buffer, slot_header.Id, false, (b, span) => {
+            span.CopyTo(b.Slice(1, SLOT_HEADER_ID_SIZE));
+        });
 
-        fixed (byte* bufferPtr = buffer) {
+        ProcessUInt32AsBytesWithBuffer(buffer, slot_header.TotalDataSize, false, (b, span) => {
+            span.CopyTo(b.Slice(9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE));
+        });
+
+        ProcessUShortAsBytesWithBuffer(buffer, slot_header.CurrentDataSize, false, (b, span) => {
+            span.CopyTo(b.Slice(13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE));
+        });
+
+        buffer[15] = slot_header.SequenceNumber;
+        ProcessUShortAsBytesWithBuffer(buffer, slot_header.ClearanceStartIndex, false, (b, span) => {
+            span.CopyTo(b.Slice(16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE));
+        });
+
+        ProcessUShortAsBytesWithBuffer(buffer, slot_header.ClearanceEndIndex, false, (b, span) => {
+            span.CopyTo(b.Slice(18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE));
+        });
+
+        ByteSpanAsPointer(buffer, bufferPtr => {
             uint baseOffset = offset + (uint)RING_BUFFER_HEADER_SIZE + (uint)slotIndex * (uint)SLOT_SIZE;
             WriteToBuffer(bufferPtr, baseOffset, SLOT_HEADER_SIZE);
-        }
+        });
+
+        WriteRingBufferSlotStatus(offset, (uint)slotIndex, slot_header.Status);
     }
 
     public void WriteSystemRingBufferSlotHeader(int slotIndex, RingBufferSlotHeader slot_header) {
@@ -347,9 +459,43 @@ public unsafe class SharedMemory2 : IDisposable {
         return status;
     }
 
+    public ulong ReadRingBufferSlotId(uint offset, int slotIndex) {
+        ulong id = 0;
+        byte* idBytes = (byte*)&id;
+        ReadFromBuffer(idBytes, offset + (uint)RING_BUFFER_HEADER_STATUS_SIZE, (uint)RING_BUFFER_HEADER__POSITION_SIZE);
+        ReverseBytesForPointerIfNeeded(idBytes, SLOT_HEADER_ID_SIZE, true);
+        return id;
+    }
+
+    public ulong ReadSystemRingBufferSlotId(int slotIndex) {
+        return ReadRingBufferSlotId(0, slotIndex);
+    }
+
+    public ulong ReadUserRingBufferSlotId(int slotIndex) {
+        return ReadRingBufferSlotId(RING_BUFFER_SIZE, slotIndex);
+    }
+
     public void WriteRingBufferSlotStatus(uint offset, uint slotIndex, SlotStatus status) {
         uint baseOffset = offset + (uint)RING_BUFFER_HEADER_SIZE + slotIndex * (uint)SLOT_SIZE;
+        if (status == SlotStatus.VALID) {
+            UserRingBufferSentCount++;
+            WriteRingBufferSlotId(baseOffset, slotIndex, UserRingBufferSentCount);
+        }
+
         WriteToBuffer((byte*)&status, baseOffset, SLOT_HEADER_STATUS_SIZE);
+    }
+
+    public void WriteRingBufferSlotId(uint offset, uint slotIndex, ulong id) {
+        uint baseOffset = offset + (uint)RING_BUFFER_HEADER_SIZE + slotIndex * (uint)SLOT_SIZE + (uint)SLOT_HEADER_STATUS_SIZE;
+        WriteToBuffer((byte*)&id, baseOffset, SLOT_HEADER_ID_SIZE);
+    }
+
+    public void WriteSystemRingBufferSlotId(uint slotIndex, ulong id) {
+        WriteRingBufferSlotId(0, slotIndex, id);
+    }
+
+    public void WriteUserRingBufferSlotId(uint slotIndex, ulong id) {
+        WriteRingBufferSlotId(RING_BUFFER_SIZE, slotIndex, id);
     }
 
     public byte* ReadRingBufferSlotData(uint offset, int slotIndex, ushort dataSize) {
@@ -369,7 +515,12 @@ public unsafe class SharedMemory2 : IDisposable {
 
     public void WriteRingBufferSlotData(uint offset, uint slotIndex, Span<byte> data, ushort dataSize) {
         byte* dataPtr = (byte*)Marshal.AllocHGlobal(dataSize);
-        CopyData(data, dataPtr, 0, dataSize);
+        if (IsLittleEndian(false)) {
+            data.Reverse();
+            CopyData(data, dataPtr, 0, dataSize);
+        } else {
+            CopyData(data, dataPtr, 0, dataSize);
+        }
 
         uint baseOffset = offset + (uint)RING_BUFFER_HEADER_SIZE + slotIndex * (uint)SLOT_SIZE + (uint)SLOT_HEADER_SIZE;
         WriteToBuffer(dataPtr, baseOffset, dataSize);
@@ -469,6 +620,7 @@ public unsafe class SharedMemory2 : IDisposable {
         DUPLEX_RING_BUFFER_SIZE = NativeMethods2.get_size_for_duplex_ring_buffer();
         DUPLEX_RING_BUFFER_ALIGNED_SIZE = NativeMethods2.get_size_for_duplex_ring_buffer_aligned();
         NUM_SLOTS = NativeMethods2.get_number_of_slots();
+        SLOT_HEADER_ID_SIZE = NativeMethods2.get_size_for_slot_header_id();
 
         Console.WriteLine($"Size of DuplexRingBuffer: {DUPLEX_RING_BUFFER_SIZE}");
         Console.WriteLine($"Size of DuplexRingBuffer page aligned: {DUPLEX_RING_BUFFER_ALIGNED_SIZE}");
@@ -616,6 +768,11 @@ public unsafe class RingBufferReader {
 
     public RingBufferReader(SharedMemory2 sharedMemory) {
         this.sharedMemory = sharedMemory;
+        UserBufferActiveFreeSlots = sharedMemory.NUM_SLOTS;
+    }
+
+    public bool IsLittleEndian(bool reading) {
+        return sharedMemory.IsLittleEndian(reading);
     }
 
     // public unsafe RingBufferSlot GetSlot(IntPtr ringBufferPtr, int slotIndex) {
@@ -651,11 +808,22 @@ public unsafe class RingBufferReader {
         Console.WriteLine($"Offset {offset} - Field '{fieldName}' - Hex data: {BitConverter.ToString(arr, offset, fieldSize).Replace("-", " ")}");
     }
 
+    private ulong[] deBounceProcessedSlots = new ulong[10000];
+    private int deBounceProcessedSlotsIndex = 0;
+    private bool checkAndAddDebounceSlot(ulong id) {
+        if (deBounceProcessedSlots.Contains(id)) {
+            return false;
+        }
 
+        deBounceProcessedSlots[deBounceProcessedSlotsIndex] = id;
+        deBounceProcessedSlotsIndex = (deBounceProcessedSlotsIndex + 1) % deBounceProcessedSlots.Length;
+        return true;
+    }
 
-    public byte[] Read() {
-        byte[] dataRead = new byte[0];
-        int startIndex = sharedMemory.ReadSystemRingBufferPosition();
+    int nextSystemReadPosition = 0;
+    public Span<byte> Read() {
+        Span<byte> dataRead = new byte[0];
+        int startIndex = nextSystemReadPosition;
         int endIndex = startIndex;
         int bytesWritten = 0;
         int? currentIndex = null;
@@ -663,90 +831,62 @@ public unsafe class RingBufferReader {
         List<int> userIndiciesToClear = new List<int>();
         while (!slotFound && currentIndex != startIndex) {
             if (currentIndex == null) {
-                currentIndex = sharedMemory.ReadSystemRingBufferPosition();
+                currentIndex = nextSystemReadPosition;
             }
 
+            var header = sharedMemory.ReadSystemRingBufferSlotHeader(nextSystemReadPosition);
+            if (header.Id == 0) {
+                return null;
+            }
 
-            var header = sharedMemory.ReadSystemRingBufferSlotHeader(currentIndex.Value);
-            //ref var slot = ref ingressBuffer.Slots[0];
+            if (!checkAndAddDebounceSlot(header.Id)) {
+                return null;
+            }
+
             if (!slotFound) {
                 dataRead = new byte[header.TotalDataSize];
             }
 
             if (header.ClearanceEndIndex > header.ClearanceStartIndex && header.ClearanceEndIndex > 0 && header.ClearanceEndIndex < sharedMemory.NUM_SLOTS) {
                 for (uint clearSlotIndex = header.ClearanceStartIndex; clearSlotIndex < header.ClearanceEndIndex; clearSlotIndex++) {
-                    //LOG_INFO("Clearing slot %d", index);
                     sharedMemory.WriteUserRingBufferSlotStatus(clearSlotIndex, SlotStatus.EMPTY);
                     UserBufferSlotsClearedCounter++;
                     UserBufferActiveFreeSlots++;
                     UserBufferActiveUsedSlots--;
                 }
             }
-            // var slot1 = ingressBuffer.GetSlot(1);
-            // var slot2 = ingressBuffer.GetSlot(2);
-            // var slot3 = ingressBuffer.GetSlot(3);
-            // var slot4 = ingressBuffer.GetSlot(4);
-            //RingBufferSlot slot = ingressBuffer.GetSlot(currentIndex.Value);
-            // if (slot.Status == SlotStatus.EMPTY) {
-            //     currentIndex = (currentIndex + 1) % RingBufferReader.NUM_SLOTS;
-            //     continue;
-            // }
 
-            //byte[] data = new byte[RingBufferReader.MAX_PAYLOAD_SIZE];
-            //Marshal.Copy((IntPtr)slot.Data, data, 0, RingBufferReader.MAX_PAYLOAD_SIZE);
-            // if (slot.Data.Any(b => b != 0)) {
-            //     Console.WriteLine("Data found");
-            //     slotFound = true;
-            // }
-
-
-            // var data1 = Encoding.ASCII.GetString(slot1.Data);
-            // var data2 = Encoding.ASCII.GetString(slot2.Data);
-            // var data3 = Encoding.ASCII.GetString(slot3.Data);
-            // var data4 = Encoding.ASCII.GetString(slot4.Data);
-            // PrintFieldBytes(slot, "ClearanceStartIndex", sizeof(ushort));
-            // PrintFieldBytes(slot, "ClearanceEndIndex", sizeof(ushort));
-            // PrintFieldBytes(slot, "CurrentDataSize", sizeof(ushort));
-            // PrintFieldBytes(slot, "TotalDataSize", sizeof(uint));
-            // PrintFieldBytes(slot, "SequenceNumber", sizeof(byte));
-            // PrintFieldBytes(slot, "Status", sizeof(byte));
             if (header.Status == SlotStatus.VALID) {
                 slotFound = true;
                 var data = sharedMemory.ReadSystemRingBufferSlotData((int)currentIndex.Value, header.CurrentDataSize);
-                sharedMemory.CopyData(data, dataRead, bytesWritten, header.CurrentDataSize);
+                sharedMemory.CopyData(data, dataRead.Slice(bytesWritten), header.CurrentDataSize);
                 bytesWritten += header.CurrentDataSize;
                 endIndex = sharedMemory.ReadSystemRingBufferPosition();
-                //AdvanceRingBuffer(ref slot);
-                //AdvanceRingBuffer2(slot);
-                break;
             } else if (header.Status == SlotStatus.ADVANCE) {
                 var data = sharedMemory.ReadSystemRingBufferSlotData((int)currentIndex.Value, header.CurrentDataSize);
-                sharedMemory.CopyData(data, dataRead.AsSpan(bytesWritten), header.CurrentDataSize);
-                //slot.DataSpan.Slice(0, slot.CurrentDataSize).CopyTo(dataRead.AsSpan((int)bytesWritten));
+                sharedMemory.CopyData(data, dataRead.Slice(bytesWritten), header.CurrentDataSize);
                 bytesWritten += header.CurrentDataSize;
                 endIndex = sharedMemory.ReadSystemRingBufferPosition();
-                //AdvanceRingBuffer(ref slot);
-                //AdvanceRingBuffer2(slot);
             }
-            currentIndex = (currentIndex + 1) % sharedMemory.NUM_SLOTS;
 
+            currentIndex = (currentIndex + 1) % sharedMemory.NUM_SLOTS;
+            nextSystemReadPosition = currentIndex.Value;
         }
 
-        // After reading, send clearance indices
-        var dataToSend = Encoding.ASCII.GetBytes(""); //TestData.TEST_PAYLOAD_10_PAST_SLOT);
-        SendResponse(dataToSend, (uint)startIndex, (uint)endIndex, userIndiciesToClear);
-        //SendClearanceIndices2(startIndex, endIndex);
-        return dataRead.ToArray();
+        if (slotFound) {
+            systemIndiciesToClear.Enqueue(((uint)startIndex, (uint)endIndex));
+        }
+
+        foreach (var index in userIndiciesToClear.Distinct()) {
+            sharedMemory.WriteUserRingBufferSlotStatus((uint)index, SlotStatus.EMPTY);
+        }
+
+        return dataRead;
     }
 
 
     private Queue<(uint Start, uint End)> systemIndiciesToClear = new Queue<(uint, uint)>();
-    private void SendResponse(byte[] data, uint startClearanceIndex, uint endClearanceIndex, IEnumerable<int> indiciesToClear) {
-        foreach (var index in indiciesToClear.Distinct()) {
-            sharedMemory.WriteUserRingBufferSlotStatus((uint)index, SlotStatus.EMPTY);
-        }
-
-        systemIndiciesToClear.Enqueue((startClearanceIndex, endClearanceIndex));
+    public void SendResponse(byte[] data) {
         WriteToSystemRingBuffer(data);
         // //Update the egress buffer's clearance indices to indicate which slots have been read
         // for (uint i = 0; i < RingBufferConstants2.NUM_SLOTS; i++) {
@@ -790,7 +930,21 @@ public unsafe class RingBufferReader {
     long UserBufferSlotsClearedCounter = 0;
     long UserBufferActiveUsedSlots = 0;
     long UserBufferActiveFreeSlots = 0;
+
+    private IDictionary<int, DateTime> slotWrittenTimes = new Dictionary<int, DateTime>();
     void WriteToSystemRingBuffer(Span<byte> data) {
+        if (UserBufferSlotsUsedCounter % 10000 == 0) {
+            printRingBufferCounters();
+        }
+
+        for (var slotIndex = 0; slotIndex < slotWrittenTimes.Count; slotIndex++) {
+            var slot = slotWrittenTimes.ElementAt(slotIndex);
+            if (DateTime.Now - slot.Value > TimeSpan.FromMilliseconds(1000)) {
+                sharedMemory.WriteUserRingBufferSlotStatus((uint)slot.Key, SlotStatus.EMPTY);
+                slotWrittenTimes.Remove(slot.Key);
+            }
+        }
+
         //Console.WriteLine($"Writing {data.Length} bytes to user ring buffer");
         int remainingSize = data.Length;
         int bytesWritten = 0;
@@ -831,15 +985,16 @@ public unsafe class RingBufferReader {
                 slotHeader.Status = SlotStatus.VALID;
             }
 
+            if (slotWrittenTimes.ContainsKey(startPosition)) {
+                slotWrittenTimes.Remove(startPosition);
+            }
+
+            slotWrittenTimes.Add(startPosition, DateTime.Now);
+            Console.WriteLine($"Writing slot total data size: {slotHeader.TotalDataSize} current data size: {slotHeader.CurrentDataSize} sequence number: {slotHeader.SequenceNumber} status: {slotHeader.Status} clearance start: {slotHeader.ClearanceStartIndex} clearance end: {slotHeader.ClearanceEndIndex}");
             sharedMemory.WriteUserRingBufferSlotHeader(startPosition, slotHeader);
             UserBufferSlotsUsedCounter++;
             UserBufferActiveFreeSlots--;
             UserBufferActiveUsedSlots++;
-        }
-
-
-        if (UserBufferSlotsUsedCounter % 10000 == 0) {
-            printRingBufferCounters();
         }
     }
 

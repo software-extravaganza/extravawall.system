@@ -66,23 +66,23 @@ static int __init Initialize(void) {
     SHOW_PARAMATER_VALUE(force_icmp);
     SetLogLevel(log_level);
     LOG_INFO("⌛️  Extrava module initializing  ⌛️");
-    // if(SetupTimeSamples() != 0){
-    //     LOG_ERROR("Failed to setup time samples");
-    //     return -1;
-    // }
+    if(SetupTimeSamples() != 0){
+        LOG_ERROR("Failed to setup time samples");
+        return -1;
+    }
+
+    if(InitializeRingBuffers() != 0){
+        LOG_ERROR("Failed to setup buffer rings");
+        return -1;
+    }
 
     // if(SetupUserSpaceCommunication() != 0){
     //     LOG_ERROR("Failed to setup user space communication");
     //     return -1;
     // }
 
-    // if(SetupNetfilterHooks() != 0){
-    //     LOG_ERROR("Failed to setup netfilter hooks");
-    //     return -1;
-    // }
-
-    if(InitializeRingBuffers() != 0){
-        LOG_ERROR("Failed to setup buffer rings");
+    if(SetupNetfilterHooks() != 0){
+        LOG_ERROR("Failed to setup netfilter hooks");
         return -1;
     }
 
@@ -91,11 +91,11 @@ static int __init Initialize(void) {
     Activate();
 
 
-    test_thread = kthread_run(test_thread_function, NULL, "test_thread");
-    if (IS_ERR(test_thread)) {
-        printk(KERN_ALERT "Failed to create test thread.\n");
-        return PTR_ERR(test_thread);
-    }
+    // test_thread = kthread_run(test_thread_function, NULL, "test_thread");
+    // if (IS_ERR(test_thread)) {
+    //     printk(KERN_ALERT "Failed to create test thread.\n");
+    //     return PTR_ERR(test_thread);
+    // }
 
 
 	return 0;
@@ -104,15 +104,15 @@ static int __init Initialize(void) {
 static void __exit Exit(void) {
     LOG_INFO("⌛️  Extrava module exiting  ⌛️");
     Deactivate();
-    //LOG_DEBUG("Cleaning up netfilter hooks");
-    // CleanupNetfilterHooks();
+    LOG_DEBUG("Cleaning up netfilter hooks");
+    CleanupNetfilterHooks();
     // LOG_DEBUG("Cleaning up user space communication");
     // CleanupUserSpaceCommunication();
-    // LOG_DEBUG("Cleaning up statistical data");
-    // CleanupTimeSamples();
+    LOG_DEBUG("Cleaning up statistical data");
+    CleanupTimeSamples();
     LOG_DEBUG("Cleaning up buffer rings");
     FreeRingBuffers();
-    kthread_stop(test_thread);
+    //kthread_stop(test_thread);
 	LOG_INFO("🛑  Extrava module unloaded  🛑");
     SetUninitialized();
 }

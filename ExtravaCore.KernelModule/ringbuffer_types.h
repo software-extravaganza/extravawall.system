@@ -22,12 +22,13 @@
 
 
 #define SLOT_HEADER_STATUS_SIZE sizeof(__u8)
+#define SLOT_HEADER_ID_SIZE sizeof(__u64)
 #define SLOT_HEADER_TOTAL_DATA_SIZE_SIZE sizeof(__u32)
 #define SLOT_HEADER_CURRENT_DATA_SIZE_SIZE sizeof(__u16)
 #define SLOT_HEADER_SEQUENCE_NUMBER_SIZE sizeof(__u8)
 #define SLOT_HEADER_CLEARANCE_START_INDEX_SIZE sizeof(__u16)
 #define SLOT_HEADER_CLEARANCE_END_INDEX_SIZE sizeof(__u16)
-#define SLOT_HEADER_SIZE (SLOT_HEADER_STATUS_SIZE + SLOT_HEADER_TOTAL_DATA_SIZE_SIZE + SLOT_HEADER_CURRENT_DATA_SIZE_SIZE + SLOT_HEADER_SEQUENCE_NUMBER_SIZE + SLOT_HEADER_CLEARANCE_START_INDEX_SIZE + SLOT_HEADER_CLEARANCE_END_INDEX_SIZE)
+#define SLOT_HEADER_SIZE (SLOT_HEADER_STATUS_SIZE + SLOT_HEADER_ID_SIZE + SLOT_HEADER_TOTAL_DATA_SIZE_SIZE + SLOT_HEADER_CURRENT_DATA_SIZE_SIZE + SLOT_HEADER_SEQUENCE_NUMBER_SIZE + SLOT_HEADER_CLEARANCE_START_INDEX_SIZE + SLOT_HEADER_CLEARANCE_END_INDEX_SIZE)
 #define SLOT_DATA_SIZE MAX_PAYLOAD_SIZE
 #define SLOT_SIZE (SLOT_HEADER_SIZE + SLOT_DATA_SIZE)
 
@@ -63,6 +64,7 @@ struct RingBufferSlotHeader {
     __u32 TotalDataSize;            // For larger data that spans multiple Slots; Matches uint from C#
     __u8  SequenceNumber;           // Range from 0 to 255; Matches byte from C#
     __u8 Status;          // Possible values: EMPTY, VALID, ADVANCE; Use bit field to ensure it's stored as __u8
+    __u64 Id;
     //char  Data[MAX_PAYLOAD_SIZE];   // Flexible array member for data payload
 };
 

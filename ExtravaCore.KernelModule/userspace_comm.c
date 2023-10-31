@@ -83,63 +83,12 @@ DECLARE_WAIT_QUEUE_HEAD(UserReadWaitQueue);
 DECLARE_WAIT_QUEUE_HEAD(UserWriteWaitQueue);
 extern bool UserRead;
 
-// Private Functions
-static int _releaseDevice(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *deviceMutex, atomic_t *atomicValue) {
-    atomic_dec(atomicValue);
-    mutex_unlock(deviceMutex);
-    LOG_DEBUG("Device %s disconnected from user space", deviceName);
-    return 0;
-}
-
-static int _openDevice(struct inode *inodep, struct file *filep, char* deviceName, struct mutex *deviceMutex, atomic_t *atomicValue) {
-    if(!mutex_trylock(deviceMutex)){
-        LOG_INFO("Device %s cannot lock; is being used by another process.", deviceName);
-        return -EBUSY;
-    }
-
-    atomic_inc(atomicValue);
-    LOG_DEBUG("Device %s connected from user space", deviceName);
-    return 0;
-}
 
 // Public Functions
 int SetupUserSpaceCommunication(void) {
     atomic_set(&IsProcessingPacketTrip, 0);
     SetShouldCaptureEventHandler(_shouldCaptureChangeHandler);
 
-    _majorNumberToUser = register_chrdev(0, DEVICE_TO_USER_SPACE, &_operationsToDeviceUser);
-    if (_majorNumberToUser < 0) {
-        LOG_ERROR("Failed to register a major number for netmod to user");
-        return -1;
-    }
-
-    _majorNumberFromUser = register_chrdev(0, DEVICE_FROM_USER_SPACE, &_operationsFromDeviceUser);
-    if (_majorNumberFromUser < 0) {
-        LOG_ERROR("Failed to register a major number for netmod from user");
-        unregister_chrdev(_majorNumberToUser, DEVICE_TO_USER_SPACE);
-        return -1;
-    }
-
-    _charClass = class_create(CLASS_NAME);
-    if (IS_ERR(_charClass)) {
-        unregister_chrdev(_majorNumberToUser, DEVICE_TO_USER_SPACE);
-        unregister_chrdev(_majorNumberFromUser, DEVICE_FROM_USER_SPACE);
-        LOG_ERROR("Failed to register device class");
-        return PTR_ERR(_charClass);
-    }
-
-    _netmodDevice = device_create(_charClass, NULL, MKDEV(_majorNumberToUser, 0), NULL, DEVICE_TO_USER_SPACE);
-    if (IS_ERR(_netmodDevice)) {
-        LOG_ERROR("Failed to create the input device");
-    }
-
-    _netmodDeviceAck = device_create(_charClass, NULL, MKDEV(_majorNumberFromUser, 0), NULL, DEVICE_FROM_USER_SPACE);
-    if (IS_ERR(_netmodDeviceAck)) {
-        LOG_ERROR("Failed to create the output device");
-    }
-
-    mutex_init(&_deviceToUserMutex);
-    mutex_init(&_deviceFromUserMutex);
     init_waitqueue_head(&_pendingPacketQueue);
     init_waitqueue_head(&UserReadWaitQueue);
     init_waitqueue_head(&UserWriteWaitQueue);
@@ -735,22 +684,22 @@ static void _shouldCaptureChangeHandler(bool shouldCapture){
 }
 
 
-static int _openDeviceTo(struct inode *inode, struct file *file){
-    SetUserSpaceReadConnected();
-    return _openDevice(inode, file, DEVICE_TO_USER_SPACE, &_deviceToUserMutex, &_deviceOpenToCount);
-}
+// static int _openDeviceTo(struct inode *inode, struct file *file){
+//     SetUserSpaceReadConnected();
+//     return _openDevice(inode, file, DEVICE_TO_USER_SPACE, &_deviceToUserMutex, &_deviceOpenToCount);
+// }
 
-static int _openDeviceFrom(struct inode *inode, struct file *file){
-    SetUserSpaceWriteConnected();
-    return _openDevice(inode, file, DEVICE_FROM_USER_SPACE, &_deviceFromUserMutex, &_deviceOpenFromCount);
-}
+// static int _openDeviceFrom(struct inode *inode, struct file *file){
+//     SetUserSpaceWriteConnected();
+//     return _openDevice(inode, file, DEVICE_FROM_USER_SPACE, &_deviceFromUserMutex, &_deviceOpenFromCount);
+// }
 
-static int _releaseDeviceTo(struct inode *inode, struct file *file) {
-    SetUserSpaceReadDisconnected();
-    return _releaseDevice(inode, file, DEVICE_TO_USER_SPACE, &_deviceToUserMutex, &_deviceOpenToCount);
-}
+// static int _releaseDeviceTo(struct inode *inode, struct file *file) {
+//     SetUserSpaceReadDisconnected();
+//     return _releaseDevice(inode, file, DEVICE_TO_USER_SPACE, &_deviceToUserMutex, &_deviceOpenToCount);
+// }
 
-static int _releaseDeviceFrom(struct inode *inode, struct file *file) {
-    SetUserSpaceWriteDisconnected();
-    return _releaseDevice(inode, file, DEVICE_FROM_USER_SPACE, &_deviceFromUserMutex, &_deviceOpenFromCount);
-}
+// static int _releaseDeviceFrom(struct inode *inode, struct file *file) {
+//     SetUserSpaceWriteDisconnected();
+//     return _releaseDevice(inode, file, DEVICE_FROM_USER_SPACE, &_deviceFromUserMutex, &_deviceOpenFromCount);
+// }

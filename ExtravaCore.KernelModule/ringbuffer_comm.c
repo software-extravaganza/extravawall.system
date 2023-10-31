@@ -11,6 +11,10 @@ long SystemBufferSlotsUsedCounter = 0;
 long SystemBufferSlotsClearedCounter = 0;
 long SystemBufferActiveUsedSlots = 0;
 long SystemBufferActiveFreeSlots = 0;
+__u64 SystemRingBufferSentCount = 0;
+__u64 *debouce_processed_slots;
+int debouce_processed_slots_index = 0;
+
 // static void _initRingBuffer(RingBuffer *buffer);
 static void _initDuplexRingBuffer(DuplexRingBuffer *duplexBuffer);
 
@@ -19,6 +23,7 @@ static void printRingBufferCounters(void){
 }
 
 void read_from_buffer(char *dest, size_t offset, size_t length) {
+    mb();
     if(!IsActive() || !IsUserSpaceConnected()){
         return;
     }
@@ -57,14 +62,15 @@ void write_to_buffer(const char *src, size_t offset, size_t length) {
     }
 
     memcpy(duplexBuffer + offset, src, length);
+    mb();
 }
 
 struct RingBufferHeader read_ring_buffer_header(uint offset) {
     struct RingBufferHeader header;
-    char buffer[5]; // Buffer to hold read data: 1 byte for status and 4 bytes for position
+    char buffer[RING_BUFFER_HEADER_SIZE]; // Buffer to hold read data: 1 byte for status and 4 bytes for position
 
     // Read data from the duplexBuffer
-    read_from_buffer(buffer, offset, 5);
+    read_from_buffer(buffer, offset, RING_BUFFER_HEADER_SIZE);
 
     // Extract status and position
     header.Status = (RingBufferStatus)buffer[0];
@@ -77,7 +83,7 @@ struct RingBufferHeader read_ring_buffer_header(uint offset) {
 }
 
 void write_ring_buffer_header(uint offset, struct RingBufferHeader header) {
-    char buffer[5]; // Buffer to hold data to write: 1 byte for status and 4 bytes for position
+    char buffer[RING_BUFFER_HEADER_SIZE]; // Buffer to hold data to write: 1 byte for status and 4 bytes for position
 
     // Assign status - it's just the first byte.
     buffer[0] = (char)header.Status;
@@ -86,7 +92,7 @@ void write_ring_buffer_header(uint offset, struct RingBufferHeader header) {
     memcpy(buffer + 1, &header.Position, sizeof(header.Position));
 
     // Write data back to the duplexBuffer at offset 0
-    write_to_buffer((char *)&buffer, offset, 5);
+    write_to_buffer((char *)&buffer, offset, RING_BUFFER_HEADER_SIZE);
 }
 
 SlotStatus read_ring_buffer_slot_status(uint offset, int slot_index) {
@@ -97,8 +103,26 @@ SlotStatus read_ring_buffer_slot_status(uint offset, int slot_index) {
     return slot_status;
 }
 
+void write_ring_buffer_slot_id(uint offset, int slot_index, __u64 id) {
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE + SLOT_HEADER_STATUS_SIZE;
+    write_to_buffer((char *)&id, base_offset, SLOT_HEADER_ID_SIZE);
+}
+
+void write_system_ring_buffer_slot_id(int slot_index, __u64 id){
+    write_ring_buffer_slot_id(0, slot_index, id);
+}
+
+void write_user_ring_buffer_slot_id(int slot_index, __u64 id){
+    write_ring_buffer_slot_id(RING_BUFFER_SIZE, slot_index, id);
+}
+
 void write_ring_buffer_slot_status(uint offset, int slot_index, SlotStatus slot_status) {
     size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE;
+    if(slot_status == VALID){
+        SystemRingBufferSentCount++;
+        write_ring_buffer_slot_id(base_offset, slot_index, SystemRingBufferSentCount);
+    }
+
     write_to_buffer((char *)&slot_status, base_offset, SLOT_HEADER_STATUS_SIZE);
 }
 
@@ -116,6 +140,20 @@ void write_system_ring_buffer_slot_status(int slot_index, SlotStatus slot_status
 
 void write_user_ring_buffer_slot_status(int slot_index, SlotStatus slot_status){
     write_ring_buffer_slot_status(RING_BUFFER_SIZE, slot_index, slot_status);
+}
+
+__u64 read_ring_buffer_id(uint offset) {
+    __u64 ring_buffer_id = 0;
+    read_from_buffer((char *)&ring_buffer_id, offset + SLOT_HEADER_STATUS_SIZE, SLOT_HEADER_ID_SIZE);
+    return ring_buffer_id;
+}
+
+__u64 read_system_ring_buffer_id(void){
+    return read_ring_buffer_id(0);
+}
+
+__u64 read_user_ring_buffer_id(void){
+    return read_ring_buffer_id(RING_BUFFER_SIZE);
 }
 
 RingBufferStatus read_ring_buffer_status(uint offset) {
@@ -179,11 +217,12 @@ struct RingBufferSlotHeader read_ring_buffer_slot_header(uint offset, int slot_i
 
     // Read the metadata fields into slot_header
     read_from_buffer((char *)&slot_header.Status, base_offset + 0, SLOT_HEADER_STATUS_SIZE);
-    read_from_buffer((char *)&slot_header.TotalDataSize, base_offset + 1, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
-    read_from_buffer((char *)&slot_header.CurrentDataSize, base_offset + 5, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
-    read_from_buffer((char *)&slot_header.SequenceNumber, base_offset + 7, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
-    read_from_buffer((char *)&slot_header.ClearanceStartIndex, base_offset + 8, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
-    read_from_buffer((char *)&slot_header.ClearanceEndIndex, base_offset + 10, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+    read_from_buffer((char *)&slot_header.Id, base_offset + 1, SLOT_HEADER_ID_SIZE);
+    read_from_buffer((char *)&slot_header.TotalDataSize, base_offset + 9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
+    read_from_buffer((char *)&slot_header.CurrentDataSize, base_offset + 13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
+    read_from_buffer((char *)&slot_header.SequenceNumber, base_offset + 15, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
+    read_from_buffer((char *)&slot_header.ClearanceStartIndex, base_offset + 16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
+    read_from_buffer((char *)&slot_header.ClearanceEndIndex, base_offset + 18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
 
     return slot_header;
 }
@@ -223,15 +262,16 @@ void write_ring_buffer_slot_header(uint offset, int slot_index, struct RingBuffe
     //printk(KERN_INFO "RingBuf: Writing status at offset %d", base_offset + 0);
     write_to_buffer((char *)&slot_header->Status, base_offset + 0, SLOT_HEADER_STATUS_SIZE);
     //printk(KERN_INFO "RingBuf: Writing total data size at offset %d", base_offset + 1);
-    write_to_buffer((char *)&slot_header->TotalDataSize, base_offset + 1, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
+    write_to_buffer((char *)&slot_header->Id, base_offset + 1, SLOT_HEADER_ID_SIZE);
+    write_to_buffer((char *)&slot_header->TotalDataSize, base_offset + 9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
     //printk(KERN_INFO "RingBuf: Writing current data size at offset %d", base_offset + 5);
-    write_to_buffer((char *)&slot_header->CurrentDataSize, base_offset + 5, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
+    write_to_buffer((char *)&slot_header->CurrentDataSize, base_offset + 13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
     //printk(KERN_INFO "RingBuf: Writing sequence number at offset %d", base_offset + 7);
-    write_to_buffer((char *)&slot_header->SequenceNumber, base_offset + 7, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
+    write_to_buffer((char *)&slot_header->SequenceNumber, base_offset + 15, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
     //printk(KERN_INFO "RingBuf: Writing clearance start index at offset %d", base_offset + 8);
-    write_to_buffer((char *)&slot_header->ClearanceStartIndex, base_offset + 8, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
+    write_to_buffer((char *)&slot_header->ClearanceStartIndex, base_offset + 16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
     //printk(KERN_INFO "RingBuf: Writing clearance end index at offset %d", base_offset + 10);
-    write_to_buffer((char *)&slot_header->ClearanceEndIndex, base_offset + 10, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+    write_to_buffer((char *)&slot_header->ClearanceEndIndex, base_offset + 18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
 }
 
 void write_ring_buffer_slot_data(uint offset, int slot_index, char *data, __u16 data_size) {
@@ -447,6 +487,7 @@ static struct file_operations fops = {
 #define CLASS_NAME "ring"
 
 int InitializeRingBuffers(void){
+    debouce_processed_slots = kmalloc(10000 * sizeof(__u64), GFP_KERNEL);
     major_num = register_chrdev(0, DEVICE_NAME, &fops);
 
     // Create device class
@@ -497,7 +538,8 @@ void FreeRingBuffers(void){
     unregister_chrdev(major_num, DEVICE_NAME);
     vfree(shared_memory);
     kfifo_free(&userIndiciesToClear);
-    kfree(&userIndiciesToClearSemaphore);
+    kfree(&userIndiciesToClearSemaphore);\
+    kfree(&debouce_processed_slots);
     //kfree(shared_memory);
 }
 // static void _initDuplexRingBuffer(DuplexRingBuffer *duplexBuffer) {
@@ -592,16 +634,22 @@ void free_ring_buffer_slot_header(RingBufferSlotHeader *slot_header) {
     kfree(slot_header);
 }
 
-void WriteToSystemRingBuffer(const char *data, size_t size) {
+int WriteToSystemRingBuffer(const char *data, size_t size) {
+    LOG_INFO("IsActive: %d; IsUserSpaceConnected: %d", IsActive(), IsUserSpaceConnected());
+    if(SystemBufferSlotsUsedCounter % 10000 == 0){
+        printRingBufferCounters();
+    }
+    
     if(!IsActive() || !IsUserSpaceConnected()){
-        return;
+        return -1;
     }
 
+    LOG_INFO("Writing...");
     down(&userIndiciesToClearSemaphore);
     IndexRange indexRange;
     while(kfifo_len(&userIndiciesToClear) > 0){
         if(!IsActive() || !IsUserSpaceConnected()){
-            return;
+            return -1;
         }
         kfifo_out(&userIndiciesToClear, &indexRange, sizeof(IndexRange));
         
@@ -621,12 +669,12 @@ void WriteToSystemRingBuffer(const char *data, size_t size) {
 
     write_system_ring_buffer_position(start_position);
 
-    //LOG_INFO("Writing to slot %d", start_position);
+    LOG_INFO("Writing to slot %d", start_position);
    
     while (remaining_size > 0) {
         if(!IsActive() || !IsUserSpaceConnected()){
             free_ring_buffer_slot_header(slot_header);
-            return;
+            return -1;
         }
         size_t bytes_to_write = min(remaining_size, MAX_PAYLOAD_SIZE);
         slot_header->CurrentDataSize = bytes_to_write; //to_little_endian_16(bytes_to_write);
@@ -645,10 +693,10 @@ void WriteToSystemRingBuffer(const char *data, size_t size) {
         remaining_size -= bytes_to_write;
         if (remaining_size > 0) {
             slot_header->Status = ADVANCE;
-            write_system_ring_buffer_position((start_position + 1) % NUM_SLOTS);
         } else {
             slot_header->Status = VALID;
         }
+        write_system_ring_buffer_position((start_position + 1) % NUM_SLOTS);
         write_system_ring_buffer_slot_header(start_position, slot_header);
         SystemBufferSlotsUsedCounter++;
         SystemBufferActiveFreeSlots--;
@@ -656,25 +704,24 @@ void WriteToSystemRingBuffer(const char *data, size_t size) {
     }
 
     free_ring_buffer_slot_header(slot_header);
-    
-    if(SystemBufferSlotsUsedCounter % 10000 == 0){
-        printRingBufferCounters();
-    }
+   
+    return start_position;
 }
 
 DataBuffer *create_data_buffer(size_t size) {
-    DataBuffer *buffer = kmalloc(sizeof(DataBuffer), GFP_KERNEL);
+    DataBuffer *buffer = kzalloc(sizeof(DataBuffer), GFP_KERNEL);  // Using kzalloc
 
-    if (buffer) {
-        buffer->data = kmalloc(size, GFP_KERNEL);  // Allocate memory for the data.
-        if (!buffer->data) {
-            // Handle allocation failure for buffer->data
-            kfree(buffer);
-            return NULL;
-        }
-        buffer->size = size;
+    if (!buffer) {
+        return NULL;
     }
 
+    buffer->data = kzalloc(size, GFP_KERNEL);  // Using kzalloc for zero-initialization
+    if (!buffer->data) {
+        kfree(buffer);
+        return NULL;
+    }
+
+    buffer->size = size;
     return buffer;
 }
 
@@ -684,72 +731,165 @@ void free_data_buffer(DataBuffer *buffer) {
     buffer->size = 0;
 }
 
+// uint next_read_user_position = 0;
+// DataBuffer *ReadFromUserRingBuffer(void) {
+//     if(!IsActive() || !IsUserSpaceConnected()){
+//         return NULL;
+//     }
+
+//     //LOG_DEBUG_PACKET("Reading from slot %d", next_read_user_position);
+//     SlotStatus status = read_user_ring_buffer_slot_status(next_read_user_position);
+//     //LOG_DEBUG_PACKET("SLOT STATUS %d", status);
+//     int slotsToLoad = 0;
+//     int slotsLoaded = 0;
+//     int currentSlot = 0;
+//     IndexRange indexRange;
+//     indexRange.Start = next_read_user_position;
+//     size_t currentOffset = 0; 
+//     DataBuffer* buffer = NULL;
+
+//     if (status != VALID && status != ADVANCE) {
+//         return NULL;
+//     }
+
+//     do {
+//         if(!IsActive() || !IsUserSpaceConnected()){
+//             if(buffer != NULL){
+//                 free_data_buffer(buffer);
+//             }
+//             return NULL;
+//         }
+//         currentSlot = next_read_user_position + slotsLoaded;
+//         RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
+//         if (slot_header.ClearanceEndIndex > slot_header.ClearanceStartIndex && slot_header.ClearanceEndIndex > 0 && slot_header.ClearanceEndIndex < NUM_SLOTS) {
+//             for(uint clearSlotIndex = slot_header.ClearanceStartIndex; clearSlotIndex < slot_header.ClearanceEndIndex; clearSlotIndex++){
+//                 LOG_INFO("Clearing slot %d", clearSlotIndex);
+//                 write_system_ring_buffer_slot_status(clearSlotIndex, EMPTY);
+//                 SystemBufferSlotsClearedCounter++;
+//                 SystemBufferActiveFreeSlots++;
+//                 SystemBufferActiveUsedSlots--;
+//             }
+//         }
+
+//         if(slotsToLoad == 0){
+//             buffer = create_data_buffer(slot_header.TotalDataSize);
+//             LOG_DEBUG_PACKET("DATA SIZE %d", slot_header.CurrentDataSize);
+//             if(slot_header.Status == ADVANCE){
+//                 // Ceiling the slotsToLoad to the number of slots required to load the data
+//                 slotsToLoad = (slot_header.TotalDataSize + MAX_PAYLOAD_SIZE - 1) / MAX_PAYLOAD_SIZE;
+//             }
+//             else{
+//                 slotsToLoad = 1;
+//             }
+//         }
+    
+//         char *newSlotData = read_user_ring_buffer_slot_data(currentSlot, slot_header.CurrentDataSize);
+//         memcpy(buffer->data + currentOffset, newSlotData, slot_header.CurrentDataSize); // Assumes buffer->data is a char*
+//         currentOffset += slot_header.CurrentDataSize;
+//         slotsLoaded++;
+//         if(slotsLoaded < slotsToLoad && slot_header.Status == VALID){
+//             LOG_WARNING("Invalid slot status mismatch for multiple slot read");
+//         }
+
+//         indexRange.End = next_read_user_position;
+//         next_read_user_position = (next_read_user_position + 1) % NUM_SLOTS;
+//     }
+//     while(slotsLoaded < slotsToLoad);
+
+//     down(&userIndiciesToClearSemaphore);
+//     kfifo_put(&userIndiciesToClear, indexRange);
+//     up(&userIndiciesToClearSemaphore);
+//     return buffer;
+// }
+
+
+
+bool check_and_add_debounce_slot(__u64 id){
+    for(int i = 0; i < debouce_processed_slots_index; i++){
+        if(debouce_processed_slots[i] == id){
+            return false;
+        }
+    }
+
+    debouce_processed_slots[debouce_processed_slots_index] = id;
+    debouce_processed_slots_index = (debouce_processed_slots_index + 1) % 10000;
+    return true;
+}
+
 uint next_read_user_position = 0;
+
 DataBuffer *ReadFromUserRingBuffer(void) {
-    if(!IsActive() || !IsUserSpaceConnected()){
+    if (!IsActive() || !IsUserSpaceConnected()) {
         return NULL;
     }
 
-    //LOG_DEBUG_PACKET("Reading from slot %d", next_read_user_position);
-    SlotStatus status = read_user_ring_buffer_slot_status(next_read_user_position);
-    //LOG_DEBUG_PACKET("SLOT STATUS %d", status);
-    int slotsToLoad = 0;
-    int slotsLoaded = 0;
-    int currentSlot = 0;
+    int currentSlot = -1;
+    DataBuffer* buffer = NULL;
+    size_t currentOffset = 0;
+    bool slotFound = false;
+    int startIndex = next_read_user_position;
+    int endIndex = startIndex;
+    int bytesLoaded = 0;
     IndexRange indexRange;
     indexRange.Start = next_read_user_position;
-    size_t currentOffset = 0; 
-    DataBuffer* buffer = NULL;
 
-    if (status != VALID && status != ADVANCE) {
-        return NULL;
-    }
-
-    do {
-        if(!IsActive() || !IsUserSpaceConnected()){
-            if(buffer != NULL){
-                free_data_buffer(buffer);
-            }
+    while (!slotFound && currentSlot != startIndex) {
+        if (currentSlot < 0) {
+            currentSlot = next_read_user_position;
+        }
+        RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
+        if(slot_header.Id == 0){
             return NULL;
         }
-        currentSlot = next_read_user_position + slotsLoaded;
-        RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
-        if(slotsToLoad == 0){
+        
+        if(!check_and_add_debounce_slot(slot_header.Id)){
+            LOG_DEBUG_PACKET("Skipping slot (debounce) %d", currentSlot);
+            return NULL;
+        }
+
+        // Allocate buffer on demand
+        if (!buffer && (slot_header.Status == VALID || slot_header.Status == ADVANCE)) {
             buffer = create_data_buffer(slot_header.TotalDataSize);
-            //LOG_DEBUG_PACKET("DATA SIZE %d", slot_header.CurrentDataSize);
-            for(uint clearSlotIndex = slot_header.ClearanceStartIndex; clearSlotIndex < slot_header.ClearanceEndIndex; clearSlotIndex++){
-                //LOG_INFO("Clearing slot %d", index);
-                write_system_ring_buffer_slot_status(clearSlotIndex, EMPTY);
-                SystemBufferSlotsClearedCounter++;
-                SystemBufferActiveFreeSlots++;
-                SystemBufferActiveUsedSlots--;
-            }
-
-            if(slot_header.Status == ADVANCE){
-                // Ceiling the slotsToLoad to the number of slots required to load the data
-                slotsToLoad = (slot_header.TotalDataSize + MAX_PAYLOAD_SIZE - 1) / MAX_PAYLOAD_SIZE;
-            }
-            else{
-                slotsToLoad = 1;
-            }
-        }
-    
-        char *newSlotData = read_user_ring_buffer_slot_data(currentSlot, slot_header.CurrentDataSize);
-        memcpy(buffer->data + currentOffset, newSlotData, slot_header.CurrentDataSize); // Assumes buffer->data is a char*
-        currentOffset += slot_header.CurrentDataSize;
-        slotsLoaded++;
-        if(slotsLoaded < slotsToLoad && slot_header.Status == VALID){
-            LOG_WARNING("Invalid slot status mismatch for multiple slot read");
         }
 
-        indexRange.End = next_read_user_position;
-        next_read_user_position = (next_read_user_position + 1) % NUM_SLOTS;
+        // Copy data from valid or advance slots
+        if (slot_header.Status == VALID || slot_header.Status == ADVANCE) {
+            //LOG_INFO("We're in. Clearance start: %d, end: %d", slot_header.ClearanceStartIndex, slot_header.ClearanceEndIndex);
+            if (slot_header.ClearanceEndIndex > slot_header.ClearanceStartIndex && slot_header.ClearanceEndIndex > 0 && slot_header.ClearanceEndIndex < NUM_SLOTS) {
+                for(uint clearSlotIndex = slot_header.ClearanceStartIndex; clearSlotIndex < slot_header.ClearanceEndIndex; clearSlotIndex++){
+                    LOG_INFO("Clearing slot %d", clearSlotIndex);
+                    write_system_ring_buffer_slot_status(clearSlotIndex, EMPTY);
+                    SystemBufferSlotsClearedCounter++;
+                    SystemBufferActiveFreeSlots++;
+                    SystemBufferActiveUsedSlots--;
+                }
+            }
+
+            char *newSlotData = read_user_ring_buffer_slot_data(currentSlot, slot_header.CurrentDataSize);
+            memcpy(buffer->data + currentOffset, newSlotData, slot_header.CurrentDataSize);
+            currentOffset += slot_header.CurrentDataSize;
+            bytesLoaded += slot_header.CurrentDataSize;
+            endIndex = (currentSlot + 1) % NUM_SLOTS;
+            slotFound = slot_header.Status == VALID;
+            LOG_INFO("Dude! %d - %d", slot_header.TotalDataSize, buffer->size);
+        }
+
+        // Move to next slot
+        currentSlot = (currentSlot + 1) % NUM_SLOTS;
+        if (currentSlot == next_read_user_position) {
+            break; // Prevent infinite loop
+        }
     }
-    while(slotsLoaded < slotsToLoad);
 
-    down(&userIndiciesToClearSemaphore);
-    kfifo_put(&userIndiciesToClear, indexRange);
-    up(&userIndiciesToClearSemaphore);
+    next_read_user_position = endIndex;
+    indexRange.End = next_read_user_position;
+    
+    if(slotFound){
+        down(&userIndiciesToClearSemaphore);
+        kfifo_put(&userIndiciesToClear, indexRange);
+        up(&userIndiciesToClearSemaphore);
+    }
+
     return buffer;
 }
 
