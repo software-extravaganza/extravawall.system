@@ -57,7 +57,8 @@ while (true) {
     var packetQueueNumber = BitConverter.ToInt32(rawPacketQueueNumber);
     var packetId = BitConverter.ToInt32(rawPacketId);
     var payload = data.Slice(intSize * 6, dataLength);
-    var routingDecision = RoutingDecision.ACCEPT; //GetRoutingDecision(logger, routingType, payload);
+    var routingDecision = RoutingDecision.ACCEPT;
+    //var routingDecision = GetRoutingDecision(logger, routingType, payload);
 
     var dataToSend = new byte[intSize * 3].AsSpan();
     var dataToSendFirstIntBytes = dataToSend.Slice(0, intSize);

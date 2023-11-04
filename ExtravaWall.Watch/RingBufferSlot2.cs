@@ -752,11 +752,11 @@ public unsafe class SharedMemory2 : IDisposable {
         SLOT_HEADER_CLEARANCE_END_INDEX_OFFSET = NativeMethods2.get_offset_for_slot_header_clearance_end_index();
         SLOT_DATA_OFFSET = NativeMethods2.get_offset_for_slot_data();
 
-        logger.Log($"Size of DuplexRingBuffer: {DUPLEX_RING_BUFFER_SIZE}");
-        logger.Log($"Size of DuplexRingBuffer page aligned: {DUPLEX_RING_BUFFER_ALIGNED_SIZE}");
-        logger.Log($"Size of RingBuffer: {RING_BUFFER_SIZE}");
-        //logger.Log($"Size of RingBuffer page aligned: {GetSizeForRingBufferAligned()}");
-        logger.Log($"Size of RingBufferSlot: {SLOT_SIZE}");
+        Console.WriteLine($"Size of DuplexRingBuffer: {DUPLEX_RING_BUFFER_SIZE}");
+        Console.WriteLine($"Size of DuplexRingBuffer page aligned: {DUPLEX_RING_BUFFER_ALIGNED_SIZE}");
+        Console.WriteLine($"Size of RingBuffer: {RING_BUFFER_SIZE}");
+        //Console.WriteLine($"Size of RingBuffer page aligned: {GetSizeForRingBufferAligned()}");
+        Console.WriteLine($"Size of RingBufferSlot: {SLOT_SIZE}");
 
         sharedMemorySize = DUPLEX_RING_BUFFER_ALIGNED_SIZE;
 
@@ -771,7 +771,7 @@ public unsafe class SharedMemory2 : IDisposable {
         if (sharedMemoryPtr == (IntPtr)(-1)) {
             throw new InvalidOperationException("Failed to map shared memory.");
         }
-        logger.Log("Memory address of sharedMemoryPtr: " + sharedMemoryPtr.ToString("X"));
+        Console.WriteLine("Memory address of sharedMemoryPtr: " + sharedMemoryPtr.ToString("X"));
 
         // IntPtr systemBufferPtr = OffsetOf(sharedMemoryPtr, IntPtr.Size * 2);
         // IntPtr userBufferPtr = OffsetOf(systemBufferPtr, sizeof(uint) + IntPtr.Size);
@@ -1139,7 +1139,7 @@ public unsafe class RingBufferReader {
     }
 
     private void printRingBufferCounters() {
-        logger.Log($"(Buffer stats) Total: {sharedMemory.NUM_SLOTS}; Actively Used: {UserBufferActiveUsedSlots}; Actively Free: {UserBufferActiveFreeSlots}; Total Used: {UserBufferSlotsUsedCounter}; Total Free: {UserBufferSlotsClearedCounter};");
+        Console.WriteLine($"(Buffer stats) Total: {sharedMemory.NUM_SLOTS}; Actively Used: {UserBufferActiveUsedSlots}; Actively Free: {UserBufferActiveFreeSlots}; Total Used: {UserBufferSlotsUsedCounter}; Total Free: {UserBufferSlotsClearedCounter};");
     }
 
 

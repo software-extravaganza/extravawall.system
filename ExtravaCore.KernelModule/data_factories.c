@@ -218,6 +218,8 @@ void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
 void ResetPendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
     if (packetTrip) {
         _recordSampleTimeForPacketTrip(packetTrip);
+        packetTrip->slotAssigned = -5;
+
         // Reset the createdTime
         packetTrip->createdTime = 0;
 

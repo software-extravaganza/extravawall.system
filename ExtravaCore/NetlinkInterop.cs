@@ -228,6 +228,10 @@ public class KernelClient {
     }
 
     public static TCPHeader ParseTCPHeader(Span<byte> data) {
+        if (data.Length < 20) {
+            return null;
+        }
+
         int tcpHeaderLength = (data[12] >> 4) * 4; // Extract header length from data offset field
         return new TCPHeader {
             SourcePort = ConvertFromBytes<ushort>(data.Slice(0, 2).ToArray()),
@@ -257,6 +261,10 @@ public class KernelClient {
             }
 
             var optionLength = data[index + 1];
+            if (index + 2 + optionLength - 2 >= data.Length || optionLength - 2 < 0) {
+                return options;
+            }
+
             var optionData = data.Slice(index + 2, optionLength - 2).ToArray();
 
             options.Add(new TCPOption { Kind = kind, Length = optionLength, Data = optionData });

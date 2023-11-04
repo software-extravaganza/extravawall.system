@@ -110,12 +110,12 @@ void StopQueueProcessorThread(void) {
 void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason) {
     char logMessage[256];
     if(!packetTrip){
-        LOG_WARNING("Packet trip is null. Ignoring decision.");
+        //LOG_WARNING("Packet trip is null. Ignoring decision.");
         return;
     }
 
     if(!packetTrip->entry){
-        LOG_WARNING("Packet trip entry is null. Ignoring decision.");
+        //LOG_WARNING("Packet trip entry is null. Ignoring decision.");
         return;
     }
     
@@ -125,6 +125,7 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[decision], GetReasonText(reason));
     LOG_DEBUG_ICMP(packetTrip, "%s", logMessage); 
 
+    ReturnPacketTrip(packetTrip);
     //DecommissionPacketTrip(packetTrip);
     //_cleanCompletedPacketTrips();
 }
@@ -600,7 +601,13 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     memcpy(dataPayload + (S32_SIZE*6), packetTrip->entry->skb->data, packetTrip->entry->skb->len);
 
     int slotAssigned = WriteToSystemRingBuffer(dataPayload, transactionSize);
-    if(slotAssigned >= 0){
+    if(slotAssigned == -1){
+        HandlePacketDecision(packetTrip, _nfDecisionFromExtravaDefaultDecision(true), MEMORY_FAILURE_PACKET);
+    } 
+    else if(slotAssigned < 0){
+        LOG_ERROR("Failed to write to system ring buffer. Slot assigned: %d", slotAssigned);
+        HandlePacketDecision(packetTrip, _nfDecisionFromExtravaDefaultDecision(true), MEMORY_FAILURE_PACKET);
+    }else if(slotAssigned >= 0){
         packetTrip->slotAssigned = slotAssigned;
     }
     // Signal or process further as needed
@@ -630,16 +637,20 @@ int _netFilterPacketProcessorThread(void *data) {
         struct list_head *pos, *q;
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
-            if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && current_node->data->slotAssigned >= 0){ // Greater than 1000ms then it's stale
-                RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(current_node->data->slotAssigned);
-                write_system_ring_buffer_slot_status(current_node->data->slotAssigned, EMPTY);
-                HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
+            __u32 slotAssigned = current_node->data->slotAssigned; 
+            if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && slotAssigned >= 0){ // Greater than 1000ms then it's stale
+                RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(slotAssigned);
+                if(startHeader.Status != EMPTY){
+                    write_system_ring_buffer_slot_status(slotAssigned, EMPTY);
+                }
+
                 list_del(pos);
                 SystemBufferSlotsClearedCounter++;
                 SystemBufferActiveFreeSlots++;
                 SystemBufferActiveUsedSlots--;
-                SlotStatus slotStatus = read_system_ring_buffer_slot_status(current_node->data->slotAssigned);
-                LOG_DEBUG_ICMP(current_node->data, "Removed stale packet (%lld) trip from queue. Slot status: %d; Slot #{%d}", startHeader.Id, slotStatus, current_node->data->slotAssigned);
+                //SlotStatus slotStatus = read_system_ring_buffer_slot_status(slotAssigned);
+                LOG_DEBUG_ICMP(current_node->data, "Removed stale packet (%lld) trip from queue. Slot status: %d; Slot #{%d}", startHeader.Id, startHeader.Status, slotAssigned);
+                HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
             }
         }
        

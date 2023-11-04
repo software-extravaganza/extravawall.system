@@ -434,10 +434,22 @@ void write_user_ring_buffer_header(struct RingBufferHeader header){
 }
 
 struct RingBufferSlotHeader read_system_ring_buffer_slot_header(int slot_index){
+    struct RingBufferSlotHeader slot_header = {0};
+    if(slot_index < 0){
+        return slot_header;
+    }
+    
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, 0, slot_header);
     return read_ring_buffer_slot_header(0, slot_index);
 }
 
 struct RingBufferSlotHeader read_user_ring_buffer_slot_header(int slot_index){
+    struct RingBufferSlotHeader slot_header = {0};
+    if(slot_index < 0){
+        return slot_header;
+    }
+
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, RING_BUFFER_SIZE, slot_header);
     return read_ring_buffer_slot_header(RING_BUFFER_SIZE, slot_index);
 }
 
@@ -707,6 +719,10 @@ void FreeRingBuffers(void){
 int FindContiguousEmptySlots(int required_slots) {
     int count = 0;
     int current_position = read_system_ring_buffer_position();
+    if(current_position < 0){
+        current_position = 0;
+    }
+
     int start_position = current_position;
 
     do { 
@@ -975,6 +991,10 @@ DataBuffer *ReadFromUserRingBuffer(void) {
     indexRange.Start = next_read_user_position;
 
     while (!slotFound && currentSlot != startIndex) {
+        if (next_read_user_position < 0) {
+            next_read_user_position = 0;
+        }
+
         if (currentSlot < 0) {
             currentSlot = next_read_user_position;
         }
@@ -1148,6 +1168,10 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
 void AdvanceSystemRingBuffer(void) {
     uint position = read_system_ring_buffer_position();
+    if(position < 0){
+        position = 0;
+    }
+    
     SlotStatus status = read_system_ring_buffer_slot_status(position);
     while (status == VALID || status == ADVANCE) {
         write_system_ring_buffer_slot_status(position, EMPTY);
@@ -1184,8 +1208,10 @@ void TestWriteToRingBuffer(void) {
     GenerateRandomData(test_data, test_data_size);
     //printk("Text generated: %s", bytes_to_ascii(test_data, test_data_size));
     // Write the random data to the ring buffer
-    WriteToSystemRingBuffer(test_data, test_data_size);
-
+    int writeResult = WriteToSystemRingBuffer(test_data, test_data_size);
+    if(writeResult < 0){
+        LOG_ERROR("Failed to write to ring buffer");
+    }
     //printk(KERN_INFO "Random data of size %zu written to the ring buffer.\n", test_data_size);
     DataBuffer *data_buffer = ReadFromUserRingBuffer();
     if (data_buffer == NULL) {
