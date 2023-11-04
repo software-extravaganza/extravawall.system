@@ -611,9 +611,9 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 ktime_t last_time;
 bool processed_packet_last_round = false;
 int _netFilterPacketProcessorThread(void *data) {
-    __u32 last_ring_buffer_position = -1;
+    //__u32 last_ring_buffer_position = -1;
     last_time = ktime_get();
-    while (!kthread_should_stop() || IsUnloading() ) {
+    while (!kthread_should_stop() && !IsUnloading() ) {
         if(!processed_packet_last_round && ktime_get() - last_time < ktime_set(0, 1000000)){ // Less than 1ms and now new packets processed, wait a millisecond
             msleep(1);
             continue;
@@ -640,7 +640,7 @@ int _netFilterPacketProcessorThread(void *data) {
         }
        
         //LOG_DEBUG_PACKET("Reading from user space ring buffer.");
-        last_ring_buffer_position = read_system_ring_buffer_position();
+        //last_ring_buffer_position = read_system_ring_buffer_position();
         DataBuffer* response = ReadFromUserRingBuffer();
         processed_packet_last_round = response != NULL && response->size > 0 && response->data != NULL;
         if(!processed_packet_last_round){

@@ -71,10 +71,10 @@ void write_to_buffer(const void *src, size_t offset, size_t length) {
         return;
     }
 
-    mutex_lock(&buffer_write_mutex);
+    //mutex_lock(&buffer_write_mutex);
     memcpy(duplexBuffer + offset, src, length);
     mb();
-    mutex_unlock(&buffer_write_mutex);
+    //mutex_unlock(&buffer_write_mutex);
     print_data(src, length, PRINT_DEC);
 }
 
@@ -299,26 +299,46 @@ struct RingBufferSlotHeader read_ring_buffer_slot_header(uint offset, int slot_i
     return slot_header;
 }
 
-char *read_ring_buffer_slot_data(uint offset, int slot_index, __u16 data_size) {
-    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, NULL);
-    if (data_size > SLOT_DATA_SIZE) {
-        // Handle error or limit data_size
-        return NULL;
+// char *read_ring_buffer_slot_data(uint offset, int slot_index, __u16 data_size) {
+//     CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, NULL);
+//     if (data_size > SLOT_DATA_SIZE) {
+//         // Handle error or limit data_size
+//         return NULL;
+//     }
+
+//     char *data_buffer = kzalloc(data_size, GFP_KERNEL);
+//     if (!data_buffer) {
+//         // Allocation failed
+//         return NULL;
+//     }
+
+//     size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_SIZE; 
+//     printk(KERN_INFO "RingBuf: Reading data at offset %d and size of %d", base_offset, data_size);
+
+//     // todo: fix crash somewhere around here
+//     read_from_buffer(&data_buffer, base_offset, data_size);
+
+//     return data_buffer;
+// }
+
+int read_ring_buffer_slot_data(char *buffer, uint offset, int slot_index, __u16 data_size) {
+    if (!buffer) {
+        // Handle null buffer error.
+        return -EINVAL;
     }
 
-    char *data_buffer = kzalloc(data_size, GFP_KERNEL);
-    if (!data_buffer) {
-        // Allocation failed
-        return NULL;
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, -EINVAL);
+    if (data_size > SLOT_DATA_SIZE) {
+        // Handle error or limit data_size
+        return -E2BIG;
     }
 
     size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_SIZE; 
-    printk(KERN_INFO "RingBuf: Reading data at offset %d and size of %d", base_offset, data_size);
+    printk(KERN_INFO "RingBuf: Reading data at offset %zu and size of %u", base_offset, data_size);
 
-    // todo: fix crash somewhere around here
-    //read_from_buffer(&data_buffer, base_offset, data_size);
+    read_from_buffer(buffer, base_offset, data_size);
 
-    return data_buffer;
+    return 0; // Return 0 for success
 }
 
 void free_ring_buffer_slot_data(char *data){
@@ -421,12 +441,19 @@ struct RingBufferSlotHeader read_user_ring_buffer_slot_header(int slot_index){
     return read_ring_buffer_slot_header(RING_BUFFER_SIZE, slot_index);
 }
 
-char *read_system_ring_buffer_slot_data(int slot_index, __u16 data_size){
-    return read_ring_buffer_slot_data(0, slot_index, data_size);
+// char *read_system_ring_buffer_slot_data(int slot_index, __u16 data_size){
+//     return read_ring_buffer_slot_data(0, slot_index, data_size);
+// }
+
+// char *read_user_ring_buffer_slot_data(int slot_index, __u16 data_size){
+//     return read_ring_buffer_slot_data(RING_BUFFER_SIZE, slot_index, data_size);
+// }
+int read_system_ring_buffer_slot_data(char *buffer, int slot_index, __u16 data_size){
+    return read_ring_buffer_slot_data(buffer, 0, slot_index, data_size);
 }
 
-char *read_user_ring_buffer_slot_data(int slot_index, __u16 data_size){
-    return read_ring_buffer_slot_data(RING_BUFFER_SIZE, slot_index, data_size);
+int read_user_ring_buffer_slot_data(char *buffer, int slot_index, __u16 data_size){
+    return read_ring_buffer_slot_data(buffer, RING_BUFFER_SIZE, slot_index, data_size);
 }
 
 void write_system_ring_buffer_slot_header(int slot_index, struct RingBufferSlotHeader *slot_header){
@@ -1037,10 +1064,20 @@ DataBuffer *ReadFromUserRingBuffer(void) {
                 }
             }
 
-            
-            char *newSlotData = read_user_ring_buffer_slot_data(currentSlot, slot_header.CurrentDataSize);
-            if(newSlotData == NULL){
-                LOG_WARNING("Skipping slot (read data null) %d", currentSlot);
+            char newSlotData[slot_header.CurrentDataSize];
+            int dataPullSuccess = read_user_ring_buffer_slot_data(newSlotData, currentSlot, slot_header.CurrentDataSize);
+            if(dataPullSuccess == -EINVAL){
+                LOG_WARNING("Skipping slot; Read data (user space) buffer is null) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+            else if(dataPullSuccess == -E2BIG){
+                LOG_WARNING("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+            else if(dataPullSuccess != 0){
+                LOG_WARNING("Skipping slot; Failed to read data %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
                 return NULL;
             }
@@ -1079,9 +1116,10 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         // Move to next slot
         currentSlot = (currentSlot + 1) % NUM_SLOTS;
-        if (currentSlot == next_read_user_position || currentSlot > NUM_SLOTS || currentSlot < 0) {
-            break; // Prevent infinite loop
-        }
+        next_read_user_position = currentSlot;
+        // if (currentSlot == next_read_user_position || currentSlot > NUM_SLOTS || currentSlot < 0) {
+        //     break; // Prevent infinite loop
+        // }
     }
 
     next_read_user_position = endIndex;
