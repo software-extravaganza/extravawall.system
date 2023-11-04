@@ -57,6 +57,23 @@ uint32_t to_little_endian_32(uint32_t value) {
     }
 }
 
+char* bytes_to_hex_string(const unsigned char *bytes, size_t size) {
+    // Each byte takes 2 characters in hex + 1 for null-terminator
+    char *hex_string = kmalloc(2 * size + 1, GFP_KERNEL);
+    if (!hex_string) {
+        return NULL; // Allocation failed
+    }
+
+    for (size_t i = 0; i < size; ++i) {
+        // sprintf shifts the pointer by 2 on each iteration, writing two characters at a time
+        sprintf(hex_string + (i * 2), "%02x", bytes[i]);
+    }
+
+    hex_string[2 * size] = '\0'; // Null-terminator for the string
+    return hex_string;
+}
+
+
 char* bytes_to_ascii(const unsigned char *data, size_t len) {
     char *ascii_str = kmalloc(len + 1, GFP_KERNEL); // Allocate memory for the ASCII string
     if (!ascii_str)
@@ -104,4 +121,67 @@ void get_random_keyboard_chars(char *buf, size_t num_chars) {
         rand_index %= sizeof(keyboard_chars) - 1;  // -1 to exclude the null terminator
         buf[i] = keyboard_chars[rand_index];
     }
+}
+
+void print_hex(const void *data, size_t len) {
+    int i;
+    const unsigned char *bytes = (const unsigned char *)data;
+    printk(KERN_INFO "Hex data: ");
+    for (i = 0; i < len; ++i) {
+        printk(KERN_CONT "%02x ", bytes[i]);
+    }
+    printk(KERN_CONT "\n"); 
+}
+
+void print_hex_with_offset(const char *data, size_t offset, size_t len) {
+    int i;
+    printk(KERN_INFO "Offset %zu - Hex data: ", offset);
+    for (i = 0; i < len; ++i) {
+        printk(KERN_CONT "%02x ", (unsigned char)data[offset + i]);
+    }
+    printk(KERN_CONT "\n"); // Newline after the hex data
+}
+
+void print_data(const void *data, size_t len, int format) {
+    int i, j;
+    const unsigned char *bytes = (const unsigned char *)data;
+
+    switch (format) {
+        case PRINT_HEX:
+            printk(KERN_INFO "Hex data: ");
+            for (i = 0; i < len; ++i) {
+                printk(KERN_CONT "%02x ", bytes[i]);
+            }
+            break;
+
+        case PRINT_BIN:
+            printk(KERN_INFO "Binary data: ");
+            for (i = 0; i < len; ++i) {
+                for (j = 7; j >= 0; --j) {
+                    printk(KERN_CONT "%u", (bytes[i] >> j) & 1);
+                }
+                printk(KERN_CONT " "); // Space between bytes
+            }
+            break;
+
+        case PRINT_DEC:
+            printk(KERN_INFO "Decimal data: ");
+            for (i = 0; i < len; ++i) {
+                printk(KERN_CONT "%u ", bytes[i]);
+            }
+            break;
+
+        case PRINT_OCT:
+            printk(KERN_INFO "Octal data: ");
+            for (i = 0; i < len; ++i) {
+                printk(KERN_CONT "%03o ", bytes[i]);
+            }
+            break;
+
+        default:
+            printk(KERN_INFO "Unknown format\n");
+            return;
+    }
+
+    printk(KERN_CONT "\n");
 }

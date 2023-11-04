@@ -434,7 +434,10 @@ void CleanupNetfilterHooks(void) {
     list_for_each_safe(pos, q, &packetQueueListHead) {
         listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
         list_del(pos);
-        kfree(listNodeToCleanUp);
+        if(listNodeToCleanUp != NULL){
+            kfree(listNodeToCleanUp);
+            listNodeToCleanUp = NULL;
+        }
     }
 }
 
@@ -575,12 +578,14 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     unsigned char headerRoutingType[S32_SIZE];
     unsigned char packetId[S32_SIZE];
     unsigned char packetQueueNumber[S32_SIZE];
-    intToBytes(0, headerFlags);
-    intToBytes(3, headerVersion);
-    intToBytes(packetTrip->entry->skb->len, headerLength);
-    intToBytes(packetTrip->routingType, headerRoutingType);
-    intToBytes(packetTrip->entry->id, packetId);
-    intToBytes(queuenum, packetQueueNumber);
+    __s32 headerFlagsValue = 0;
+    __s32 headerVersionValue = 3;
+    int_to_bytes(&headerFlagsValue, headerFlags, sizeof(headerFlagsValue));
+    int_to_bytes(&headerVersionValue, headerVersion, sizeof(headerVersionValue));
+    int_to_bytes(&packetTrip->entry->skb->len, headerLength, sizeof(packetTrip->entry->skb->len));
+    int_to_bytes(&packetTrip->routingType, headerRoutingType, sizeof(packetTrip->routingType));
+    int_to_bytes(&packetTrip->entry->id, packetId, sizeof(packetTrip->entry->id));
+    int_to_bytes(&queuenum, packetQueueNumber, sizeof(queuenum));
     memcpy(dataPayload, headerFlags, S32_SIZE);
     memcpy(dataPayload + S32_SIZE, headerRoutingType, S32_SIZE);
     memcpy(dataPayload + (S32_SIZE*2), headerVersion, S32_SIZE);
@@ -622,6 +627,7 @@ int _netFilterPacketProcessorThread(void *data) {
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
             if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && current_node->data->slotAssigned >= 0){ // Greater than 1000ms then it's stale
+                RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(current_node->data->slotAssigned);
                 write_system_ring_buffer_slot_status(current_node->data->slotAssigned, EMPTY);
                 HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
                 list_del(pos);
@@ -629,7 +635,7 @@ int _netFilterPacketProcessorThread(void *data) {
                 SystemBufferActiveFreeSlots++;
                 SystemBufferActiveUsedSlots--;
                 SlotStatus slotStatus = read_system_ring_buffer_slot_status(current_node->data->slotAssigned);
-                LOG_DEBUG_ICMP(current_node->data, "Removed stale packet trip from queue. Slot status: %d", slotStatus);
+                LOG_DEBUG_ICMP(current_node->data, "Removed stale packet (%lld) trip from queue. Slot status: %d; Slot #{%d}", startHeader.Id, slotStatus, current_node->data->slotAssigned);
             }
         }
        
@@ -641,9 +647,11 @@ int _netFilterPacketProcessorThread(void *data) {
             continue;
         }
 
-        __u32 packetId = bytesToUint(response->data);
-        __u32 packetQueueNumber = bytesToUint(response->data + S32_SIZE);
-        __u32 routingDecision = bytesToUint(response->data + S32_SIZE*2);
+        __u32 packetId, packetQueueNumber, routingDecision;
+        bytes_to_int(response->data, &packetId, sizeof(response->data));
+        bytes_to_int(response->data + S32_SIZE, &packetQueueNumber, sizeof(response->data));
+        bytes_to_int(response->data + S32_SIZE*2, &routingDecision, sizeof(response->data));
+
         free_data_buffer(response);
         LOG_DEBUG_PACKET("Received response. Decision: %d, Packet Id: %d, Queue Number: %d", routingDecision, packetId, packetQueueNumber);
 
@@ -681,5 +689,16 @@ void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
         PacketQueueEmpty(_write2PacketsQueue);
         PacketQueueEmpty(_injectionPacketsQueue);
         PacketQueueEmpty(_completedQueue);
+
+        struct PacketTripListNode *listNodeToCleanUp;
+        struct list_head *pos, *q;
+        list_for_each_safe(pos, q, &packetQueueListHead) {
+            listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
+            list_del(pos);
+            if(listNodeToCleanUp != NULL){
+                kfree(listNodeToCleanUp);
+                listNodeToCleanUp = NULL;
+            }
+        }
     }
 }

@@ -20,30 +20,37 @@ void __LoggerSetLevel(int level);
 static inline void _logGenericFunc(int num_level, const char* kern_level, const char* fmt, const char* file, const char* func, int line, ...) {
     va_list args;
     char buffer[1024];
-    char full_fmt[] = "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
+    char* full_fmt;
     char* category;
 
     //The statement I need help with
     if(kern_level == NULL){
         category = "";
+        full_fmt = KERN_INFO "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else if(strcmp(kern_level, KERN_DEBUG) == 0){
         category = "DEBUG";
+        full_fmt = KERN_DEBUG "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else if(strcmp(kern_level, KERN_INFO) == 0){
         category = "INFO";
+        full_fmt = KERN_INFO "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else if(strcmp(kern_level, KERN_ERR) == 0){
         category = "ERROR";
+        full_fmt = KERN_ERR "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else if(strcmp(kern_level, KERN_WARNING) == 0){
         category = "WARNING";
+        full_fmt = KERN_WARNING "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else if(strcmp(kern_level, KERN_ALERT) == 0){
         category = "ALERT";
+        full_fmt = KERN_ALERT "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
     else{
         category = "UNKNOWN";
+        full_fmt = KERN_INFO "EXTRAVA [%s➡ %s➡ %d] %s: %s\n";
     }
 
     va_start(args, line);

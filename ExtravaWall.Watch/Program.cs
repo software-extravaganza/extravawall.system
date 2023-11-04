@@ -30,15 +30,15 @@ while (true) {
     }
 
     Console.WriteLine($"Data found: {data.Length} bytes");
-    var rawPacketQueueNumber = data.Slice(intSize * 5, intSize);
+    var flags = BitConverter.ToInt32(data.Slice(0, intSize));
+    var routingType = (RoutingType)BitConverter.ToInt32(data.Slice(intSize * 1, intSize));
+    var version = BitConverter.ToInt32(data.Slice(intSize * 2, intSize));
+    var dataLength = BitConverter.ToInt32(data.Slice(intSize * 3, intSize));
     var rawPacketId = data.Slice(intSize * 4, intSize);
+    var rawPacketQueueNumber = data.Slice(intSize * 5, intSize);
     var packetQueueNumber = BitConverter.ToInt32(rawPacketQueueNumber);
     var packetId = BitConverter.ToInt32(rawPacketId);
-    var flags = BitConverter.ToInt32(data.Slice(intSize * 3, intSize));
-    var routingType = (RoutingType)BitConverter.ToInt32(data.Slice(intSize * 2, intSize));
-    var version = BitConverter.ToInt32(data.Slice(intSize, intSize));
-    var dataLength = BitConverter.ToInt32(data.Slice(0, intSize));
-    Span<byte> payload = data.Slice(intSize * 4, dataLength);
+    Span<byte> payload = data.Slice(intSize * 6, dataLength);
     var routingDecision = GetRoutingDecision(routingType, payload);
 
     var dataToSend = new byte[intSize * 3].AsSpan();
@@ -48,7 +48,7 @@ while (true) {
 
     rawPacketId.Slice(0, intSize).CopyTo(dataToSendFirstIntBytes);
     rawPacketQueueNumber.Slice(0, intSize).CopyTo(dataToSendSecondIntBytes);
-    if (reader.IsLittleEndian(false)) {
+    if (BitConverter.IsLittleEndian) {
         BinaryPrimitives.WriteInt32LittleEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian
     } else {
         BinaryPrimitives.WriteInt32BigEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian

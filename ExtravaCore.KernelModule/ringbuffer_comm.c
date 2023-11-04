@@ -14,6 +14,7 @@ long SystemBufferActiveFreeSlots = 0;
 __u64 SystemRingBufferSentCount = 0;
 __u64 *debouce_processed_slots;
 int debouce_processed_slots_index = 0;
+DEFINE_MUTEX(buffer_write_mutex);
 
 // static void _initRingBuffer(RingBuffer *buffer);
 static void _initDuplexRingBuffer(DuplexRingBuffer *duplexBuffer);
@@ -22,26 +23,35 @@ static void printRingBufferCounters(void){
     LOG_INFO(MESSAGE_BUFFER_DATA, NUM_SLOTS, SystemBufferActiveUsedSlots, SystemBufferActiveFreeSlots, SystemBufferSlotsUsedCounter, SystemBufferSlotsClearedCounter);
 }
 
-void read_from_buffer(char *dest, size_t offset, size_t length) {
-    mb();
-    if(!IsActive() || !IsUserSpaceConnected()){
+void read_from_buffer(void *dest, size_t offset, size_t length) {
+    mb(); // Ensure memory operations complete before proceeding 
+
+    if (!IsActive() || !IsUserSpaceConnected()) {
+        //LOG_ALERT("RingBuf: Inactive or no userspace connection");
         return;
     }
 
-    if(!duplexBuffer){
+    if (!duplexBuffer) {
         LOG_ALERT("RingBuf: duplexBuffer is NULL");
         return;
     }
 
-    if(!dest){
-        LOG_ALERT("RingBuf: dest is NULL");
+    if (!dest) {
+        LOG_ALERT("RingBuf: Destination buffer is NULL");
         return;
     }
-    
+
+    if(offset + length > DUPLEX_RING_BUFFER_SIZE){
+        LOG_ALERT("RingBuf: offset + length is greater than DUPLEX_RING_BUFFER_SIZE");
+        return;
+    }
+
+    // Safe to copy directly to void* since memcpy operates on void pointers.
     memcpy(dest, duplexBuffer + offset, length);
 }
 
-void write_to_buffer(const char *src, size_t offset, size_t length) {
+
+void write_to_buffer(const void *src, size_t offset, size_t length) {
     if(!IsActive() || !IsUserSpaceConnected()){
         return;
     }
@@ -61,51 +71,61 @@ void write_to_buffer(const char *src, size_t offset, size_t length) {
         return;
     }
 
+    mutex_lock(&buffer_write_mutex);
     memcpy(duplexBuffer + offset, src, length);
     mb();
+    mutex_unlock(&buffer_write_mutex);
+    print_data(src, length, PRINT_DEC);
 }
 
 struct RingBufferHeader read_ring_buffer_header(uint offset) {
-    struct RingBufferHeader header;
+    struct RingBufferHeader header = {0};
+    CHECK_INDEX_AND_OFFSET_RETURN(0, offset, header);
     char buffer[RING_BUFFER_HEADER_SIZE]; // Buffer to hold read data: 1 byte for status and 4 bytes for position
 
     // Read data from the duplexBuffer
-    read_from_buffer(buffer, offset, RING_BUFFER_HEADER_SIZE);
+    read_from_buffer(&buffer, offset, RING_BUFFER_HEADER_SIZE);
 
     // Extract status and position
     header.Status = (RingBufferStatus)buffer[0];
 
     // Be cautious with endianess here. If you are sure about the byte order, you can use memcpy.
     // If duplexBuffer is in a different byte order than your system, you might need to convert.
-    memcpy(&header.Position, buffer + 1, sizeof(header.Position));
+    memcpy(&header.Position, buffer + 1, RING_BUFFER_HEADER__POSITION_SIZE);
 
     return header;
 }
 
 void write_ring_buffer_header(uint offset, struct RingBufferHeader header) {
+    CHECK_INDEX_AND_OFFSET(0, offset);
     char buffer[RING_BUFFER_HEADER_SIZE]; // Buffer to hold data to write: 1 byte for status and 4 bytes for position
 
     // Assign status - it's just the first byte.
     buffer[0] = (char)header.Status;
 
     // Copy position - again, be cautious about endianness.
-    memcpy(buffer + 1, &header.Position, sizeof(header.Position));
+    memcpy(buffer + 1, &header.Position, RING_BUFFER_HEADER__POSITION_SIZE);
 
     // Write data back to the duplexBuffer at offset 0
-    write_to_buffer((char *)&buffer, offset, RING_BUFFER_HEADER_SIZE);
+    write_to_buffer(&buffer, offset, RING_BUFFER_HEADER_SIZE);
 }
 
 SlotStatus read_ring_buffer_slot_status(uint offset, int slot_index) {
     SlotStatus slot_status = EMPTY;
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE;
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_STATUS_OFFSET;
     //printk(KERN_INFO "RingBuf: Reading status at offset %d", base_offset);
-    read_from_buffer((char *)&slot_status, base_offset, SLOT_HEADER_STATUS_SIZE);
+    read_from_buffer(&slot_status, base_offset, SLOT_HEADER_STATUS_SIZE);
     return slot_status;
 }
 
 void write_ring_buffer_slot_id(uint offset, int slot_index, __u64 id) {
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE + SLOT_HEADER_STATUS_SIZE;
-    write_to_buffer((char *)&id, base_offset, SLOT_HEADER_ID_SIZE);
+    CHECK_INDEX_AND_OFFSET(slot_index, offset);
+    unsigned char slotId[SLOT_HEADER_ID_SIZE];
+    int_to_bytes(&id, slotId, SLOT_HEADER_ID_SIZE);
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_ID_OFFSET;
+    LOG_INFO("RingBuf: Writing id (%llu) at offset %d", id, base_offset);
+    print_data(&slotId, SLOT_HEADER_ID_SIZE, PRINT_DEC);
+    write_to_buffer(&slotId, base_offset, SLOT_HEADER_ID_SIZE);
 }
 
 void write_system_ring_buffer_slot_id(int slot_index, __u64 id){
@@ -117,48 +137,67 @@ void write_user_ring_buffer_slot_id(int slot_index, __u64 id){
 }
 
 void write_ring_buffer_slot_status(uint offset, int slot_index, SlotStatus slot_status) {
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE;
-    if(slot_status == VALID){
-        SystemRingBufferSentCount++;
-        write_ring_buffer_slot_id(base_offset, slot_index, SystemRingBufferSentCount);
-    }
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_STATUS_OFFSET;
+    SlotStatus oldStatus = read_ring_buffer_slot_status(offset, slot_index);
+    if(oldStatus != slot_status){
+        if(slot_status == VALID){
+            SystemRingBufferSentCount++;
+            write_ring_buffer_slot_id(offset, slot_index, SystemRingBufferSentCount);
+        }
+        else if(slot_status == EMPTY){
+            write_ring_buffer_slot_id(offset, slot_index, 0);
+        }
 
-    write_to_buffer((char *)&slot_status, base_offset, SLOT_HEADER_STATUS_SIZE);
+        write_to_buffer(&slot_status, base_offset, SLOT_HEADER_STATUS_SIZE);
+    }
 }
 
 SlotStatus read_system_ring_buffer_slot_status(int slot_index){
-    return read_ring_buffer_slot_status(0, slot_index);
+    uint offset = 0;
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, EMPTY);
+    return read_ring_buffer_slot_status(offset, slot_index);
 }
 
 SlotStatus read_user_ring_buffer_slot_status(int slot_index){
-    return read_ring_buffer_slot_status(RING_BUFFER_SIZE, slot_index);
+    uint offset = RING_BUFFER_SIZE;
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, EMPTY);
+    return read_ring_buffer_slot_status(offset, slot_index);
 }
 
 void write_system_ring_buffer_slot_status(int slot_index, SlotStatus slot_status){
-    write_ring_buffer_slot_status(0, slot_index, slot_status);
+    uint offset = 0;
+    CHECK_INDEX_AND_OFFSET(slot_index, offset);
+    write_ring_buffer_slot_status(offset, slot_index, slot_status);
 }
 
 void write_user_ring_buffer_slot_status(int slot_index, SlotStatus slot_status){
+    uint offset = RING_BUFFER_SIZE;
+    CHECK_INDEX_AND_OFFSET(slot_index, offset);
     write_ring_buffer_slot_status(RING_BUFFER_SIZE, slot_index, slot_status);
 }
 
-__u64 read_ring_buffer_id(uint offset) {
-    __u64 ring_buffer_id = 0;
-    read_from_buffer((char *)&ring_buffer_id, offset + SLOT_HEADER_STATUS_SIZE, SLOT_HEADER_ID_SIZE);
-    return ring_buffer_id;
+__u64 read_ring_buffer_slot_id(int slot_index, uint offset) {
+    CHECK_INDEX_AND_OFFSET_RETURN(0, offset, 0);
+    char *slotIdBytes;
+    __u64 slotId;
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_ID_OFFSET;
+    read_from_buffer(&slotIdBytes, base_offset, SLOT_HEADER_ID_SIZE);
+    bytes_to_int(slotIdBytes, &slotId, SLOT_HEADER_ID_SIZE);
+    return slotId;
 }
 
-__u64 read_system_ring_buffer_id(void){
-    return read_ring_buffer_id(0);
+__u64 read_system_ring_buffer_slot_id(int slot_index){
+    return read_ring_buffer_slot_id(slot_index, 0);
 }
 
-__u64 read_user_ring_buffer_id(void){
-    return read_ring_buffer_id(RING_BUFFER_SIZE);
+__u64 read_user_ring_buffer_slot_id(int slot_index){
+    return read_ring_buffer_slot_id(slot_index, RING_BUFFER_SIZE);
 }
 
 RingBufferStatus read_ring_buffer_status(uint offset) {
+    CHECK_INDEX_AND_OFFSET_RETURN(0, offset, Inactive);
     RingBufferStatus ring_buffer_status = Inactive;
-    read_from_buffer((char *)&ring_buffer_status, offset, SLOT_HEADER_STATUS_SIZE);
+    read_from_buffer(&ring_buffer_status, offset, SLOT_HEADER_STATUS_SIZE);
     return ring_buffer_status;
 }
 
@@ -171,7 +210,7 @@ RingBufferStatus read_user_ring_buffer_status(void){
 }
 
 void write_ring_buffer_status(uint offset, RingBufferStatus ring_buffer_status) {
-    write_to_buffer((char *)&ring_buffer_status, offset, SLOT_HEADER_STATUS_SIZE);
+    write_to_buffer(&ring_buffer_status, offset, SLOT_HEADER_STATUS_SIZE);
 }
 
 void write_system_ring_buffer_status(RingBufferStatus ring_buffer_status){
@@ -182,10 +221,34 @@ void write_user_ring_buffer_status(RingBufferStatus ring_buffer_status){
     write_ring_buffer_status(RING_BUFFER_SIZE, ring_buffer_status);
 }
 
+// __u32 read_ring_buffer_position(uint offset){
+//     CHECK_INDEX_AND_OFFSET_RETURN(0, offset, 0);
+//     char *positionBytes;
+//     __u32 position;
+    
+//     read_from_buffer(&positionBytes, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
+//     bytes_to_int(positionBytes, &position, RING_BUFFER_HEADER__POSITION_SIZE);
+//     return position;
+// }
+
 __u32 read_ring_buffer_position(uint offset){
-    __u32 position = 0;
+    CHECK_INDEX_AND_OFFSET_RETURN(0, offset, 0);
+
+    unsigned char positionBytes[RING_BUFFER_HEADER__POSITION_SIZE];  // Buffer allocated on stack
+
+    // Ensure that the offset is valid and will not go beyond the buffer size.
+    // If the offset is not valid, return a default value or handle the error appropriately.
+    if (offset + RING_BUFFER_HEADER_STATUS_SIZE + RING_BUFFER_HEADER__POSITION_SIZE > DUPLEX_RING_BUFFER_SIZE) {
+        // Handle invalid offset error
+        return 0; // or appropriate error code or handling
+    }
+
     //printk(KERN_INFO "RingBuf: Reading position at offset %d", offset + 1);
-    read_from_buffer((char *)&position, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
+    read_from_buffer(positionBytes, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
+
+    __u32 position;
+    bytes_to_int(positionBytes, &position, sizeof(position));
+
     return position;
 }
 
@@ -198,8 +261,11 @@ __u32 read_user_ring_buffer_position(void){
 }
 
 void write_ring_buffer_position(int offset, __u32 position){
+    CHECK_INDEX_AND_OFFSET(0, offset);
     //printk(KERN_INFO "RingBuf: Writing position at offset %d", offset + 1);
-    write_to_buffer((char *)&position, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
+    unsigned char bufferPosition[RING_BUFFER_HEADER__POSITION_SIZE];
+    int_to_bytes(&position, bufferPosition, RING_BUFFER_HEADER__POSITION_SIZE);
+    write_to_buffer(&bufferPosition, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
 }
 
 void write_system_ring_buffer_position(__u32 position){
@@ -212,22 +278,29 @@ void write_user_ring_buffer_position(__u32 position){
 
 struct RingBufferSlotHeader read_ring_buffer_slot_header(uint offset, int slot_index) {
     struct RingBufferSlotHeader slot_header = {0};
-
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE;
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, slot_header);
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE);
 
     // Read the metadata fields into slot_header
-    read_from_buffer((char *)&slot_header.Status, base_offset + 0, SLOT_HEADER_STATUS_SIZE);
-    read_from_buffer((char *)&slot_header.Id, base_offset + 1, SLOT_HEADER_ID_SIZE);
-    read_from_buffer((char *)&slot_header.TotalDataSize, base_offset + 9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
-    read_from_buffer((char *)&slot_header.CurrentDataSize, base_offset + 13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
-    read_from_buffer((char *)&slot_header.SequenceNumber, base_offset + 15, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
-    read_from_buffer((char *)&slot_header.ClearanceStartIndex, base_offset + 16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
-    read_from_buffer((char *)&slot_header.ClearanceEndIndex, base_offset + 18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+    read_from_buffer(&slot_header.Status, base_offset + SLOT_HEADER_STATUS_OFFSET, SLOT_HEADER_STATUS_SIZE);
+    read_from_buffer(&slot_header.Id, base_offset + SLOT_HEADER_ID_OFFSET, SLOT_HEADER_ID_SIZE);
+    read_from_buffer(&slot_header.TotalDataSize, base_offset + SLOT_HEADER_TOTAL_DATA_SIZE_OFFSET, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
+    read_from_buffer(&slot_header.CurrentDataSize, base_offset + SLOT_HEADER_CURRENT_DATA_SIZE_OFFSET, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
+    read_from_buffer(&slot_header.SequenceNumber, base_offset + SLOT_HEADER_SEQUENCE_NUMBER_OFFSET, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
+    read_from_buffer(&slot_header.ClearanceStartIndex, base_offset + SLOT_HEADER_CLEARANCE_START_INDEX_OFFSET, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
+    read_from_buffer(&slot_header.ClearanceEndIndex, base_offset + SLOT_HEADER_CLEARANCE_END_INDEX_OFFSET, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+
+    // slot_header.Id = bytesToUint64((uint8_t *)&slot_header.Id);
+    // slot_header.TotalDataSize = bytesToUint32((uint8_t *)&slot_header.TotalDataSize);
+    // slot_header.CurrentDataSize = bytesToUint16((uint8_t *)&slot_header.CurrentDataSize);
+    // slot_header.ClearanceStartIndex = bytesToUint16((uint8_t *)&slot_header.ClearanceStartIndex);
+    // slot_header.ClearanceEndIndex = bytesToUint16((uint8_t *)&slot_header.ClearanceEndIndex);
 
     return slot_header;
 }
 
 char *read_ring_buffer_slot_data(uint offset, int slot_index, __u16 data_size) {
+    CHECK_INDEX_AND_OFFSET_RETURN(slot_index, offset, NULL);
     if (data_size > SLOT_DATA_SIZE) {
         // Handle error or limit data_size
         return NULL;
@@ -239,8 +312,11 @@ char *read_ring_buffer_slot_data(uint offset, int slot_index, __u16 data_size) {
         return NULL;
     }
 
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE + SLOT_HEADER_SIZE; 
-    read_from_buffer(data_buffer, base_offset, data_size);
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_SIZE; 
+    printk(KERN_INFO "RingBuf: Reading data at offset %d and size of %d", base_offset, data_size);
+
+    // todo: fix crash somewhere around here
+    //read_from_buffer(&data_buffer, base_offset, data_size);
 
     return data_buffer;
 }
@@ -253,25 +329,58 @@ void free_ring_buffer_slot_data(char *data){
 
 void write_ring_buffer_slot_header(uint offset, int slot_index, struct RingBufferSlotHeader *slot_header) {
     if (!slot_header) {
+        LOG_ALERT("RingBuf: Slot header is NULL");
         return; // Or handle the error as needed
     }
 
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE;
+    CHECK_INDEX_AND_OFFSET(slot_index, offset);
+
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE);
+
+    unsigned char slotId[SLOT_HEADER_ID_SIZE];
+    unsigned char slotTotalDataSize[SLOT_HEADER_TOTAL_DATA_SIZE_SIZE];
+    unsigned char slotCurrentDataSize[SLOT_HEADER_CURRENT_DATA_SIZE_SIZE];
+    unsigned char slotClearanceStartIndex[SLOT_HEADER_CLEARANCE_START_INDEX_SIZE];
+    unsigned char slotClearanceEndIndex[SLOT_HEADER_CLEARANCE_END_INDEX_SIZE];
+
+    int_to_bytes(&slot_header->Id, slotId, sizeof(slot_header->Id));
+    int_to_bytes(&slot_header->TotalDataSize, slotTotalDataSize, sizeof(slot_header->TotalDataSize));
+    int_to_bytes(&slot_header->CurrentDataSize, slotCurrentDataSize, sizeof(slot_header->CurrentDataSize));
+    int_to_bytes(&slot_header->ClearanceStartIndex, slotClearanceStartIndex, sizeof(slot_header->ClearanceStartIndex));
+    int_to_bytes(&slot_header->ClearanceEndIndex, slotClearanceEndIndex, sizeof(slot_header->ClearanceEndIndex));
 
     // Write the metadata fields from slot_header
-    //printk(KERN_INFO "RingBuf: Writing status at offset %d", base_offset + 0);
-    write_to_buffer((char *)&slot_header->Status, base_offset + 0, SLOT_HEADER_STATUS_SIZE);
-    //printk(KERN_INFO "RingBuf: Writing total data size at offset %d", base_offset + 1);
-    write_to_buffer((char *)&slot_header->Id, base_offset + 1, SLOT_HEADER_ID_SIZE);
-    write_to_buffer((char *)&slot_header->TotalDataSize, base_offset + 9, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
-    //printk(KERN_INFO "RingBuf: Writing current data size at offset %d", base_offset + 5);
-    write_to_buffer((char *)&slot_header->CurrentDataSize, base_offset + 13, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
-    //printk(KERN_INFO "RingBuf: Writing sequence number at offset %d", base_offset + 7);
-    write_to_buffer((char *)&slot_header->SequenceNumber, base_offset + 15, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
-    //printk(KERN_INFO "RingBuf: Writing clearance start index at offset %d", base_offset + 8);
-    write_to_buffer((char *)&slot_header->ClearanceStartIndex, base_offset + 16, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
-    //printk(KERN_INFO "RingBuf: Writing clearance end index at offset %d", base_offset + 10);
-    write_to_buffer((char *)&slot_header->ClearanceEndIndex, base_offset + 18, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+    
+    // printk(KERN_INFO "RingBuf: Writing id (%llu) at offset %d", slot_header->Id, base_offset + 1);
+    // print_data(&slot_header->Id, SLOT_HEADER_ID_SIZE, PRINT_DEC);
+    // write_to_buffer(&slotId, base_offset + 1, SLOT_HEADER_ID_SIZE);
+
+    __u32 bob;
+    printk(KERN_INFO "RingBuf: Writing total data size (%u) at offset %d", slot_header->TotalDataSize, base_offset + SLOT_HEADER_TOTAL_DATA_SIZE_OFFSET);
+    print_data(&slot_header->TotalDataSize, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE, PRINT_DEC);
+    write_to_buffer(&slotTotalDataSize, base_offset + SLOT_HEADER_TOTAL_DATA_SIZE_OFFSET, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
+    read_from_buffer(&bob, base_offset + SLOT_HEADER_TOTAL_DATA_SIZE_OFFSET, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE);
+    print_data(&bob, SLOT_HEADER_TOTAL_DATA_SIZE_SIZE, PRINT_DEC);
+
+    printk(KERN_INFO "RingBuf: Writing current data size (%hu) at offset %d", slot_header->CurrentDataSize, base_offset + SLOT_HEADER_CURRENT_DATA_SIZE_OFFSET);
+    print_data(&slot_header->CurrentDataSize, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE, PRINT_DEC);
+    write_to_buffer(&slotCurrentDataSize, base_offset + SLOT_HEADER_CURRENT_DATA_SIZE_OFFSET, SLOT_HEADER_CURRENT_DATA_SIZE_SIZE);
+
+    printk(KERN_INFO "RingBuf: Writing sequence number (%d) at offset %d", slot_header->SequenceNumber, base_offset + SLOT_HEADER_SEQUENCE_NUMBER_OFFSET);
+    print_data(&slot_header->SequenceNumber, SLOT_HEADER_SEQUENCE_NUMBER_SIZE, PRINT_DEC);
+    write_to_buffer(&slot_header->SequenceNumber, base_offset + SLOT_HEADER_SEQUENCE_NUMBER_OFFSET, SLOT_HEADER_SEQUENCE_NUMBER_SIZE);
+
+    printk(KERN_INFO "RingBuf: Writing clearance start index (%hu) at offset %d", slot_header->ClearanceStartIndex, base_offset + SLOT_HEADER_CLEARANCE_START_INDEX_OFFSET );
+    print_data(&slot_header->ClearanceStartIndex, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE, PRINT_DEC);
+    write_to_buffer(&slotClearanceStartIndex, base_offset + SLOT_HEADER_CLEARANCE_START_INDEX_OFFSET, SLOT_HEADER_CLEARANCE_START_INDEX_SIZE);
+
+    printk(KERN_INFO "RingBuf: Writing clearance end index (%hu) at offset %d", slot_header->ClearanceEndIndex, base_offset + SLOT_HEADER_CLEARANCE_END_INDEX_OFFSET);
+    print_data(&slot_header->ClearanceEndIndex, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE, PRINT_DEC);
+    write_to_buffer(&slotClearanceEndIndex, base_offset + SLOT_HEADER_CLEARANCE_END_INDEX_OFFSET, SLOT_HEADER_CLEARANCE_END_INDEX_SIZE);
+
+    printk(KERN_INFO "RingBuf: Writing status (%d) at offset %d", slot_header->Status, base_offset + SLOT_HEADER_STATUS_OFFSET);
+    print_data(&slot_header->Status, SLOT_HEADER_STATUS_SIZE, PRINT_DEC);
+    write_system_ring_buffer_slot_status(slot_index, slot_header->Status);
 }
 
 void write_ring_buffer_slot_data(uint offset, int slot_index, char *data, __u16 data_size) {
@@ -280,7 +389,9 @@ void write_ring_buffer_slot_data(uint offset, int slot_index, char *data, __u16 
         return; // Or handle the error as needed
     }
 
-    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + slot_index * SLOT_SIZE + SLOT_HEADER_SIZE;
+    CHECK_INDEX_AND_OFFSET(slot_index, offset);
+
+    size_t base_offset = offset + RING_BUFFER_HEADER_SIZE + (slot_index * SLOT_SIZE) + SLOT_HEADER_SIZE;
     //printk(KERN_INFO "RingBuf: Writing data at offset %d", base_offset);
     //printk("Data %s", bytes_to_ascii(data, data_size));
     write_to_buffer(data, base_offset, data_size);
@@ -487,6 +598,7 @@ static struct file_operations fops = {
 #define CLASS_NAME "ring"
 
 int InitializeRingBuffers(void){
+    mutex_init(&buffer_write_mutex);
     debouce_processed_slots = kmalloc(10000 * sizeof(__u64), GFP_KERNEL);
     major_num = register_chrdev(0, DEVICE_NAME, &fops);
 
@@ -587,7 +699,7 @@ int FindContiguousEmptySlots(int required_slots) {
     return -1; // Not enough contiguous EMPTY Slots found
 }
 
-static void print_binary(const char *data, size_t len) {
+void print_binary(const char *data, size_t len) {
     int i, j;
     printk(KERN_INFO "Binary data: ");
     for (i = 0; i < len; ++i) {
@@ -603,24 +715,6 @@ static void print_binary(const char *data, size_t len) {
     printk(KERN_CONT "\n"); // Newline after the entire binary data is printed
 }
 
-static void print_hex(const char *data, size_t len) {
-    int i;
-    printk(KERN_INFO "Hex data: ");
-    for (i = 0; i < len; ++i) {
-        printk(KERN_CONT "%02x ", (unsigned char)data[i]);
-    }
-    printk(KERN_CONT "\n"); // Newline after the entire hex data is printed
-}
-
-void print_hex_with_offset(const char *data, size_t offset, size_t len) {
-    int i;
-    printk(KERN_INFO "Offset %zu - Hex data: ", offset);
-    for (i = 0; i < len; ++i) {
-        printk(KERN_CONT "%02x ", (unsigned char)data[offset + i]);
-    }
-    printk(KERN_CONT "\n"); // Newline after the hex data
-}
-
 RingBufferSlotHeader *create_ring_buffer_slot_header(void) {
     RingBufferSlotHeader *slot_header = kmalloc(sizeof(RingBufferSlotHeader), GFP_KERNEL);
     if (!slot_header) {
@@ -631,7 +725,9 @@ RingBufferSlotHeader *create_ring_buffer_slot_header(void) {
 }
 
 void free_ring_buffer_slot_header(RingBufferSlotHeader *slot_header) {
-    kfree(slot_header);
+    if(slot_header != NULL){
+        kfree(slot_header);
+    }
 }
 
 int WriteToSystemRingBuffer(const char *data, size_t size) {
@@ -642,6 +738,10 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
     
     if(!IsActive() || !IsUserSpaceConnected()){
         return -1;
+    }
+
+    if (size > U32_MAX) {
+        printk(KERN_INFO "Warning: size_t value exceeds __u32 range, truncation will occur\n");
     }
 
     LOG_INFO("Writing...");
@@ -677,6 +777,10 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
             return -1;
         }
         size_t bytes_to_write = min(remaining_size, MAX_PAYLOAD_SIZE);
+        if(slot_header == NULL){
+            return -2;
+        }
+
         slot_header->CurrentDataSize = bytes_to_write; //to_little_endian_16(bytes_to_write);
         slot_header->TotalDataSize = size; //to_little_endian_32(size);
         slot_header->ClearanceStartIndex = 0; //to_little_endian_16(0);
@@ -696,6 +800,7 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
         } else {
             slot_header->Status = VALID;
         }
+        
         write_system_ring_buffer_position((start_position + 1) % NUM_SLOTS);
         write_system_ring_buffer_slot_header(start_position, slot_header);
         SystemBufferSlotsUsedCounter++;
@@ -704,7 +809,7 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
     }
 
     free_ring_buffer_slot_header(slot_header);
-   
+    LOG_INFO("Slot written %d", start_position);
     return start_position;
 }
 
@@ -729,6 +834,12 @@ void free_data_buffer(DataBuffer *buffer) {
     kfree(buffer->data);
     buffer->data = NULL;
     buffer->size = 0;
+}
+
+void free_data_buffer_if_needed(DataBuffer *buffer, bool bufferIsSet) {
+    if(bufferIsSet){
+        free_data_buffer(buffer);
+    }
 }
 
 // uint next_read_user_position = 0;
@@ -825,11 +936,13 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
     int currentSlot = -1;
     DataBuffer* buffer = NULL;
+    bool bufferSet = false;
     size_t currentOffset = 0;
     bool slotFound = false;
     int startIndex = next_read_user_position;
     int endIndex = startIndex;
     int bytesLoaded = 0;
+    long maxTotalDataSize = MAX_PAYLOAD_SIZE * (NUM_SLOTS / 2);
     IndexRange indexRange;
     indexRange.Start = next_read_user_position;
 
@@ -837,24 +950,83 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         if (currentSlot < 0) {
             currentSlot = next_read_user_position;
         }
+
+        if (currentSlot > NUM_SLOTS) {
+            LOG_WARNING("Forcing slot to zero (out of range) %d", currentSlot);
+            currentSlot = 0;
+        }
+
         RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
         if(slot_header.Id == 0){
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.Id == 0) {
+            LOG_ERROR("Skipping slot (id 0) %d", currentSlot);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.ClearanceStartIndex < 0) {
+            LOG_ERROR("Skipping slot; ClearanceStartIndex is out of range (%d)", slot_header.ClearanceStartIndex);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.ClearanceEndIndex > NUM_SLOTS) {
+            LOG_ERROR("Skipping slot; ClearanceEndIndex is out of range (%d)", slot_header.ClearanceEndIndex);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.ClearanceEndIndex < slot_header.ClearanceStartIndex) {
+            LOG_ERROR("Skipping slot; ClearanceEndIndex (%d) smaller than ClearanceStartIndex (%d)", slot_header.ClearanceStartIndex, slot_header.ClearanceEndIndex);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.TotalDataSize > maxTotalDataSize || slot_header.TotalDataSize < 0) {
+            LOG_ERROR("Skipping slot; TotalDataSize is out of range (%d)", slot_header.TotalDataSize);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.CurrentDataSize > MAX_PAYLOAD_SIZE || slot_header.CurrentDataSize < 0) {
+            LOG_ERROR("Skipping slot; CurrentDataSize is out of range (%d)", slot_header.CurrentDataSize);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+
+        if (slot_header.Status > 3) {
+            LOG_ERROR("Skipping slot; Status is out of range (%d)", slot_header.Status);
+            free_data_buffer_if_needed(buffer, bufferSet);
             return NULL;
         }
         
         if(!check_and_add_debounce_slot(slot_header.Id)){
-            LOG_DEBUG_PACKET("Skipping slot (debounce) %d", currentSlot);
+            //LOG_DEBUG_PACKET("Skipping slot (debounce) %d", currentSlot);
+            free_data_buffer_if_needed(buffer, bufferSet);
             return NULL;
         }
 
         // Allocate buffer on demand
-        if (!buffer && (slot_header.Status == VALID || slot_header.Status == ADVANCE)) {
+        if (buffer == NULL && (slot_header.Status == VALID || slot_header.Status == ADVANCE)) {
             buffer = create_data_buffer(slot_header.TotalDataSize);
+        }
+
+        if(buffer == NULL){
+            LOG_WARNING("Skipping slot (buffer null) %d", currentSlot);
+            free_data_buffer_if_needed(buffer, bufferSet);
+            return NULL;
+        }
+        else{
+            bufferSet = true;
         }
 
         // Copy data from valid or advance slots
         if (slot_header.Status == VALID || slot_header.Status == ADVANCE) {
-            //LOG_INFO("We're in. Clearance start: %d, end: %d", slot_header.ClearanceStartIndex, slot_header.ClearanceEndIndex);
+            LOG_INFO("We're in. ClearanceStartIndex: %d; ClearanceEndIndex: %d; CurrentDataSize: %d; TotalDataSize: %d; Status: %d", slot_header.ClearanceStartIndex, slot_header.ClearanceEndIndex, slot_header.CurrentDataSize, slot_header.TotalDataSize, slot_header.Status);
             if (slot_header.ClearanceEndIndex > slot_header.ClearanceStartIndex && slot_header.ClearanceEndIndex > 0 && slot_header.ClearanceEndIndex < NUM_SLOTS) {
                 for(uint clearSlotIndex = slot_header.ClearanceStartIndex; clearSlotIndex < slot_header.ClearanceEndIndex; clearSlotIndex++){
                     LOG_INFO("Clearing slot %d", clearSlotIndex);
@@ -865,7 +1037,38 @@ DataBuffer *ReadFromUserRingBuffer(void) {
                 }
             }
 
+            
             char *newSlotData = read_user_ring_buffer_slot_data(currentSlot, slot_header.CurrentDataSize);
+            if(newSlotData == NULL){
+                LOG_WARNING("Skipping slot (read data null) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+
+            if(buffer->size > MAX_PAYLOAD_SIZE){
+                LOG_ERROR("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+
+            if(buffer->size + currentOffset > MAX_PAYLOAD_SIZE){
+                LOG_ERROR("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+
+            if(buffer == NULL){
+                LOG_ERROR("Skipping slot; Read data (user space) buffer is null) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+
+            if(buffer->data == NULL){
+                LOG_ERROR("Skipping slot; Read data (user space) buffer data is null) %d", currentSlot);
+                free_data_buffer_if_needed(buffer, bufferSet);
+                return NULL;
+            }
+            
             memcpy(buffer->data + currentOffset, newSlotData, slot_header.CurrentDataSize);
             currentOffset += slot_header.CurrentDataSize;
             bytesLoaded += slot_header.CurrentDataSize;
@@ -876,7 +1079,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         // Move to next slot
         currentSlot = (currentSlot + 1) % NUM_SLOTS;
-        if (currentSlot == next_read_user_position) {
+        if (currentSlot == next_read_user_position || currentSlot > NUM_SLOTS || currentSlot < 0) {
             break; // Prevent infinite loop
         }
     }

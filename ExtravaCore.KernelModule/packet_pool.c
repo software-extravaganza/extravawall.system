@@ -88,15 +88,20 @@ void FreeAllPools() {
     for (int i = 0; i < cpuCount; i++) {
         FreePool(&pools[i]);
     }
-    kfree(pools);
+    
+    if(pools != NULL){
+        kfree(pools);
+    }
 }
 
 // Free a single pool
 static void FreePool(PacketPool *pool) {
-    for (int i = 0; i < pool->currentSize; i++) {
-        FreePendingPacketTrip(&pool->packets[i]);
+    if(pool != NULL && pool->packets != NULL){
+        for (int i = 0; i < pool->currentSize; i++) {
+            FreePendingPacketTrip(&pool->packets[i]);
+        }
+        kfree(pool->packets);
+        pool->currentSize = 0;
+        pool->usedCount = 0;
     }
-    kfree(pool->packets);
-    pool->currentSize = 0;
-    pool->usedCount = 0;
 }

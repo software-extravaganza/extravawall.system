@@ -6,6 +6,11 @@
 #include <linux/slab.h> // For kmalloc/kfree
 #include "logger.h"
 
+#define PRINT_HEX 0
+#define PRINT_BIN 1
+#define PRINT_DEC 2
+#define PRINT_OCT 3
+
 // Define a function type for functions that take no arguments and return void
 typedef void (*func_ptr_t)(void);
 
@@ -16,8 +21,11 @@ int is_little_endian(void);
 uint16_t to_little_endian_16(uint16_t value);
 uint32_t to_little_endian_32(uint32_t value);
 char* bytes_to_ascii(const unsigned char *data, size_t len);
+char* bytes_to_hex_string(const unsigned char *bytes, size_t size);
 void get_random_ascii_chars(char *buf, size_t num_chars);
-void get_random_keyboard_chars(char *buf, size_t num_chars) ;
+void get_random_keyboard_chars(char *buf, size_t num_chars);
+void print_hex(const void *data, size_t len);
+void print_data(const void *data, size_t len, int format);
 // static inline void check_null_helper(const char* ptr_name, void* generic_ptr, LogType log_type_enum, void (*code_func)(void)) {
 //     typeof(generic_ptr) value = generic_ptr;
 //     log_func_t log_func = log_functions[log_type_enum];
@@ -180,6 +188,32 @@ void get_random_keyboard_chars(char *buf, size_t num_chars) ;
             log_func("%s is NULL. (%s)", #ptr, __FILENAME_NO_EXT__, __func__, __LINE__, description); \
         } \
     } while(0)
+
+
+#define CHECK_INDEX_AND_OFFSET_RETURN(index, offset, failReturn) \
+    do{ \
+        if (index < 0 || index >= NUM_SLOTS){ \
+            LOG_ERROR("RingBuf: Index %d is out of range", index); \
+            return failReturn; \
+        } \
+        if(offset < 0 || offset >= DUPLEX_RING_BUFFER_SIZE) { \
+            LOG_ERROR("RingBuf: Offset %d is out of range", offset); \
+            return failReturn; \
+        } \
+    }while(0)
+
+#define CHECK_INDEX_AND_OFFSET(index, offset) \
+    do{ \
+        if (index < 0 || index >= NUM_SLOTS){ \
+            LOG_ERROR("RingBuf: Index %d is out of range", index); \
+            return; \
+        } \
+        if(offset < 0 || offset >= DUPLEX_RING_BUFFER_SIZE) { \
+            LOG_ERROR("RingBuf: Offset %d is out of range", offset); \
+            return; \
+        } \
+    }while(0)
+
 
 
 #endif // HELPERS_H

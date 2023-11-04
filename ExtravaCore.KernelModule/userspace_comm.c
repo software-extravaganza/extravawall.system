@@ -410,10 +410,14 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
         // Copy header to user space
         LOG_DEBUG_ICMP(packetTrip, "Sending packetTrip header to user space; Version: %d; Length: %lu bytes", COMMUNICATION_VERSION, TRANSACTION_HEADER_SIZE);
         
-        intToBytes(sendUserSpaceReset == true ? 1 : 0, headerFlags);
-        intToBytes(COMMUNICATION_VERSION, headerVersion);
-        intToBytes(packetTrip->entry->skb->len + S32_SIZE, headerLength);
-        intToBytes(packetTrip->routingType, headerRoutingType);
+        int_to_bytes(sendUserSpaceReset == true ? 1 : 0, headerFlags, S32_SIZE);
+        int_to_bytes(COMMUNICATION_VERSION, headerVersion, S32_SIZE);
+        int_to_bytes(&packetTrip->entry->skb->len + S32_SIZE, headerLength, S32_SIZE);
+        int_to_bytes(&packetTrip->routingType, headerRoutingType, S32_SIZE);
+        //intToBytes(sendUserSpaceReset == true ? 1 : 0, headerFlags);
+        // intToBytes(COMMUNICATION_VERSION, headerVersion);
+        // intToBytes(packetTrip->entry->skb->len + S32_SIZE, headerLength);
+        // intToBytes(packetTrip->routingType, headerRoutingType);
         memcpy(headerPayload, headerFlags, S32_SIZE);
         memcpy(headerPayload + S32_SIZE, headerRoutingType, S32_SIZE);
         memcpy(headerPayload + (S32_SIZE*2), headerVersion, S32_SIZE);
@@ -463,7 +467,7 @@ static ssize_t _readDeviceTo(struct file* filep, char __user* buf, size_t length
 
         // Copy packetTrip data to user space
         LOG_DEBUG_ICMP(packetTrip, "Sending packetTrip data to user space; Version: %d; Length: %d bytes", COMMUNICATION_VERSION, transactionSize);
-        intToBytes(sendUserSpaceReset == true ? 1: 0, headerFlags);
+        int_to_bytes(sendUserSpaceReset == true ? 1: 0, headerFlags, S32_SIZE);
 
         memcpy(dataPayload, headerFlags, S32_SIZE);
         memcpy(dataPayload + S32_SIZE, packetTrip->entry->skb->data, packetTrip->entry->skb->len);

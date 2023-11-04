@@ -2,10 +2,17 @@
 #define TYPE_CONVERTERS_H
 
 #include <linux/kernel.h>
+#include <linux/byteorder/generic.h>
+#include <linux/types.h>  // For fixed-width integer types like u16, u32, u64, etc.
+#include <linux/byteorder/generic.h>  // For endian conversion functions
 #include "logger.h"
 #include "helpers.h"
 #include "data_structures.h"
 
+#define S32_SIZE (sizeof(s32))
+#define U32_SIZE (sizeof(u32))
+#define U64_SIZE (sizeof(u64))
+#define U16_SIZE (sizeof(u16))
 #define IP_DSCP_MASK 0xFC  // 11111100
 #define IP_ECN_MASK  0x03  // 00000011
 
@@ -60,9 +67,9 @@
 const char* ipProtocolToString(unsigned int proto);
 const char* hookToString(unsigned int hooknum);
 const char* routeTypeToString(unsigned int route_type);
-void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]);
-int32_t bytesToInt(uint8_t *bytes, size_t num_bytes);
-__u32 bytesToUint(uint8_t *bytes) ;
+void int_to_bytes(const void *value, unsigned char *bytes, size_t len);
+void bytes_to_int(const unsigned char *bytes, void *value, size_t len);
+
 void ipToString(const unsigned int ip, char *buffer, size_t buf_len);
 
 #endif // TYPE_CONVERTERS_H

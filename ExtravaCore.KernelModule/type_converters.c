@@ -208,29 +208,43 @@ const char* ecnToString(u8 ecn) {
     }
 }
 
-void intToBytes(s32 value, unsigned char bytes[sizeof(s32)]) {
-    for (size_t i = 0; i < sizeof(s32); i++) {
-        bytes[i] = (value >> (8 * (sizeof(s32) - 1 - i))) & 0xFF;
+uint64_t htonll(uint64_t value) {
+    return ((uint64_t)htonl(value & 0xFFFFFFFF) << 32) | htonl(value >> 32);
+}
+
+uint64_t ntohll(uint64_t value) {
+    return ((uint64_t)ntohl(value >> 32)) | ((uint64_t)ntohl(value & 0xFFFFFFFF) << 32);
+}
+
+// Converts an integer to bytes based on its size
+void int_to_bytes(const void *value, unsigned char *bytes, size_t len) {
+    if (len == sizeof(u16)) {
+        u16 val = cpu_to_le16(*(u16*)value);
+        memcpy(bytes, &val, len);
+    } else if (len == sizeof(u32)) {
+        u32 val = cpu_to_le32(*(u32*)value);
+        memcpy(bytes, &val, len);
+    } else if (len == sizeof(u64)) {
+        u64 val = cpu_to_le64(*(u64*)value);
+        memcpy(bytes, &val, len);
     }
 }
 
-s32 bytesToInt(uint8_t *bytes, size_t num_bytes) {
-    s32 result = 0;
-    if (num_bytes > sizeof(result)) {
-        num_bytes = sizeof(result);
+// Converts bytes to an integer based on its size
+void bytes_to_int(const unsigned char *bytes, void *value, size_t len) {
+    if (len == sizeof(u16)) {
+        u16 val;
+        memcpy(&val, bytes, len);
+        *(u16*)value = le16_to_cpu(val);
+    } else if (len == sizeof(u32)) {
+        u32 val;
+        memcpy(&val, bytes, len);
+        *(u32*)value = le32_to_cpu(val);
+    } else if (len == sizeof(u64)) {
+        u64 val;
+        memcpy(&val, bytes, len);
+        *(u64*)value = le64_to_cpu(val);
     }
-    for (size_t i = 0; i < num_bytes; ++i) {
-        result |= ((s32)bytes[i]) << (i * 8);
-    }
-    return result;
-}
-
-__u32 bytesToUint(uint8_t *bytes) {
-    __u32 result = 0;
-    for (size_t i = 0; i < sizeof(__u32); ++i) {
-        result |= ((__u32)bytes[i]) << (i * 8);
-    }
-    return result;
 }
 
 /* 

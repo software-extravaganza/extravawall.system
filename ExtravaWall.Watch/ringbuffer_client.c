@@ -85,6 +85,38 @@ __u16 get_size_for_slot_header_id(){
     return SLOT_HEADER_ID_SIZE;
 }
 
+__s32 get_offset_for_slot_header_status(){
+    return SLOT_HEADER_STATUS_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_id(){
+    return SLOT_HEADER_ID_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_total_data_size(){
+    return SLOT_HEADER_TOTAL_DATA_SIZE_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_current_data_size(){
+    return SLOT_HEADER_CURRENT_DATA_SIZE_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_sequence_number(){
+    return SLOT_HEADER_SEQUENCE_NUMBER_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_clearance_start_index(){
+    return SLOT_HEADER_CLEARANCE_START_INDEX_OFFSET;
+}
+
+__s32 get_offset_for_slot_header_clearance_end_index(){
+    return SLOT_HEADER_CLEARANCE_END_INDEX_OFFSET;
+}
+
+__s32 get_offset_for_slot_data(){
+    return SLOT_HEADER_SIZE;
+}
+
 
 // void* open_shared_memory(const char* path) {
 //     fd = open(path, O_RDWR | O_SYNC, 0600);
