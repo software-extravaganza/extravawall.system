@@ -194,7 +194,7 @@ public class KernelClient {
         }
     }
 
-    public static CreationResult<IPHeader> ParseIPHeader(Span<byte> data) {
+    public static CreationResult<IPHeader> ParseIPHeader(ReadOnlySpan<byte> data) {
         if (data.Length < 20) {
             return new CreationResult<IPHeader>(null, false, "Data is too short to be a valid IP header.");
         }

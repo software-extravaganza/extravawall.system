@@ -29,6 +29,9 @@ void SetUserSpaceReadDisconnected(void);
 void SetUserSpaceWriteDisconnected(void);
 void SetLogLevel(int level);
 int GetLogLevel(void);
+void SetHooksConnected(void);
+void SetHooksDisconnected(void);
+bool AreHooksConnected(void);
 void SetShouldCaptureEventHandler(captureEventHandler handler);
 
 #endif // _MODULE_CONTROL_H_

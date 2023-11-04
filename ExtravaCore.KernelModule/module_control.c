@@ -23,6 +23,7 @@ static bool _oldIsInitialized = true;
 static bool _oldIsUserSpaceReadConnected = true;
 static bool _oldIsUserSpaceWriteConnected = true;
 static bool _oldIsUserSpaceConnected = true;
+static bool _areHooksConnected = false;
 static int _oldLogLevel = -9999;
 static captureEventHandler _shouldCaptureUserEventHandler = NULL;
 
@@ -37,6 +38,9 @@ bool IsUnloading(void){
     return _isUnloading;
 }
 
+bool AreHooksConnected(void){
+    return _areHooksConnected;
+}
 
 bool IsInitialized(void){
     return _isInitialized;
@@ -90,6 +94,24 @@ void SetInitialized(void){
 
 void SetUnloading(void){
     _isUnloading = true;
+    _shouldCaptureChangeHandler();
+}
+
+void SetHooksConnected(void){
+    if(_areHooksConnected == true){
+        return;
+    }
+
+    _areHooksConnected = true;
+    _shouldCaptureChangeHandler();
+}
+
+void SetHooksDisconnected(void){
+    if(_areHooksConnected == false){
+        return;
+    }
+
+    _areHooksConnected = false;
     _shouldCaptureChangeHandler();
 }
 
@@ -166,7 +188,7 @@ void SetShouldCaptureEventHandler(captureEventHandler handler){
 }
 
 static void _shouldCaptureChangeHandler(void){
-    bool _newShouldCapture = IsActive() && IsInitialized() && IsUserSpaceConnected() && !IsUnloading();
+    bool _newShouldCapture = IsActive() && IsInitialized() && IsUserSpaceConnected() && !IsUnloading() && AreHooksConnected();
     if(_oldShouldCapture == _newShouldCapture){
         return;
     }

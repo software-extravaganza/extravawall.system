@@ -90,7 +90,7 @@ static void printRingBufferCounters(void){
 int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler) {
     _queueProcessorThread = kthread_run(handler, NULL, "packet_processor");
     if (IS_ERR(_queueProcessorThread)) {
-        printk(KERN_ERR "Failed to start packet_processor_thread.\n");
+        LOG_ERROR("Failed to start packet_processor_thread.");
         CleanupNetfilterHooks();  // Make sure to clean up before exiting
         return PTR_ERR(_queueProcessorThread);
     }
@@ -317,7 +317,7 @@ int SetupNetfilterHooks(void) {
     InitializeAllPools(2000);
     int ret = packet_queue_init();
     if (ret) {
-        printk(KERN_ERR "Failed to initialize packet queues.\n");
+        LOG_ERROR("Failed to initialize packet queues");
         return ret;
     }
     
@@ -372,6 +372,7 @@ int SetupNetfilterHooks(void) {
 
     LOG_INFO("Registering queue handler");
     nf_register_queue_handler(_queueHandlerOps);
+    SetHooksConnected();
 
     init_waitqueue_head(&QueueProcessorExitedWaitQueue);
     init_waitqueue_head(&_queueItemProcessedWaitQueue);
@@ -387,6 +388,7 @@ int SetupNetfilterHooks(void) {
 void CleanupNetfilterHooks(void) {
     printRingBufferCounters();
     _isInitialized = false;
+    SetHooksDisconnected();
     if (_queueHandlerOps) {
         nf_unregister_queue_handler();
         kfree(_queueHandlerOps);
@@ -417,8 +419,7 @@ void CleanupNetfilterHooks(void) {
     }
 
     packet_queue_cleanup();
-    FreeAllPools();
-    
+  
     PacketQueueCleanup(_pendingPacketsQueue);
     PacketQueueCleanup(_read1PacketsQueue);
     PacketQueueCleanup(_read2PacketsQueue);
@@ -439,6 +440,8 @@ void CleanupNetfilterHooks(void) {
             listNodeToCleanUp = NULL;
         }
     }
+
+    FreeAllPools();
 }
 
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip){
@@ -466,7 +469,7 @@ static struct nf_queue_handler* _setupQueueHandlerHook(void) {
 
 static void _hookDrop(struct net *net){
     LOG_DEBUG("Cleaning up netfilter queue hooks");
-    
+    SetHooksDisconnected();
     if(_queueHandlerOps){
         nf_unregister_queue_handler();
         kfree(_queueHandlerOps);
@@ -481,6 +484,7 @@ static void _hookDrop(struct net *net){
             return;
         }
         nf_register_queue_handler(_queueHandlerOps);
+        SetHooksConnected();
     }
 }
 
