@@ -1030,7 +1030,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         }
 
         if (slot_header.ClearanceEndIndex < slot_header.ClearanceStartIndex) {
-            LOG_ERROR("Skipping slot; ClearanceEndIndex (%d) smaller than ClearanceStartIndex (%d)", slot_header.ClearanceStartIndex, slot_header.ClearanceEndIndex);
+            LOG_ERROR("Skipping slot; ClearanceEndIndex (%d) smaller than ClearanceStartIndex (%d)", slot_header.ClearanceEndIndex, slot_header.ClearanceStartIndex);
             currentSlot = (currentSlot + 1) % NUM_SLOTS;
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
@@ -1159,7 +1159,22 @@ DataBuffer *ReadFromUserRingBuffer(void) {
     
     if(slotFound){
         down(&userIndiciesToClearSemaphore);
-        kfifo_put(&userIndiciesToClear, indexRange);
+        if (indexRange.End < indexRange.End) {
+            IndexRange rangeToEndOfBuffer;
+            IndexRange rangeFromBeginningOfBuffer;
+
+            rangeToEndOfBuffer.Start = indexRange.Start;
+            rangeToEndOfBuffer.End = NUM_SLOTS;
+            rangeFromBeginningOfBuffer.Start = 0;
+            rangeFromBeginningOfBuffer.End = indexRange.End;
+
+            kfifo_put(&userIndiciesToClear, rangeToEndOfBuffer);
+            kfifo_put(&userIndiciesToClear, rangeFromBeginningOfBuffer);
+        }
+        else {
+            kfifo_put(&userIndiciesToClear, indexRange);
+        }
+        
         up(&userIndiciesToClearSemaphore);
     }
 

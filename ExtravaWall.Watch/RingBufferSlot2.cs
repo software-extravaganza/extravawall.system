@@ -1011,7 +1011,12 @@ public unsafe class RingBufferReader {
         }
 
         if (slotFound) {
-            systemIndiciesToClear.Enqueue(((uint)startIndex, (uint)endIndex));
+            if (endIndex < startIndex) {
+                systemIndiciesToClear.Enqueue(((uint)startIndex, sharedMemory.NUM_SLOTS));
+                systemIndiciesToClear.Enqueue((0, (uint)endIndex));
+            } else {
+                systemIndiciesToClear.Enqueue(((uint)startIndex, (uint)endIndex));
+            }
         }
 
         foreach (var index in userIndiciesToClear.Distinct()) {
