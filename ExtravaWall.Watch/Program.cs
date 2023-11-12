@@ -48,6 +48,11 @@ while (true) {
     }
 
     logger.Log($"Data found: {data.Length} bytes");
+    if (data.Length < intSize * 6) {
+        logger.Log($"Data too small ({data.Length} bytes)");
+        continue;
+    }
+
     var flags = BitConverter.ToInt32(data.Slice(0, intSize));
     var routingType = (RoutingType)BitConverter.ToInt32(data.Slice(intSize * 1, intSize));
     var version = BitConverter.ToInt32(data.Slice(intSize * 2, intSize));
@@ -64,11 +69,6 @@ while (true) {
     var dataToSendFirstIntBytes = dataToSend.Slice(0, intSize);
     var dataToSendSecondIntBytes = dataToSend.Slice(intSize, intSize);
     var dataToSendThirdIntBytes = dataToSend.Slice(intSize * 2, intSize);
-
-    if (rawPacketId.Length != intSize || rawPacketQueueNumber.Length != intSize) {
-        logger.Log($"Invalid packet id or queue number: {rawPacketId.Length} {rawPacketQueueNumber.Length}");
-        continue;
-    }
 
     rawPacketId.Slice(0, intSize).CopyTo(dataToSendFirstIntBytes);
     rawPacketQueueNumber.Slice(0, intSize).CopyTo(dataToSendSecondIntBytes);
