@@ -61,6 +61,12 @@ while (true) {
     var rawPacketQueueNumber = data.Slice(intSize * 5, intSize);
     var packetQueueNumber = BitConverter.ToInt32(rawPacketQueueNumber);
     var packetId = BitConverter.ToInt32(rawPacketId);
+
+    if (data.Length < (intSize * 6) + dataLength) {
+        logger.Log($"Data too small ({data.Length} bytes) for payload ({dataLength} bytes)");
+        continue;
+    }
+
     var payload = data.Slice(intSize * 6, dataLength);
     var routingDecision = RoutingDecision.ACCEPT;
     //var routingDecision = GetRoutingDecision(logger, routingType, payload);
