@@ -65,6 +65,11 @@ while (true) {
     var dataToSendSecondIntBytes = dataToSend.Slice(intSize, intSize);
     var dataToSendThirdIntBytes = dataToSend.Slice(intSize * 2, intSize);
 
+    if (rawPacketId.Length != intSize || rawPacketQueueNumber.Length != intSize) {
+        logger.Log($"Invalid packet id or queue number: {rawPacketId.Length} {rawPacketQueueNumber.Length}");
+        continue;
+    }
+
     rawPacketId.Slice(0, intSize).CopyTo(dataToSendFirstIntBytes);
     rawPacketQueueNumber.Slice(0, intSize).CopyTo(dataToSendSecondIntBytes);
     if (BitConverter.IsLittleEndian) {
