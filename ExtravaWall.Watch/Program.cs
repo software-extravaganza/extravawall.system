@@ -21,6 +21,7 @@ bool processedPacketLastRound = false;
 //SharedMemoryManager.open_shared_memory("/dev/ringbuffer_device");
 while (true) {
     if (!processedPacketLastRound && DateTime.Now - lastTime < TimeSpan.FromMilliseconds(1)) {
+        processedPacketLastRound = false;
         Thread.Sleep(1);
         continue;
     }
@@ -39,6 +40,7 @@ while (true) {
     var data = reader.Read();
     if (data == null) {
         //logger.Log("No data found");
+        processedPacketLastRound = false;
         continue;
     }
 
@@ -50,6 +52,7 @@ while (true) {
     logger.Log($"Data found: {data.Length} bytes");
     if (data.Length < intSize * 6) {
         logger.Log($"Data too small ({data.Length} bytes)");
+        processedPacketLastRound = false;
         continue;
     }
 
@@ -64,6 +67,7 @@ while (true) {
 
     if (data.Length < (intSize * 6) + dataLength) {
         logger.Log($"Data too small ({data.Length} bytes) for payload ({dataLength} bytes)");
+        processedPacketLastRound = false;
         continue;
     }
 

@@ -626,6 +626,7 @@ int _netFilterPacketProcessorThread(void *data) {
     last_time = ktime_get();
     while (!kthread_should_stop() && !IsUnloading() ) {
         if(!processed_packet_last_round && ktime_get() - last_time < ktime_set(0, 1000000)){ // Less than 1ms and now new packets processed, wait a millisecond
+            processed_packet_last_round = false;
             msleep(1);
             continue;
         }
@@ -637,7 +638,7 @@ int _netFilterPacketProcessorThread(void *data) {
         struct list_head *pos, *q;
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
-            __u32 slotAssigned = current_node->data->slotAssigned; 
+            __u32 slotAssigned = current_node->data->slotAssigned;
             if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && slotAssigned >= 0){ // Greater than 1000ms then it's stale
                 RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(slotAssigned);
                 if(startHeader.Status != EMPTY){
@@ -680,6 +681,7 @@ int _netFilterPacketProcessorThread(void *data) {
         }
 
         if(nodeFound == NULL){
+            processed_packet_last_round = false;
             continue;
         }
 
