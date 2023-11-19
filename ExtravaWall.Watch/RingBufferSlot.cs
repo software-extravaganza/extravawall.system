@@ -108,7 +108,10 @@ public unsafe struct DuplexRingBuffer {
 public enum SlotStatus : byte {
     EMPTY = 0,
     VALID = 1,
-    ADVANCE = 2
+    ADVANCE_START = 2,
+    ADVANCE = 3,
+    ADVANCE_END = 4,
+    PREPPING = 5
 }
 
 public enum RingBufferStatus : byte {

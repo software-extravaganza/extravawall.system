@@ -1,4 +1,4 @@
-CFLAGS=-isystem /lib/modules/$(shell uname -r) -std=gnu99
+CFLAGS=-isystem /lib/modules/$(shell uname -r) -std=gnu99 -g
 basedir = $(PWD)
 srcdir = $(basedir)/src
 incdir = $(basedir)/include

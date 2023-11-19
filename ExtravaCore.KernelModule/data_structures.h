@@ -49,6 +49,7 @@ typedef enum {
 } RoutingDecision;
 typedef enum {
     MEMORY_FAILURE_PACKET,
+    NO_SLOT_ASSIGNED,
     MEMORY_FAILURE_PACKET_HEADER,
     BUFFER_FULL,
     TIMEOUT,
@@ -70,6 +71,7 @@ typedef struct {
 } PendingPacket;
 
 typedef struct {
+    __u64 id;
     bool available;
     ktime_t createdTime;
     __u32 slotAssigned;

@@ -230,6 +230,19 @@ void int_to_bytes(const void *value, unsigned char *bytes, size_t len) {
     }
 }
 
+void beint_to_bytes(const void *value, unsigned char *bytes, size_t len) {
+    if (len == sizeof(__be16)) {
+        __be16 val = cpu_to_be16(*(__be16*)value);
+        memcpy(bytes, &val, len);
+    } else if (len == sizeof(__be32)) {
+        __be32 val = cpu_to_be32(*(__be32*)value);
+        memcpy(bytes, &val, len);
+    } else if (len == sizeof(__be64)) {
+        __be64 val = cpu_to_be64(*(__be64*)value);
+        memcpy(bytes, &val, len);
+    }
+}
+
 // Converts bytes to an integer based on its size
 void bytes_to_int(const unsigned char *bytes, void *value, size_t len) {
     if (len == sizeof(u16)) {
@@ -244,6 +257,22 @@ void bytes_to_int(const unsigned char *bytes, void *value, size_t len) {
         u64 val;
         memcpy(&val, bytes, len);
         *(u64*)value = le64_to_cpu(val);
+    }
+}
+
+void bytes_to_beint(const unsigned char *bytes, void *value, size_t len) {
+    if (len == sizeof(__be16)) {
+        __be16 val;
+        memcpy(&val, bytes, len);
+        *(__be16*)value = be16_to_cpu(val);
+    } else if (len == sizeof(__be32)) {
+        __be32 val;
+        memcpy(&val, bytes, len);
+        *(__be32*)value = be32_to_cpu(val);
+    } else if (len == sizeof(__be64)) {
+        __be64 val;
+        memcpy(&val, bytes, len);
+        *(__be64*)value = be64_to_cpu(val);
     }
 }
 

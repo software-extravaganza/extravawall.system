@@ -3,6 +3,8 @@ using System.Text;
 using ExtravaCore;
 using ExtravaWall.Watch;
 using System.Buffers.Binary;
+using Microsoft.Extensions.Logging;
+
 // See https://aka.ms/new-console-template for more information
 Console.WriteLine("ExtavaWall Watch");
 
@@ -11,85 +13,144 @@ Console.WriteLine("ExtavaWall Watch");
 //await KernelClient.StartAsync();
 
 const int intSize = sizeof(int);
-var logger = new Logger(false);
+const int ushortSize = sizeof(ushort);
+const int ulongSize = sizeof(ulong);
+using ILoggerFactory factory = LoggerFactory.Create(builder =>
+    builder.AddConsole()
+.SetMinimumLevel(LogLevel.Information)
+//.SetMinimumLevel(LogLevel.Trace)
+);
+ILogger logger = factory.CreateLogger("Program");
+
+
+//var logger = new Logger(true);
 SharedMemory2 sharedMemory = new SharedMemory2(logger, "/dev/ringbuffer_device");
 RingBufferReader reader = new RingBufferReader(logger, sharedMemory);
 DateTime lastTime = DateTime.Now;
 bool processedPacketLastRound = false;
-
+ulong dataProcessed = 0;
+ulong HandledPacketCounter = 0;
+IDictionary<byte, ulong> protocolCounter = new Dictionary<byte, ulong>();
 
 //SharedMemoryManager.open_shared_memory("/dev/ringbuffer_device");
-while (true) {
-    if (!processedPacketLastRound && DateTime.Now - lastTime < TimeSpan.FromMilliseconds(1)) {
-        processedPacketLastRound = false;
-        Thread.Sleep(1);
-        continue;
-    }
 
-    //logger.Log($"Checking for data ({reader.SlotWrittenTimes.Count})");
-    for (var slotIndex = 0; slotIndex < reader.SlotWrittenTimes.Count; slotIndex++) {
-        var slot = reader.SlotWrittenTimes.ElementAt(slotIndex);
-        if (DateTime.Now - slot.Value > TimeSpan.FromMilliseconds(100)) {
-            sharedMemory.WriteUserRingBufferSlotStatus((uint)slot.Key, SlotStatus.EMPTY);
-            reader.SlotWrittenTimes.Remove(slot.Key);
-            logger.Log($"Removed stale response in slot {slot.Key} due to timeout");
+Task handlePacketsTask = Task.Run(() => {
+    while (true) {
+        if (!processedPacketLastRound && DateTime.Now - lastTime < TimeSpan.FromMilliseconds(1)) {
+            processedPacketLastRound = false;
+            Thread.Sleep(1);
+            continue;
         }
+
+        //logger.Log($"Checking for data ({reader.SlotWrittenTimes.Count})");
+        for (var slotIndex = 0; slotIndex < reader.SlotWrittenTimes.Count; slotIndex++) {
+            var slot = reader.SlotWrittenTimes.ElementAt(slotIndex);
+            if (DateTime.Now - slot.Value > TimeSpan.FromMilliseconds(1000)) {
+                sharedMemory.WriteUserRingBufferSlotStatus((uint)slot.Key, SlotStatus.EMPTY);
+                reader.SlotWrittenTimes.Remove(slot.Key);
+                //logger.LogWarning($"Removed stale response in slot {slot.Key} due to timeout");
+            }
+        }
+
+        lastTime = DateTime.Now;
+        var data = reader.Read();
+        if (data == null) {
+            //logger.LogWarning("No data found");
+            processedPacketLastRound = false;
+            continue;
+        }
+
+        processedPacketLastRound = data.Length > 0;
+        if (!processedPacketLastRound) {
+            continue;
+        }
+
+        //logger.Log($"Data found: {data.Length} bytes");
+        if (data.Length < (intSize * 5) + ushortSize) {
+            logger.LogError($"Data too small ({data.Length} bytes)");
+            processedPacketLastRound = false;
+            continue;
+        }
+
+        HandledPacketCounter++;
+        if (HandledPacketCounter % 1_000 == 0 && HandledPacketCounter != 0) {
+            var protocolResults = new StringBuilder();
+            foreach (var protocol in protocolCounter) {
+                protocolResults.Append($"{KernelClient.IpProtocolToString(protocol.Key)}: {protocol.Value}; ");
+            }
+
+            logger.LogInformation($"Handled {HandledPacketCounter} packets. Protocols: {protocolResults}");
+        }
+
+        var peeler = new DataPeeler(data);
+        var flags = peeler.PeelBytesToInt32(); //BitConverter.ToInt32(data.Slice(0, intSize));
+        var routingType = peeler.PeelBytesToEnum<RoutingType>();
+        var version = peeler.PeelBytesToInt32();
+        var dataLength = peeler.PeelBytesToInt32();
+        var packetId = peeler.PeelBytesToUInt64();
+        var packetQueueNumber = peeler.PeelBytesToUInt32();
+
+        logger.LogTrace($"Flags: {flags}, Routing Type: {routingType}, Version: {version}, Data Length: {dataLength}, Packet ID: {packetId}, Packet Queue Number: {packetQueueNumber}");
+
+        if (dataLength < 0) {
+            logger.LogError($"Data length is invalid: {dataLength}");
+            processedPacketLastRound = false;
+            continue;
+        }
+
+        dataProcessed += (ulong)dataLength;
+        if (dataProcessed % 1_000_000_000 == 0 && dataProcessed != 0) {
+            logger.LogInformation($"Processed {dataProcessed / 1_000_000_000} Gb of data.");
+        }
+
+        if (peeler.Length < dataLength) {
+            logger.LogError($"Data too small ({peeler.Length} bytes) for payload ({dataLength} bytes)");
+            processedPacketLastRound = false;
+            continue;
+        }
+
+        var payload = peeler.PeelBytes(dataLength);
+        var routingDecision = (uint)RoutingDecision.ACCEPT;
+        //var routingDecision = GetRoutingDecision(logger, routingType, payload);
+        KernelClient.CreationResult<IPHeader> ipHeaderResult = KernelClient.ParseIPHeader(payload);
+        if (ipHeaderResult.Success) {
+            var protocol = (byte)ipHeaderResult.Value.Protocol;
+            if (protocolCounter.TryGetValue(protocol, out var protocolCount)) {
+                protocolCounter[protocol] = protocolCount + 1;
+            } else {
+                protocolCounter.Add(protocol, 1);
+            }
+        }
+
+        var dataToSend = new byte[(intSize * 2) + ulongSize].AsSpan();
+        var dataToSendFirstIntBytes = dataToSend.Slice(0, ulongSize);
+        var dataToSendSecondIntBytes = dataToSend.Slice(ulongSize, intSize);
+        var dataToSendThirdIntBytes = dataToSend.Slice(ulongSize + intSize, intSize);
+
+        BitConverter.GetBytes(packetId).CopyTo(dataToSendFirstIntBytes);
+        BitConverter.GetBytes(packetQueueNumber).CopyTo(dataToSendSecondIntBytes);
+        if (BitConverter.IsLittleEndian) {
+            BinaryPrimitives.WriteInt32LittleEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian
+        } else {
+            BinaryPrimitives.WriteInt32BigEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian
+        }
+
+        logger.LogTrace($"Sending response for packet {packetId} with routing decision {routingDecision}");
+        reader.SendResponse(dataToSend.ToArray());
     }
+});
 
-    lastTime = DateTime.Now;
-    var data = reader.Read();
-    if (data == null) {
-        //logger.Log("No data found");
-        processedPacketLastRound = false;
-        continue;
-    }
+List<Task> handlingTasks = new List<Task>{
+    handlePacketsTask.ContinueWith((task) => {
+        logger.LogError($"Task 1 failed: {task.Exception}");
+    }, TaskContinuationOptions.OnlyOnFaulted),
 
-    processedPacketLastRound = data.Length > 0;
-    if (!processedPacketLastRound) {
-        continue;
-    }
+    // handlePacketsTask.ContinueWith((task) => {
+    //     logger.LogError($"Task 2 failed: {task.Exception}");
+    // }, TaskContinuationOptions.OnlyOnFaulted),
+};
 
-    logger.Log($"Data found: {data.Length} bytes");
-    if (data.Length < intSize * 6) {
-        logger.Log($"Data too small ({data.Length} bytes)");
-        processedPacketLastRound = false;
-        continue;
-    }
-
-    var flags = BitConverter.ToInt32(data.Slice(0, intSize));
-    var routingType = (RoutingType)BitConverter.ToInt32(data.Slice(intSize * 1, intSize));
-    var version = BitConverter.ToInt32(data.Slice(intSize * 2, intSize));
-    var dataLength = BitConverter.ToInt32(data.Slice(intSize * 3, intSize));
-    var rawPacketId = data.Slice(intSize * 4, intSize);
-    var rawPacketQueueNumber = data.Slice(intSize * 5, intSize);
-    var packetQueueNumber = BitConverter.ToInt32(rawPacketQueueNumber);
-    var packetId = BitConverter.ToInt32(rawPacketId);
-
-    if (data.Length < (intSize * 6) + dataLength) {
-        logger.Log($"Data too small ({data.Length} bytes) for payload ({dataLength} bytes)");
-        processedPacketLastRound = false;
-        continue;
-    }
-
-    var payload = data.Slice(intSize * 6, dataLength);
-    var routingDecision = RoutingDecision.ACCEPT;
-    //var routingDecision = GetRoutingDecision(logger, routingType, payload);
-
-    var dataToSend = new byte[intSize * 3].AsSpan();
-    var dataToSendFirstIntBytes = dataToSend.Slice(0, intSize);
-    var dataToSendSecondIntBytes = dataToSend.Slice(intSize, intSize);
-    var dataToSendThirdIntBytes = dataToSend.Slice(intSize * 2, intSize);
-
-    rawPacketId.Slice(0, intSize).CopyTo(dataToSendFirstIntBytes);
-    rawPacketQueueNumber.Slice(0, intSize).CopyTo(dataToSendSecondIntBytes);
-    if (BitConverter.IsLittleEndian) {
-        BinaryPrimitives.WriteInt32LittleEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian
-    } else {
-        BinaryPrimitives.WriteInt32BigEndian(dataToSendThirdIntBytes, (int)routingDecision); // Or WriteInt32BigEndian
-    }
-
-    reader.SendResponse(dataToSend.ToArray());
-}
+Task.WaitAll(handlingTasks.ToArray());
 
 static RoutingDecision GetRoutingDecision(Logger logger, RoutingType routingType, ReadOnlySpan<byte> payload) {
     var routingDecision = RoutingDecision.DROP;

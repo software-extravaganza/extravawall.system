@@ -61,20 +61,21 @@ static struct file_operations _operationsFromDeviceUser = {
 };
 
 // Public Fields
-long PacketsIngressCounter = 0;
-long PacketsQueuedCounter = 0;
-long PacketsCapturedCounter = 0;
-long PacketsProcessedCounter = 0;
-long PacketsAcceptCounter = 0;
-long PacketsManipulateCounter = 0;
-long PacketsDropCounter = 0;
-long PacketsStaleCounter = 0;
-long ReadWaitCounter = 0;
-long ReadWokeCounter = 0;
-long WriteWaitCounter = 0;
-long WriteWokeCounter = 0;
-long QueueProcessorWaitCounter = 0;
-long QueueProcessorWokeCounter = 0;
+__u64 PacketsIngressCounter = 0;
+__u64 PacketsHandledCounter = 0;
+__u64 PacketsQueuedCounter = 0;
+__u64 PacketsCapturedCounter = 0;
+__u64 PacketsProcessedCounter = 0;
+__u64 PacketsAcceptCounter = 0;
+__u64 PacketsManipulateCounter = 0;
+__u64 PacketsDropCounter = 0;
+__u64 PacketsStaleCounter = 0;
+__u64 ReadWaitCounter = 0;
+__u64 ReadWokeCounter = 0;
+__u64 WriteWaitCounter = 0;
+__u64 WriteWokeCounter = 0;
+__u64 QueueProcessorWaitCounter = 0;
+__u64 QueueProcessorWokeCounter = 0;
 
 
 atomic_t IsProcessingPacketTrip = ATOMIC_INIT(0); // 0 for false, 1 for true
@@ -195,6 +196,7 @@ int _packetProcessorThread(void *data) {
         LOG_DEBUG_ICMP(pendingPacketTrip, "Popping from _pendingPacketsQueue. Current size: %d; Size after pop: %d", pendingQueueLength, pendingQueueLength - 1);
         if(pendingPacketTrip == NULL){
             LOG_ERROR("Processed packet trip is null from _pendingPacketsQueue");
+            up(&newPacketSemaphore);
             continue;
         }
         up(&newPacketSemaphore);

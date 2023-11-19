@@ -2,6 +2,7 @@
 
 // Constants
 #define MESSAGE_MEMORY_FAILURE_PACKET "Memory allocation failure for packet"
+#define MESSAGE_NO_SLOT_ASSIGNED "No slot assigned for packet"
 #define MESSAGE_MEMORY_FAILURE_PACKET_HEADER "Memory allocation failure for packet header"
 #define MESSAGE_BUFFER_FULL "Dropped a packet because the packet buffer is full"
 #define MESSAGE_TIMEOUT "Dropped a packet that timed out"
@@ -13,6 +14,7 @@
 // Private members
 static DecisionReasonInfo _reasonInfos[] = {
     { MEMORY_FAILURE_PACKET, MESSAGE_MEMORY_FAILURE_PACKET },
+    { NO_SLOT_ASSIGNED, MESSAGE_NO_SLOT_ASSIGNED },
     { MEMORY_FAILURE_PACKET_HEADER, MESSAGE_MEMORY_FAILURE_PACKET_HEADER },
     { BUFFER_FULL, MESSAGE_BUFFER_FULL },
     { TIMEOUT, MESSAGE_TIMEOUT },
@@ -41,7 +43,7 @@ void safeFree(void* ptr) {
 
 int SetupTimeSamples(void) {
     if (!timeSamples) {
-        timeSamples = kmalloc(numSamples * sizeof(u64), GFP_KERNEL);
+        timeSamples = kzalloc(numSamples * sizeof(u64), GFP_KERNEL);
         if (!timeSamples) {
             LOG_ERROR("Failed to allocate memory for timeSamples.");
             return -1; 
@@ -49,7 +51,7 @@ int SetupTimeSamples(void) {
     }
 
     if (!sortedTimeSamples) {
-        sortedTimeSamples = kmalloc(numSamples * sizeof(u64), GFP_KERNEL);
+        sortedTimeSamples = kzalloc(numSamples * sizeof(u64), GFP_KERNEL);
         if (!sortedTimeSamples) {
             LOG_ERROR("Failed to allocate memory for sortedTimeSamples.");
             kfree(timeSamples);
@@ -62,7 +64,9 @@ int SetupTimeSamples(void) {
 
 void CleanupTimeSamples(void) {
     safeFree(timeSamples);
-    safeFree(timeSamples);
+    timeSamples = NULL;
+    safeFree(sortedTimeSamples);
+    sortedTimeSamples = NULL;
 }
 
 void recordSampleTime(u64 duration) {
@@ -218,6 +222,7 @@ void FreePendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
 void ResetPendingPacketTrip(PendingPacketRoundTrip *packetTrip) {
     if (packetTrip) {
         _recordSampleTimeForPacketTrip(packetTrip);
+        packetTrip->id = 0;
         packetTrip->slotAssigned = -5;
 
         // Reset the createdTime

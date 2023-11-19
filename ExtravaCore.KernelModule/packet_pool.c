@@ -31,7 +31,7 @@ static void InitializePool(PacketPool *pool, int cpu, int initialSize) {
 }
 
 // Get a free packet trip from the current CPU's pool
-PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, RoutingType type) {
+PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, __u64 id, RoutingType type) {
     if (!entry) {
         LOG_DEBUG("Entry provided is NULL.");
         return NULL;
@@ -59,6 +59,7 @@ PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, RoutingT
         if (currentPool->packets[i].available) {
             currentPool->usedCount++;
             PendingPacketRoundTrip* packetTrip = &currentPool->packets[i];
+            packetTrip->id = id;
             packetTrip->available = false;
             packetTrip->entry = entry;
             packetTrip->routingType = type;
@@ -85,9 +86,9 @@ void ReturnPacketTrip(PendingPacketRoundTrip *packetTrip) {
 // Free all pools
 void FreeAllPools() {
     int cpuCount = num_online_cpus();
-    for (int i = 0; i < cpuCount; i++) {
-        FreePool(&pools[i]);
-    }
+    // for (int i = 0; i < cpuCount; i++) {
+    //     FreePool(&pools[i]);
+    // }
     
     if(pools != NULL){
         kfree(pools);

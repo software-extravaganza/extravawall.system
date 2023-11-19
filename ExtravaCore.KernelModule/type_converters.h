@@ -10,6 +10,7 @@
 #include "data_structures.h"
 
 #define S32_SIZE (sizeof(s32))
+#define BE16_SIZE (sizeof(__be16))
 #define U32_SIZE (sizeof(u32))
 #define U64_SIZE (sizeof(u64))
 #define U16_SIZE (sizeof(u16))
@@ -69,6 +70,8 @@ const char* hookToString(unsigned int hooknum);
 const char* routeTypeToString(unsigned int route_type);
 void int_to_bytes(const void *value, unsigned char *bytes, size_t len);
 void bytes_to_int(const unsigned char *bytes, void *value, size_t len);
+void beint_to_bytes(const void *value, unsigned char *bytes, size_t len);
+void bytes_to_beint(const unsigned char *bytes, void *value, size_t len);
 
 void ipToString(const unsigned int ip, char *buffer, size_t buf_len);
 

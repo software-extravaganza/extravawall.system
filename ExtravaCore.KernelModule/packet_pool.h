@@ -20,7 +20,7 @@ typedef struct {
 extern PacketPool *pools;
 
 void InitializeAllPools(int initialSize);
-PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, RoutingType type);
+PendingPacketRoundTrip* GetFreePacketTrip(struct nf_queue_entry *entry, __u64 id, RoutingType type) ;
 void ReturnPacketTrip(PendingPacketRoundTrip *packetTrip);
 void FreeAllPools(void);
 

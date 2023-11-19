@@ -9,6 +9,7 @@
 #include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/semaphore.h>
+#include <linux/spinlock.h>
 #include <linux/kfifo.h>
 #include <linux/init.h>
 #include <linux/const.h>

@@ -58,7 +58,10 @@ typedef struct DuplexRingBuffer DuplexRingBuffer;
 typedef enum {
     EMPTY = 0,
     VALID = 1,
-    ADVANCE = 2,
+    ADVANCE_START = 2,
+    ADVANCE = 3,
+    ADVANCE_END = 4,
+    PREPPING = 5,
 } SlotStatus;
 
 typedef struct {
