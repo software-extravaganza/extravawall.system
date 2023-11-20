@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/ExtravaWall.Watch/bin/Debug/net7.0/linux-x64/ExtravaWall.Watch.dll",
+            "program": "${workspaceFolder}/ExtravaWall.Watch/bin/Debug/net8.0/linux-x64/ExtravaWall.Watch.dll",
             "args": [],
             "cwd": "${workspaceFolder}/ExtravaWall.Watch",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
@@ -30,7 +30,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/ExtravaWallSetup/bin/Debug/net7.0/linux-x64/ExtravaWallSetup.dll",
+            "program": "${workspaceFolder}/ExtravaWallSetup/bin/Debug/net8.0/linux-x64/ExtravaWallSetup.dll",
             "args": [],
             "cwd": "${workspaceFolder}/ExtravaWallSetup",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
@@ -49,7 +49,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/ExtravaWallSetup/bin/Debug/net7.0/linux-x64/ExtravaWallSetup.dll",
+            "program": "${workspaceFolder}/ExtravaWallSetup/bin/Debug/net8.0/linux-x64/ExtravaWallSetup.dll",
             "args": ["--no-root"],
             "cwd": "${workspaceFolder}/ExtravaWallSetup",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console

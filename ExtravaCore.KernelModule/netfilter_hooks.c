@@ -696,7 +696,7 @@ int _netFilterPacketProcessorThread(void *data) {
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
             __u32 slotAssigned = current_node->data->slotAssigned;
-
+ 
             //smp_processor_id() == 0 && 
             if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && slotAssigned >= 0){ // Greater than 1000ms then it's stale
                 RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(slotAssigned);
@@ -732,6 +732,8 @@ int _netFilterPacketProcessorThread(void *data) {
         free_data_buffer(response);
         LOG_DEBUG_PACKET("Received response. Decision: %d, Packet Id: %lld, Queue Number: %d", routingDecision, packetId, packetQueueNumber);
 
+        //__u32 packetQueueNumber, routingDecision;
+
         current_node = NULL;
         struct PacketTripListNode *nodeFound = NULL;
         list_for_each_entry(current_node, &packetQueueListHead, list) {
@@ -739,6 +741,16 @@ int _netFilterPacketProcessorThread(void *data) {
                 nodeFound = current_node;
                 break;
            }
+            // routingDecision = ACCEPT;
+            // nodeFound = current_node;
+
+            // down(&userIndiciesToClearSemaphore);
+            // IndexRange rangeToClear;
+            // rangeToClear.Start = nodeFound->data->slotAssigned;
+            // rangeToClear.End = nodeFound->data->slotAssigned;
+            // kfifo_put(&userIndiciesToClear, rangeToClear);
+            // up(&userIndiciesToClearSemaphore);
+            // break;
         }
 
         if(nodeFound == NULL){

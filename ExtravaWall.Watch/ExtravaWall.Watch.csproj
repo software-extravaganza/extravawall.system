@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <!-- <RuntimeIdentifiers>win10-x64;linux-x64;debian.11-x64</RuntimeIdentifiers> -->
 
     <ImplicitUsings>enable</ImplicitUsings>
@@ -14,8 +14,9 @@
     <!-- <PublishAot>true</PublishAot> -->
     <OptimizationPreference>Size</OptimizationPreference>
     <PublishTrimmed>true</PublishTrimmed>
+    <PublishAot>true</PublishAot>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- <PublishSingleFile>true</PublishSingleFile> -->
     <SelfContained>true</SelfContained>
     <!-- <StripSymbols>false</StripSymbols> -->
     <!--<PublishAot>true</PublishAot>-->
