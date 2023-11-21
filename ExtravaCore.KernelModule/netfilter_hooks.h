@@ -68,6 +68,7 @@ extern __u64 WriteWaitCounter;
 extern __u64 WriteWokeCounter;
 extern __u64 QueueProcessorWokeCounter;
 extern __u64 QueueProcessorWaitCounter;
+extern __u32 last_user_ring_buffer_position;
 
 extern long SystemBufferSlotsUsedCounter;
 extern long SystemBufferSlotsClearedCounter;

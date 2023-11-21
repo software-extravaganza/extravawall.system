@@ -44,6 +44,7 @@ DEFINE_PER_CPU(struct task_struct *, _queueProcessorThreads);
 // Spinlock for synchronization
 DEFINE_SPINLOCK(packet_queue_lock);
 LIST_HEAD(packetQueueListHead);
+LIST_HEAD(packetQueueToProcessHead);
 
 atomic_t _pendingQueueItemAdded = ATOMIC_INIT(0);
 bool _readQueueItemAdded = false;
@@ -357,7 +358,7 @@ int SetupNetfilterHooks(void) {
         LOG_ERROR("Failed to initialize packet queues");
         return ret;
     }
-    
+
     _preRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _postRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
     _localRoutingOps = kzalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
@@ -456,7 +457,7 @@ void CleanupNetfilterHooks(void) {
     }
 
     packet_queue_cleanup();
-  
+
     PacketQueueCleanup(_pendingPacketsQueue);
     PacketQueueCleanup(_read1PacketsQueue);
     PacketQueueCleanup(_read2PacketsQueue);
@@ -531,7 +532,7 @@ static void _hookDrop(struct net *net){
 // Workqueue function
 static void packet_work_func(struct work_struct *work)
 {
-    if (IsUnloading()){  
+    if (IsUnloading()){ 
         return;
     }
 
@@ -578,7 +579,6 @@ static void packet_work_func(struct work_struct *work)
         wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
         LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
     }
-    
 
     kfree(pw); // Free the work structure
     LOG_DEBUG_ICMP(packetTrip, "Exiting packet_work_func.");
@@ -595,17 +595,13 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
         return NF_DROP;
     }
 
-    
     // Get the current CPU's packet queue
     //PacketQueue *queue = this_cpu_ptr(&cpu_packet_queues);
 
     LOG_DEBUG_ICMP(packetTrip, "About to queue work to packet_wq id: %d", packetTrip->id);
     struct PacketTripListNode *node;
     node = kmalloc(sizeof(*node), GFP_KERNEL); // GFP_KERNEL for normal kernel allocation
-    if (node) {
-        node->data = packetTrip;
-        list_add_tail(&node->list, &packetQueueListHead); // Add new node to the list
-    }
+    
     // Lock, push to queue, and unlock
     // spin_lock(&packet_queue_lock);
     // PacketQueuePush(queue, packetTrip);
@@ -649,6 +645,11 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
     else if(slotAssigned >= 0){
         packetTrip->slotAssigned = slotAssigned;
     }
+
+    if (node) {
+        node->data = packetTrip;
+        list_add_tail(&node->list, &packetQueueToProcessHead); // Add new node to the list
+    }
     // Signal or process further as needed
     // atomic_set(&_pendingQueueItemAdded, 1);
     // if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
@@ -672,32 +673,39 @@ int _netFilterPacketProcessorThread(void *data) {
 
         last_time = ktime_get();
         // Clean stale packets
-        down(&userIndiciesToClearSemaphore);
-        IndexRange indexRange;
-        int currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
-        int previousIndiciesToClearCount = 0;
-        while(currentIndiciesToClearCount > 0){
-            if(!IsActive() || !IsUserSpaceConnected() || currentIndiciesToClearCount == previousIndiciesToClearCount){
-                up(&userIndiciesToClearSemaphore);
-                return -1;
-            }
-            kfifo_out(&userIndiciesToClear, &indexRange, sizeof(IndexRange));
+        // down(&userIndiciesToClearSemaphore);
+        // IndexRange indexRange;
+        // int currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
+        // int previousIndiciesToClearCount = 0;
+        // while(currentIndiciesToClearCount > 0){
+        //     if(!IsActive() || !IsUserSpaceConnected() || currentIndiciesToClearCount == previousIndiciesToClearCount){
+        //         up(&userIndiciesToClearSemaphore);
+        //         return -1;
+        //     }
+        //     kfifo_out(&userIndiciesToClear, &indexRange, sizeof(IndexRange));
 
-            previousIndiciesToClearCount = currentIndiciesToClearCount;
-            currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
+        //     previousIndiciesToClearCount = currentIndiciesToClearCount;
+        //     currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
+        // }
+        // up(&userIndiciesToClearSemaphore);
+
+        __u32 buffer_position = read_system_ring_buffer_position();
+        if(buffer_position != 0){
+            continue;
         }
-        up(&userIndiciesToClearSemaphore);
 
         struct PacketTripListNode *current_node = NULL;
         struct list_head *stalePacketToRemove = NULL;
         struct list_head *pos, *q;
+        int positionToReset = last_user_ring_buffer_position;
+        write_system_ring_buffer_slot_status(positionToReset, EMPTY);
 
         down(&packetResponseSemaphore);
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
             __u32 slotAssigned = current_node->data->slotAssigned;
- 
-            //smp_processor_id() == 0 && 
+
+            //smp_processor_id() == 0 &&
             if(last_time - current_node->data->createdTime > ktime_set(0, 1000000000) && slotAssigned >= 0){ // Greater than 1000ms then it's stale
                 RingBufferSlotHeader startHeader = read_system_ring_buffer_slot_header(slotAssigned);
                 if(startHeader.Status != EMPTY){
@@ -711,6 +719,30 @@ int _netFilterPacketProcessorThread(void *data) {
                 //SlotStatus slotStatus = read_system_ring_buffer_slot_status(slotAssigned);
                 LOG_DEBUG_ICMP(current_node->data, "Removed stale packet (%lld) trip from queue. Slot status: %d; Slot #{%d}", startHeader.Id, startHeader.Status, slotAssigned);
                 HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
+            }
+            else if(positionToReset == slotAssigned){
+                list_del(pos);
+            }
+        }
+
+        if(current_node == NULL){
+            up(&packetResponseSemaphore);
+            continue;
+        }
+
+        struct PacketTripListNode *new_node;
+        new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
+        current_node = NULL;
+        struct PacketTripListNode *nodeFound = NULL;
+        list_for_each_safe(pos, q, &packetQueueToProcessHead) {
+            current_node = list_entry(pos, struct PacketTripListNode, list);
+            if (current_node) {
+                new_node->data = current_node->data;
+                list_add_tail(&new_node->list, &packetQueueListHead); // Add new node to the list
+                list_del(pos);
+                LOG_DEBUG_ICMP(current_node->data, "Activated system slot #%d", current_node->data->slotAssigned);
+                write_system_ring_buffer_position(current_node->data->slotAssigned);
+                break;
             }
         }
 
@@ -733,10 +765,8 @@ int _netFilterPacketProcessorThread(void *data) {
         LOG_DEBUG_PACKET("Received response. Decision: %d, Packet Id: %lld, Queue Number: %d", routingDecision, packetId, packetQueueNumber);
 
         //__u32 packetQueueNumber, routingDecision;
-
-        current_node = NULL;
-        struct PacketTripListNode *nodeFound = NULL;
-        list_for_each_entry(current_node, &packetQueueListHead, list) {
+        list_for_each_safe(pos, q, &packetQueueListHead) {
+           current_node = list_entry(pos, struct PacketTripListNode, list);
            if(current_node->data->id == packetId){
                 nodeFound = current_node;
                 break;

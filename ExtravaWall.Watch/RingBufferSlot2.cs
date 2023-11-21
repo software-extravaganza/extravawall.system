@@ -223,6 +223,15 @@ public unsafe class SharedMemory2 : IDisposable {
 
     public ushort SLOT_HEADER_ID_SIZE { get; }
 
+    public int LoopAroundIncrement(int? currentPosition, int upperBound) {
+        currentPosition += 1;
+        return LoopAroundCheck(currentPosition, upperBound);
+    }
+
+    public int LoopAroundCheck(int? currentPosition, int upperBound) {
+        var position = currentPosition ?? 0;
+        return (position % upperBound == 0) ? (position % upperBound) : upperBound;
+    }
     unsafe void ReadFromBuffer(byte* dest, long offset, long length) {
         Thread.MemoryBarrier();
         if (DuplexBuffer != null && dest != null) {
@@ -465,7 +474,9 @@ public unsafe class SharedMemory2 : IDisposable {
         WriteRingBufferPosition(0, (uint)position, true);
     }
 
+    public uint LastUserRingBufferPosition = 0;
     public void WriteUserRingBufferPosition(int position) {
+        LastUserRingBufferPosition = (uint)position;
         WriteRingBufferPosition(RING_BUFFER_SIZE, (uint)position, false);
     }
 
@@ -950,13 +961,13 @@ public unsafe class RingBufferReader {
         }
 
         deBounceProcessedSlots[deBounceProcessedSlotsIndex] = id;
-        deBounceProcessedSlotsIndex = (deBounceProcessedSlotsIndex + 1) % deBounceProcessedSlots.Length;
+        deBounceProcessedSlotsIndex = sharedMemory.LoopAroundIncrement(deBounceProcessedSlotsIndex, deBounceProcessedSlots.Length);
         return true;
     }
 
     int nextSystemReadPosition = 0;
     public ReadOnlySpan<byte> Read() {
-        Span<byte> dataRead = new byte[0];
+        Span<byte> dataRead = Array.Empty<byte>();
         int startIndex = nextSystemReadPosition;
         int endIndex = startIndex;
         int bytesWritten = 0;
@@ -967,8 +978,28 @@ public unsafe class RingBufferReader {
         int slotsNeeded = 0;
         int slotsReceived = 0;
         int slotReceiveAttempt = 0;
+        int userReadPosition = -1;
         List<int> userIndiciesToClear = new List<int>();
+        userReadPosition = sharedMemory.ReadUserRingBufferPosition();
+        if (userReadPosition <= 0) {
+            sharedMemory.WriteUserRingBufferSlotStatus(sharedMemory.LastUserRingBufferPosition, SlotStatus.EMPTY);
+            foreach (var slotHeaderQueued in slotHeadersQueue) {
+                logger.LogTrace("Activated user slot #" + slotHeaderQueued.Key);
+                sharedMemory.WriteUserRingBufferPosition(slotHeaderQueued.Key);
+                break;
+            }
+        }
+
         while (!slotFoundEnded && currentIndex != startIndex) {
+            if (!isAdvancing) {
+                nextSystemReadPosition = sharedMemory.ReadSystemRingBufferPosition();
+                if (nextSystemReadPosition <= 0) {
+                    return Array.Empty<byte>();
+                }
+
+                logger.LogTrace("Received system slot #" + nextSystemReadPosition);
+            }
+
             if (currentIndex == null) {
                 currentIndex = nextSystemReadPosition;
             }
@@ -976,25 +1007,37 @@ public unsafe class RingBufferReader {
             var header = sharedMemory.ReadSystemRingBufferSlotHeader(nextSystemReadPosition);
 
             if (header.Id == 0) {
-                currentIndex = (currentIndex + 1) % sharedMemory.NUM_SLOTS;
+                currentIndex = sharedMemory.LoopAroundIncrement(currentIndex, sharedMemory.NUM_SLOTS);
                 nextSystemReadPosition = currentIndex.Value;
                 if (slotFoundStarted) {
-                    return new byte[0];
+                    logger.LogTrace("Slot ID is 0, but slot found started. Ending read.");
+                    sharedMemory.WriteSystemRingBufferPosition(0);
+                    return Array.Empty<byte>();
                 }
+
+                logger.LogTrace("Slot ID is 0. Skipping.");
+                sharedMemory.WriteSystemRingBufferPosition(0);
                 continue;
             }
 
             if (!checkAndAddDebounceSlot(header.Id)) {
-                currentIndex = (currentIndex + 1) % sharedMemory.NUM_SLOTS;
+                currentIndex = sharedMemory.LoopAroundIncrement(currentIndex, sharedMemory.NUM_SLOTS);
                 nextSystemReadPosition = currentIndex.Value;
                 if (slotFoundStarted) {
-                    return new byte[0];
+                    logger.LogTrace("Slot ID is a duplicate, but slot found started. Ending read.");
+                    sharedMemory.WriteSystemRingBufferPosition(0);
+                    return Array.Empty<byte>();
                 }
+
+                logger.LogTrace("Slot ID is a duplicate. Skipping.");
+                sharedMemory.WriteSystemRingBufferPosition(0);
                 continue;
             }
 
             if (slotFoundStarted && header.Status == SlotStatus.EMPTY) {
-                return new byte[0];
+                logger.LogTrace("Slot ID is empty, but slot found started. Ending read.");
+                sharedMemory.WriteSystemRingBufferPosition(0);
+                return Array.Empty<byte>();
             }
 
 
@@ -1039,27 +1082,30 @@ public unsafe class RingBufferReader {
             }
 
             endIndex = currentIndex.Value;
-            currentIndex = (currentIndex + 1) % sharedMemory.NUM_SLOTS;
+            currentIndex = sharedMemory.LoopAroundIncrement(currentIndex, sharedMemory.NUM_SLOTS);
             nextSystemReadPosition = currentIndex.Value;
             logger.LogTrace($"Slot finished. Slots needed: {slotsNeeded}; Slots captured: {slotsReceived}");
         }
 
-        if (slotFoundEnded) {
-            if (endIndex < startIndex) {
-                systemIndiciesToClear.Enqueue(((uint)startIndex, sharedMemory.NUM_SLOTS));
-                systemIndiciesToClear.Enqueue((0, (uint)endIndex));
-            } else {
-                systemIndiciesToClear.Enqueue(((uint)startIndex, (uint)endIndex));
-            }
-        }
+        // if (slotFoundEnded) {
+        //     if (endIndex < startIndex) {
+        //         systemIndiciesToClear.Enqueue(((uint)startIndex, sharedMemory.NUM_SLOTS));
+        //         systemIndiciesToClear.Enqueue((0, (uint)endIndex));
+        //     } else {
+        //         systemIndiciesToClear.Enqueue(((uint)startIndex, (uint)endIndex));
+        //     }
+        // }
 
-        foreach (var index in userIndiciesToClear.Distinct()) {
-            sharedMemory.WriteUserRingBufferSlotStatus((uint)index, SlotStatus.EMPTY);
-        }
+        // foreach (var index in userIndiciesToClear.Distinct()) {
+        //     sharedMemory.WriteUserRingBufferSlotStatus((uint)index, SlotStatus.EMPTY);
+        // }
 
         if (bytesWritten > 0) {
             logger.LogTrace($"Read {bytesWritten} bytes from system ring buffer");
         }
+
+        logger.LogTrace("Reset system slot number (0)");
+        sharedMemory.WriteSystemRingBufferPosition(0);
         return dataRead;
     }
 
@@ -1093,11 +1139,11 @@ public unsafe class RingBufferReader {
                 if (count == required_slots) {
                     return start_position; // Found enough contiguous EMPTY Slots
                 }
-                current_position = (current_position + 1) % sharedMemory.NUM_SLOTS;
+                current_position = sharedMemory.LoopAroundIncrement(current_position, sharedMemory.NUM_SLOTS);
             } else {
                 // Reset count and move to the next position
                 count = 0;
-                start_position = (start_position + 1) % sharedMemory.NUM_SLOTS;
+                start_position = sharedMemory.LoopAroundIncrement(start_position, sharedMemory.NUM_SLOTS);
                 current_position = start_position;
             }
         } while (start_position != sharedMemory.ReadUserRingBufferPosition());
@@ -1111,6 +1157,7 @@ public unsafe class RingBufferReader {
     long UserBufferActiveFreeSlots = 0;
 
     public IDictionary<int, DateTime> SlotWrittenTimes { get; } = new Dictionary<int, DateTime>();
+    private IDictionary<int, RingBufferSlotHeader> slotHeadersQueue { get; } = new Dictionary<int, RingBufferSlotHeader>();
     void WriteToSystemRingBuffer(Span<byte> data) {
         if (UserBufferSlotsUsedCounter % 10000 == 0) {
             printRingBufferCounters();
@@ -1137,17 +1184,17 @@ public unsafe class RingBufferReader {
             startPosition = 0;
         }
 
-        sharedMemory.WriteUserRingBufferPosition((int)startPosition);
+        //sharedMemory.WriteUserRingBufferPosition((int)startPosition);
 
         while (remainingSize > 0) {
             ushort bytes_to_write = (ushort)Math.Min(remainingSize, sharedMemory.SLOT_DATA_SIZE);
             slotHeader.CurrentDataSize = bytes_to_write; //to_little_endian_16(bytes_to_write);
             slotHeader.TotalDataSize = (ushort)data.Length; //to_little_endian_32(size);
-            if (systemIndiciesToClear.Count > 0) {
-                var nextSetToClear = systemIndiciesToClear.Dequeue();
-                slotHeader.ClearanceStartIndex = (ushort)nextSetToClear.Start;
-                slotHeader.ClearanceEndIndex = (ushort)nextSetToClear.End;
-            }
+            // if (systemIndiciesToClear.Count > 0) {
+            //     var nextSetToClear = systemIndiciesToClear.Dequeue();
+            //     slotHeader.ClearanceStartIndex = (ushort)nextSetToClear.Start;
+            //     slotHeader.ClearanceEndIndex = (ushort)nextSetToClear.End;
+            // }
 
             if (data.Length > sharedMemory.SLOT_DATA_SIZE) {
                 slotHeader.SequenceNumber = (byte)sequenceNumber++;
@@ -1160,7 +1207,7 @@ public unsafe class RingBufferReader {
             remainingSize -= bytes_to_write;
             if (remainingSize > 0) {
                 slotHeader.Status = SlotStatus.ADVANCE;
-                sharedMemory.WriteUserRingBufferPosition((startPosition + 1) % sharedMemory.NUM_SLOTS);
+                //sharedMemory.WriteUserRingBufferPosition((startPosition + 1) % sharedMemory.NUM_SLOTS);
             } else {
                 slotHeader.Status = SlotStatus.VALID;
             }
@@ -1172,7 +1219,10 @@ public unsafe class RingBufferReader {
                 SlotWrittenTimes.Remove(startPosition);
             }
 
-            SlotWrittenTimes.Add(startPosition, DateTime.Now);
+            if (remainingSize <= 0) {
+                SlotWrittenTimes.Add(startPosition, DateTime.Now);
+                slotHeadersQueue.Add(startPosition, slotHeader);
+            }
 
             UserBufferSlotsUsedCounter++;
             UserBufferActiveFreeSlots--;

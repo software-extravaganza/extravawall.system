@@ -278,13 +278,15 @@ void write_system_ring_buffer_position(__u32 position){
     write_ring_buffer_position(0, position);
 }
 
+__u32 last_user_ring_buffer_position = 0;
 void write_user_ring_buffer_position(__u32 position){
+    last_user_ring_buffer_position = position;
     write_ring_buffer_position(RING_BUFFER_SIZE, position);
 }
 
 static int adjust_slot_index_if_needed(int slot_index){
-    if(slot_index < 0){
-        return 0;
+    if(slot_index < 1){
+        return 1;
     }
     else if(slot_index >= NUM_SLOTS){
         return slot_index - NUM_SLOTS;
@@ -746,8 +748,8 @@ int FindContiguousEmptySlots(int required_slots) {
     spin_lock_irqsave(&position_lock, flags);
     int count, check = 0;
     int current_position = read_system_ring_buffer_position();
-    if(current_position < 0){
-        current_position = 0;
+    if(current_position < 1){
+        current_position = 1;
     }
 
     int start_position = current_position;
@@ -763,11 +765,11 @@ int FindContiguousEmptySlots(int required_slots) {
                 spin_unlock_irqrestore(&position_lock, flags);
                 return start_position; // Found enough contiguous EMPTY Slots
             }
-            current_position = (current_position + 1) % NUM_SLOTS;
+            current_position = loop_around_increment(current_position, NUM_SLOTS);
         } else {
             // Reset count and move to the next position
             count = 0;
-            start_position = (start_position + 1) % NUM_SLOTS;
+            start_position = loop_around_increment(start_position, NUM_SLOTS);
             current_position = start_position;
         }
     } while (check < NUM_SLOTS * 2);
@@ -851,9 +853,9 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
         start_position = 0;
     }
 
-    spin_lock_irqsave(&position_lock, flags);
-    write_system_ring_buffer_position(start_position);
-    spin_unlock_irqrestore(&position_lock, flags);
+    //spin_lock_irqsave(&position_lock, flags);
+    //write_system_ring_buffer_position(start_position);
+    //spin_unlock_irqrestore(&position_lock, flags);
     LOG_DEBUG_PACKET("Total slots needed %d", required_slots);
     int current_position = start_position;
     while (remaining_size > 0) {
@@ -896,11 +898,11 @@ int WriteToSystemRingBuffer(const char *data, size_t size) {
 
         //LOG_DEBUG_PACKET("Slot written %d", current_position);
         //LOG_INFO("Slot written %d", current_position);
-        current_position = (current_position + 1) % NUM_SLOTS;
+        current_position = loop_around_increment(current_position, NUM_SLOTS);
 
-        spin_lock_irqsave(&position_lock, flags);
-        write_system_ring_buffer_position(current_position);
-        spin_unlock_irqrestore(&position_lock, flags);
+        //spin_lock_irqsave(&position_lock, flags);
+        //write_system_ring_buffer_position(current_position);
+        //spin_unlock_irqrestore(&position_lock, flags);
     }
 
     if (required_slots <= 1) {
@@ -1020,7 +1022,7 @@ void free_data_buffer_if_needed(DataBuffer *buffer, bool bufferIsSet) {
 //         }
 
 //         indexRange.End = next_read_user_position;
-//         next_read_user_position = (next_read_user_position + 1) % NUM_SLOTS;
+//         next_read_user_position = loop_around_increment(next_read_user_position, NUM_SLOTS);
 //     }
 //     while(slotsLoaded < slotsToLoad);
 
@@ -1059,13 +1061,15 @@ DataBuffer *ReadFromUserRingBuffer(void) {
     int startIndex = next_read_user_position;
     int endIndex = startIndex;
     int bytesLoaded = 0;
+    int systemIntPosition = -1;
     long maxTotalDataSize = MAX_PAYLOAD_SIZE * (NUM_SLOTS / 2);
     IndexRange indexRange;
     indexRange.Start = next_read_user_position;
 
     while (!slotFound && currentSlot != startIndex) {
-        if (next_read_user_position < 0) {
-            next_read_user_position = 0;
+        next_read_user_position = read_user_ring_buffer_position();
+        if(next_read_user_position <= 0){
+            return NULL;
         }
 
         if (currentSlot < 0) {
@@ -1077,10 +1081,11 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = 0;
         }
 
+        LOG_DEBUG_PACKET("Received user slot #{%d}", currentSlot);
         RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
 
         if (slot_header.Id == 0) {
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1088,7 +1093,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.ClearanceStartIndex < 0) {
             LOG_ERROR("Skipping slot; ClearanceStartIndex is out of range (%d)", slot_header.ClearanceStartIndex);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1096,7 +1101,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.ClearanceEndIndex > NUM_SLOTS) {
             LOG_ERROR("Skipping slot; ClearanceEndIndex is out of range (%d)", slot_header.ClearanceEndIndex);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1104,7 +1109,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.ClearanceEndIndex < slot_header.ClearanceStartIndex) {
             LOG_ERROR("Skipping slot; ClearanceEndIndex (%d) smaller than ClearanceStartIndex (%d)", slot_header.ClearanceEndIndex, slot_header.ClearanceStartIndex);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1112,7 +1117,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.TotalDataSize > maxTotalDataSize || slot_header.TotalDataSize < 0) {
             LOG_ERROR("Skipping slot; TotalDataSize is out of range (%d)", slot_header.TotalDataSize);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1120,7 +1125,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.CurrentDataSize > MAX_PAYLOAD_SIZE || slot_header.CurrentDataSize < 0) {
             LOG_ERROR("Skipping slot; CurrentDataSize is out of range (%d)", slot_header.CurrentDataSize);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1128,7 +1133,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if (slot_header.Status > 3) {
             LOG_ERROR("Skipping slot; Status is out of range (%d)", slot_header.Status);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1136,7 +1141,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
 
         if(!check_and_add_debounce_slot(slot_header.Id)){
             //LOG_DEBUG_PACKET("Skipping slot (debounce) %d", currentSlot);
-            currentSlot = (currentSlot + 1) % NUM_SLOTS;
+            currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
             continue;
@@ -1214,13 +1219,13 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             memcpy(buffer->data + currentOffset, newSlotData, slot_header.CurrentDataSize);
             currentOffset += slot_header.CurrentDataSize;
             bytesLoaded += slot_header.CurrentDataSize;
-            endIndex = (currentSlot + 1) % NUM_SLOTS;
+            endIndex = loop_around_increment(currentSlot, NUM_SLOTS);
             slotFound = slot_header.Status == VALID;
             LOG_DEBUG_PACKET("Dude! %d - %d", slot_header.TotalDataSize, buffer->size);
         }
 
         // Move to next slot
-        currentSlot = (currentSlot + 1) % NUM_SLOTS;
+        currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
         next_read_user_position = currentSlot;
         // if (currentSlot == next_read_user_position || currentSlot > NUM_SLOTS || currentSlot < 0) {
         //     break; // Prevent infinite loop
@@ -1251,21 +1256,22 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         up(&userIndiciesToClearSemaphore);
     }
 
+    write_user_ring_buffer_position(0);
     return buffer;
 }
 
-void AdvanceSystemRingBuffer(void) {
-    uint position = read_system_ring_buffer_position();
-    if(position < 0){
-        position = 0;
-    }
+// void AdvanceSystemRingBuffer(void) {
+//     uint position = read_system_ring_buffer_position();
+//     if(position < 0){
+//         position = 0;
+//     }
 
-    SlotStatus status = read_system_ring_buffer_slot_status(position);
-    while (status == VALID || status == ADVANCE_END) {
-        write_system_ring_buffer_slot_status(position, EMPTY);
-        write_system_ring_buffer_position((read_system_ring_buffer_position() + 1) % NUM_SLOTS);
-    }
-}
+//     SlotStatus status = read_system_ring_buffer_slot_status(position);
+//     while (status == VALID || status == ADVANCE_END) {
+//         write_system_ring_buffer_slot_status(position, EMPTY);
+//         write_system_ring_buffer_position(loop_around_increment(read_system_ring_buffer_position(), NUM_SLOTS);
+//     }
+// }
 
 void GenerateRandomData(char *data, size_t size) {
     const char *prefix = "hello ";

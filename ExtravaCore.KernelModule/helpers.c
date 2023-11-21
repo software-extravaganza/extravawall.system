@@ -31,6 +31,15 @@ char* timeToHumanizedString(ktime_t kt) {
     return nanosecondsToHumanizedString(ns);
 }
 
+int loop_around_increment(int current_position,int upper_bound) {
+    current_position += 1; 
+    return loop_around_check(current_position, upper_bound);
+}
+
+int loop_around_check(int current_position,int upper_bound) {
+    return (current_position % upper_bound) ? (current_position % upper_bound) : upper_bound;
+}
+
 
 int is_little_endian() {
     uint16_t test = 0x00FF;

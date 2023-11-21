@@ -26,6 +26,8 @@ void get_random_ascii_chars(char *buf, size_t num_chars);
 void get_random_keyboard_chars(char *buf, size_t num_chars);
 void print_hex(const void *data, size_t len);
 void print_data(const void *data, size_t len, int format);
+int loop_around_increment(int current_position,int upper_bound);
+int loop_around_check(int current_position,int upper_bound);
 // static inline void check_null_helper(const char* ptr_name, void* generic_ptr, LogType log_type_enum, void (*code_func)(void)) {
 //     typeof(generic_ptr) value = generic_ptr;
 //     log_func_t log_func = log_functions[log_type_enum];

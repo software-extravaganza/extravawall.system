@@ -17,8 +17,8 @@ const int ushortSize = sizeof(ushort);
 const int ulongSize = sizeof(ulong);
 using ILoggerFactory factory = LoggerFactory.Create(builder =>
     builder.AddConsole()
-.SetMinimumLevel(LogLevel.Information)
-//.SetMinimumLevel(LogLevel.Trace)
+//.SetMinimumLevel(LogLevel.Information)
+.SetMinimumLevel(LogLevel.Trace)
 );
 ILogger logger = factory.CreateLogger("Program");
 
@@ -109,12 +109,8 @@ static RoutingDecision GetRoutingDecision(Logger logger, RoutingType routingType
 
 static bool ProcessNextPacket(int intSize, int ushortSize, int ulongSize, ILogger logger, RingBufferReader reader, ref ulong dataProcessed, ref ulong HandledPacketCounter, IDictionary<byte, ulong> protocolCounter) {
     var data = reader.Read();
-    if (data == null) {
+    if (data == null || data.Length <= 0) {
         //logger.LogWarning("No data found");
-        return false;
-    }
-
-    if (data.Length <= 0) {
         return false;
     }
 
