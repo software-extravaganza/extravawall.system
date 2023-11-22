@@ -194,7 +194,7 @@ int loop_around_check(int current_position,int upper_bound);
 
 #define CHECK_INDEX_AND_OFFSET_RETURN(index, offset, failReturn) \
     do{ \
-        if (index < 0 || index >= NUM_SLOTS){ \
+        if (index < 0 || index > NUM_SLOTS){ \
             LOG_ERROR("RingBuf: Index %d is out of range", index); \
             return failReturn; \
         } \
@@ -206,11 +206,11 @@ int loop_around_check(int current_position,int upper_bound);
 
 #define CHECK_INDEX_AND_OFFSET(index, offset) \
     do{ \
-        if (index < 0 || index >= NUM_SLOTS){ \
+        if (index < 0 || index > NUM_SLOTS){ \
             LOG_ERROR("RingBuf: Index %d is out of range", index); \
             return; \
         } \
-        if(offset < 0 || offset >= DUPLEX_RING_BUFFER_SIZE) { \
+        if(offset < 0 || offset > DUPLEX_RING_BUFFER_SIZE) { \
             LOG_ERROR("RingBuf: Offset %d is out of range", offset); \
             return; \
         } \

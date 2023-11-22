@@ -32,6 +32,7 @@ int WriteToSystemRingBuffer(const char *data, size_t size);
 __u32 read_system_ring_buffer_position(void);
 void write_system_ring_buffer_slot_status(int slot_index, SlotStatus slot_status);
 void write_system_ring_buffer_position(__u32 position);
+void write_user_ring_buffer_position(__u32 position);
 SlotStatus read_system_ring_buffer_slot_status(int slot_index);
 RingBufferSlotHeader read_system_ring_buffer_slot_header(int slot_index);
 void free_data_buffer(DataBuffer *buffer);

@@ -100,13 +100,13 @@ int SetupUserSpaceCommunication(void) {
         return IS_ERR(_netmodDevice) ? PTR_ERR(_netmodDevice) : PTR_ERR(_netmodDeviceAck);
     }
 
-    int threadRegistration = RegisterQueueProcessorThreadHandler(_packetProcessorThread);
-    if (threadRegistration != 0) {
-        LOG_ERROR("Failed to register queue processor thread handler");
-        CleanupUserSpaceCommunication();
-        CleanupNetfilterHooks();
-        return threadRegistration;
-    }
+    // int threadRegistration = RegisterQueueProcessorThreadHandler(_packetProcessorThread, _packet);
+    // if (threadRegistration != 0) {
+    //     LOG_ERROR("Failed to register queue processor thread handler");
+    //     CleanupUserSpaceCommunication();
+    //     CleanupNetfilterHooks();
+    //     return threadRegistration;
+    // }
 
     _isLoaded = true;
     return 0;

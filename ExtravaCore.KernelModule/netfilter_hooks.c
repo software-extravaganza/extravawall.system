@@ -41,10 +41,13 @@ PacketQueue *_completedQueue;
 int num_cpus_to_use = 1; // = num_online_cpus() / 2; // Use 50% of the CPUs
 DEFINE_PER_CPU(PacketQueue, cpu_packet_queues);
 DEFINE_PER_CPU(struct task_struct *, _queueProcessorThreads);
+DEFINE_PER_CPU(struct task_struct *, _queueResponseProcessorThreads);
 // Spinlock for synchronization
 DEFINE_SPINLOCK(packet_queue_lock);
 LIST_HEAD(packetQueueListHead);
 LIST_HEAD(packetQueueToProcessHead);
+static rwlock_t packetQueueListHead_rwlock = __RW_LOCK_UNLOCKED(packetQueueListHead_rwlock);
+static rwlock_t packetQueueToProcessHead_rwlock = __RW_LOCK_UNLOCKED(packetQueueToProcessHead_rwlock);
 
 atomic_t _pendingQueueItemAdded = ATOMIC_INIT(0);
 bool _readQueueItemAdded = false;
@@ -80,6 +83,8 @@ static int _nfDecisionFromExtravaDecision(RoutingDecision decision, bool count);
 static int _nfDecisionFromExtravaDefaultDecision(bool count);
 static int interceptIpv4(struct iphdr *ipHeader, RoutingType type, const char* routeTypeName, struct sk_buff *skb, const struct nf_hook_state *state, const char* hookName);
 int _netFilterPacketProcessorThread(void *data);
+int _netFilterPacketResponseProcessorThread(void *data);
+
 
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback) {
     _registeredCallback = callback;
@@ -90,23 +95,32 @@ static void printRingBufferCounters(void){
     LOG_INFO(MESSAGE_EVENTS_CAPTURED, ReadWaitCounter, ReadWokeCounter, WriteWaitCounter, WriteWokeCounter, QueueProcessorWaitCounter, QueueProcessorWokeCounter);
 }
 
-int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler) {
+int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler, packet_processor_thread_handler_t response_handler) {
     int cpu;
     char thread_name[32]; // Ensure this is large enough to hold the base name and CPU number
-
-   for_each_possible_cpu(cpu) {
+    char response_thread_name[32];
+    for_each_possible_cpu(cpu) {
         if (cpu >= num_cpus_to_use) {
             break; // Only start threads on a subset of CPUs
         }
         snprintf(thread_name, sizeof(thread_name), "packet_processor_%d", cpu);
+        snprintf(response_thread_name, sizeof(thread_name), "packet_response_processor_%d", cpu);
         
         struct task_struct **ptr = per_cpu_ptr(&_queueProcessorThreads, cpu);
+        struct task_struct **response_ptr = per_cpu_ptr(&_queueResponseProcessorThreads, cpu);
         *ptr = kthread_run(handler, NULL, thread_name);
+        *response_ptr = kthread_run(response_handler, NULL, response_thread_name);
 
         if (IS_ERR(*ptr)) {
             LOG_ERROR("Failed to start packet_processor_thread %d.", cpu);
             CleanupNetfilterHooks();  // Cleanup
             return PTR_ERR(*ptr);
+        }
+
+        if (IS_ERR(*response_ptr)) {
+            LOG_ERROR("Failed to start packet_response_processor_thread %d.", cpu);
+            CleanupNetfilterHooks();  // Cleanup
+            return PTR_ERR(*response_ptr);
         }
     }
     // _queueProcessorThread = kthread_run(handler, NULL, "packet_processor");
@@ -128,9 +142,15 @@ void StopQueueProcessorThread(void) {
         }
         
         struct task_struct **ptr = per_cpu_ptr(&_queueProcessorThreads, cpu);
+        struct task_struct **response_ptr = per_cpu_ptr(&_queueResponseProcessorThreads, cpu);
         if (*ptr != NULL) {
             kthread_stop(*ptr);
             *ptr = NULL;
+        }
+
+        if (*response_ptr != NULL) {
+            kthread_stop(*response_ptr);
+            *response_ptr = NULL;
         }
     }
     // if(!_queueProcessorThread){
@@ -152,13 +172,13 @@ void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision de
         //LOG_WARNING("Packet trip entry is null. Ignoring decision.");
         return;
     }
-    
+
     int nfDecision = _nfDecisionFromExtravaDecision(decision, true);
     nf_reinject(packetTrip->entry, nfDecision);
 
     // Use ternary operator to determine which icon to use (DROP will be chosen even for numbers out of range; this is here for safety)
     snprintf(logMessage, sizeof(logMessage), "%s%s Extrava", DECISION_ICONS[nfDecision == NF_DROP ? 1 : decision], GetReasonText(reason));
-    LOG_DEBUG_ICMP(packetTrip, "%s", logMessage); 
+    LOG_DEBUG_ICMP(packetTrip, "%s", logMessage);
     LOG_DEBUG_ICMP(packetTrip, "Packet Id: %d;", packetTrip->id);
 
     ReturnPacketTrip(packetTrip);
@@ -418,7 +438,7 @@ int SetupNetfilterHooks(void) {
     init_waitqueue_head(&PendingQueueItemAddedWaitQueue);
 
     _isInitialized = true;
-    RegisterQueueProcessorThreadHandler(_netFilterPacketProcessorThread);
+    RegisterQueueProcessorThreadHandler(_netFilterPacketProcessorThread, _netFilterPacketResponseProcessorThread);
     LOG_INFO("Completed SetupNetfilterHooks");
     return 0;
 }
@@ -465,12 +485,23 @@ void CleanupNetfilterHooks(void) {
     PacketQueueCleanup(_write2PacketsQueue);
     PacketQueueCleanup(_injectionPacketsQueue);
     PacketQueueCleanup(_completedQueue);
+
+    up(&packetResponseSemaphore);
     StopQueueProcessorThread();
 
     struct PacketTripListNode *listNodeToCleanUp;
     struct list_head *pos, *q;
 
     list_for_each_safe(pos, q, &packetQueueListHead) {
+        listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
+        list_del(pos);
+        if(listNodeToCleanUp != NULL){
+            kfree(listNodeToCleanUp);
+            listNodeToCleanUp = NULL;
+        }
+    }
+
+    list_for_each_safe(pos, q, &packetQueueToProcessHead) {
         listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
         list_del(pos);
         if(listNodeToCleanUp != NULL){
@@ -648,14 +679,11 @@ static int _packetQueueHandler(struct nf_queue_entry *entry, unsigned int queuen
 
     if (node) {
         node->data = packetTrip;
+        write_lock(&packetQueueToProcessHead_rwlock);
         list_add_tail(&node->list, &packetQueueToProcessHead); // Add new node to the list
+        write_unlock(&packetQueueToProcessHead_rwlock);
     }
-    // Signal or process further as needed
-    // atomic_set(&_pendingQueueItemAdded, 1);
-    // if (atomic_cmpxchg(&_pendingQueueItemAdded, 0, 1) == 0) {
-    //     wake_up_interruptible(&PendingQueueItemAddedWaitQueue);
-    //     LOG_DEBUG_ICMP(packetTrip, "Woke up PendingQueueItemAddedWaitQueue. IsProcessingPacketTrip is set to %d", atomic_read(&IsProcessingPacketTrip));
-    // }
+
     return 0;
 }
 
@@ -672,35 +700,18 @@ int _netFilterPacketProcessorThread(void *data) {
         }
 
         last_time = ktime_get();
-        // Clean stale packets
-        // down(&userIndiciesToClearSemaphore);
-        // IndexRange indexRange;
-        // int currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
-        // int previousIndiciesToClearCount = 0;
-        // while(currentIndiciesToClearCount > 0){
-        //     if(!IsActive() || !IsUserSpaceConnected() || currentIndiciesToClearCount == previousIndiciesToClearCount){
-        //         up(&userIndiciesToClearSemaphore);
-        //         return -1;
-        //     }
-        //     kfifo_out(&userIndiciesToClear, &indexRange, sizeof(IndexRange));
-
-        //     previousIndiciesToClearCount = currentIndiciesToClearCount;
-        //     currentIndiciesToClearCount = kfifo_len(&userIndiciesToClear);
-        // }
-        // up(&userIndiciesToClearSemaphore);
-
         __u32 buffer_position = read_system_ring_buffer_position();
-        if(buffer_position != 0){
+        if(buffer_position > 0){
             continue;
         }
 
         struct PacketTripListNode *current_node = NULL;
         struct list_head *stalePacketToRemove = NULL;
         struct list_head *pos, *q;
-        int positionToReset = last_user_ring_buffer_position;
-        write_system_ring_buffer_slot_status(positionToReset, EMPTY);
-
+        int positionToReset = last_system_ring_buffer_position;
+        
         down(&packetResponseSemaphore);
+        write_lock(&packetQueueListHead_rwlock);
         list_for_each_safe(pos, q, &packetQueueListHead) {
             current_node = list_entry(pos, struct PacketTripListNode, list);
             __u32 slotAssigned = current_node->data->slotAssigned;
@@ -721,37 +732,54 @@ int _netFilterPacketProcessorThread(void *data) {
                 HandlePacketDecision(current_node->data, _nfDecisionFromExtravaDefaultDecision(false), TIMEOUT);
             }
             else if(positionToReset == slotAssigned){
-                list_del(pos);
+                //list_del(pos);
             }
         }
+        write_unlock(&packetQueueListHead_rwlock);
 
-        if(current_node == NULL){
-            up(&packetResponseSemaphore);
-            continue;
-        }
-
-        struct PacketTripListNode *new_node;
-        new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
-        current_node = NULL;
-        struct PacketTripListNode *nodeFound = NULL;
-        list_for_each_safe(pos, q, &packetQueueToProcessHead) {
-            current_node = list_entry(pos, struct PacketTripListNode, list);
+        write_lock(&packetQueueToProcessHead_rwlock);
+        struct list_head *pos2, *q2;
+        list_for_each_safe(pos2, q2, &packetQueueToProcessHead) {
+            current_node = list_entry(pos2, struct PacketTripListNode, list);
             if (current_node) {
-                new_node->data = current_node->data;
-                list_add_tail(&new_node->list, &packetQueueListHead); // Add new node to the list
-                list_del(pos);
-                LOG_DEBUG_ICMP(current_node->data, "Activated system slot #%d", current_node->data->slotAssigned);
+                list_del_init(pos2);
+                write_lock(&packetQueueListHead_rwlock);
+                list_add_tail(&current_node->list, &packetQueueListHead); // Add new node to the list
+                write_unlock(&packetQueueListHead_rwlock);
+
+                LOG_DEBUG_ICMP(current_node->data, "Activated system slot #%d, for ID %lld", current_node->data->slotAssigned, current_node->data->id);
                 write_system_ring_buffer_position(current_node->data->slotAssigned);
+                if(current_node->data->slotAssigned != positionToReset && positionToReset > 0){
+                    write_system_ring_buffer_slot_status(positionToReset, EMPTY);
+                }
+                
                 break;
             }
         }
+        write_unlock(&packetQueueToProcessHead_rwlock);
+        up(&packetResponseSemaphore);
+    }
 
-        //LOG_DEBUG_PACKET("Reading from user space ring buffer.");
-        //last_ring_buffer_position = read_system_ring_buffer_position();
+    up(&packetResponseSemaphore);
+    return 0;
+}
+
+
+ktime_t last_time_response;
+bool processed_packet_response_last_round = false;
+int _netFilterPacketResponseProcessorThread(void *data) {
+    last_time_response = ktime_get();
+    while (!kthread_should_stop() && !IsUnloading() ) {
+        if(!processed_packet_response_last_round && ktime_get() - last_time_response < ktime_set(0, 1000000)){ // Less than 1ms and now new packets processed, wait a millisecond
+            processed_packet_response_last_round = false;
+            msleep(1);
+            continue;
+        }
+
+        last_time_response = ktime_get();
         DataBuffer* response = ReadFromUserRingBuffer();
-        processed_packet_last_round = response != NULL && response->size > 0 && response->data != NULL;
-        if(!processed_packet_last_round){
-            up(&packetResponseSemaphore);
+        processed_packet_response_last_round = response != NULL && response->size > 0 && response->data != NULL;
+        if(!processed_packet_response_last_round){
             continue;
         }
 
@@ -764,36 +792,32 @@ int _netFilterPacketProcessorThread(void *data) {
         free_data_buffer(response);
         LOG_DEBUG_PACKET("Received response. Decision: %d, Packet Id: %lld, Queue Number: %d", routingDecision, packetId, packetQueueNumber);
 
-        //__u32 packetQueueNumber, routingDecision;
+        struct PacketTripListNode *current_node = NULL;
+        struct list_head *stalePacketToRemove = NULL;
+        struct list_head *pos, *q;
+        struct PacketTripListNode *nodeFound = NULL;
+        read_lock(&packetQueueListHead_rwlock);
         list_for_each_safe(pos, q, &packetQueueListHead) {
            current_node = list_entry(pos, struct PacketTripListNode, list);
-           if(current_node->data->id == packetId){
+           LOG_DEBUG_PACKET("Checking packet trip %lld against %lld", current_node->data->id, packetId);
+           if(current_node && current_node->data->id == packetId){
                 nodeFound = current_node;
                 break;
            }
-            // routingDecision = ACCEPT;
-            // nodeFound = current_node;
-
-            // down(&userIndiciesToClearSemaphore);
-            // IndexRange rangeToClear;
-            // rangeToClear.Start = nodeFound->data->slotAssigned;
-            // rangeToClear.End = nodeFound->data->slotAssigned;
-            // kfifo_put(&userIndiciesToClear, rangeToClear);
-            // up(&userIndiciesToClearSemaphore);
-            // break;
         }
+        read_unlock(&packetQueueListHead_rwlock);
 
         if(nodeFound == NULL){
             processed_packet_last_round = false;
-            up(&packetResponseSemaphore);
+            LOG_DEBUG_PACKET("Packet trip not found. Ignoring response.");
             continue;
         }
 
         LOG_DEBUG_ICMP(current_node->data, "Received decision on packet. Decision: %d", routingDecision);
         list_del(&nodeFound->list);
-        up(&packetResponseSemaphore);
         nodeFound->data->decision = routingDecision;
         HandlePacketDecision(nodeFound->data, routingDecision, USER_ACCEPT);
+        //write_user_ring_buffer_position(0);
     }
 
     return 0;
@@ -815,6 +839,15 @@ void NetFilterShouldCaptureChangeHandler(bool shouldCapture){
         struct PacketTripListNode *listNodeToCleanUp;
         struct list_head *pos, *q;
         list_for_each_safe(pos, q, &packetQueueListHead) {
+            listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
+            list_del(pos);
+            if(listNodeToCleanUp != NULL){
+                kfree(listNodeToCleanUp);
+                listNodeToCleanUp = NULL;
+            }
+        }
+
+        list_for_each_safe(pos, q, &packetQueueToProcessHead) {
             listNodeToCleanUp = list_entry(pos, struct PacketTripListNode, list);
             list_del(pos);
             if(listNodeToCleanUp != NULL){

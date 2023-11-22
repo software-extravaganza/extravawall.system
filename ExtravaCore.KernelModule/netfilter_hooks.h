@@ -11,6 +11,7 @@
 #include <linux/kthread.h>
 #include <linux/semaphore.h>
 #include <linux/list.h>
+#include <linux/rwlock.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -68,7 +69,7 @@ extern __u64 WriteWaitCounter;
 extern __u64 WriteWokeCounter;
 extern __u64 QueueProcessorWokeCounter;
 extern __u64 QueueProcessorWaitCounter;
-extern __u32 last_user_ring_buffer_position;
+extern __u32 last_system_ring_buffer_position;
 
 extern long SystemBufferSlotsUsedCounter;
 extern long SystemBufferSlotsClearedCounter;
@@ -83,7 +84,7 @@ extern atomic_t IsProcessingPacketTrip;
 void CleanupNetfilterHooks(void);
 void HandlePacketDecision(PendingPacketRoundTrip *packetTrip, RoutingDecision decision, DecisionReason reason);
 void RegisterPacketProcessingCallback(packet_processing_callback_t callback);
-int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler);
+int RegisterQueueProcessorThreadHandler(packet_processor_thread_handler_t handler, packet_processor_thread_handler_t response_handler);
 int SetupNetfilterHooks(void);
 void DecommissionPacketTrip(PendingPacketRoundTrip *packetTrip);
 void CleanUpStaleItemsOnQueue(PacketQueue* queue, const char *queueName);

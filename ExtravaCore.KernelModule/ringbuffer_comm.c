@@ -16,6 +16,7 @@ __u64 *debouce_processed_slots;
 int debouce_processed_slots_index = 0;
 DEFINE_MUTEX(buffer_write_mutex);
 static spinlock_t position_lock;
+
 // static void _initRingBuffer(RingBuffer *buffer);
 static void _initDuplexRingBuffer(DuplexRingBuffer *duplexBuffer);
 static int adjust_slot_index_if_needed(int slot_index);
@@ -147,7 +148,7 @@ void write_ring_buffer_slot_status(uint offset, int slot_index, SlotStatus slot_
         if(slot_status == EMPTY){
             write_ring_buffer_slot_id(offset, slot_index, 0);
         }
-        else{
+        else if(slot_status == PREPPING){
             SystemRingBufferSentCount++;
             write_ring_buffer_slot_id(offset, slot_index, SystemRingBufferSentCount);
         }
@@ -268,19 +269,27 @@ __u32 read_user_ring_buffer_position(void){
 
 void write_ring_buffer_position(int offset, __u32 position){
     CHECK_INDEX_AND_OFFSET(0, offset);
+    if(position > NUM_SLOTS){
+        LOG_ERROR("Position is greater than number of slots");
+        return;
+    }
+    else if (position < 0){
+        LOG_ERROR("Position is less than 0");
+        return;
+    }
     //printk(KERN_INFO "Writing position at offset %d", offset + 1);
     unsigned char bufferPosition[RING_BUFFER_HEADER__POSITION_SIZE];
     int_to_bytes(&position, bufferPosition, RING_BUFFER_HEADER__POSITION_SIZE);
     write_to_buffer(&bufferPosition, offset + RING_BUFFER_HEADER_STATUS_SIZE, RING_BUFFER_HEADER__POSITION_SIZE);
 }
 
+__u32 last_system_ring_buffer_position = 0;
 void write_system_ring_buffer_position(__u32 position){
+    last_system_ring_buffer_position = position;
     write_ring_buffer_position(0, position);
 }
 
-__u32 last_user_ring_buffer_position = 0;
 void write_user_ring_buffer_position(__u32 position){
-    last_user_ring_buffer_position = position;
     write_ring_buffer_position(RING_BUFFER_SIZE, position);
 }
 
@@ -743,11 +752,12 @@ void FreeRingBuffers(void){
 //     }
 // }
 
+int last_contiguous_empty_slot = 1;
 int FindContiguousEmptySlots(int required_slots) {
     unsigned long flags;
     spin_lock_irqsave(&position_lock, flags);
     int count, check = 0;
-    int current_position = read_system_ring_buffer_position();
+    int current_position = loop_around_check(last_contiguous_empty_slot, NUM_SLOTS);
     if(current_position < 1){
         current_position = 1;
     }
@@ -763,6 +773,7 @@ int FindContiguousEmptySlots(int required_slots) {
                     write_system_ring_buffer_slot_status(start_position + i, PREPPING);
                 }
                 spin_unlock_irqrestore(&position_lock, flags);
+                last_contiguous_empty_slot = start_position + required_slots;
                 return start_position; // Found enough contiguous EMPTY Slots
             }
             current_position = loop_around_increment(current_position, NUM_SLOTS);
@@ -1053,6 +1064,11 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         return NULL;
     }
 
+    next_read_user_position = read_user_ring_buffer_position();
+    if(next_read_user_position <= 0){
+        return NULL;
+    }
+
     int currentSlot = -1;
     DataBuffer* buffer = NULL;
     bool bufferSet = false;
@@ -1067,27 +1083,21 @@ DataBuffer *ReadFromUserRingBuffer(void) {
     indexRange.Start = next_read_user_position;
 
     while (!slotFound && currentSlot != startIndex) {
-        next_read_user_position = read_user_ring_buffer_position();
-        if(next_read_user_position <= 0){
+        currentSlot = next_read_user_position;
+        if (currentSlot > NUM_SLOTS) {
+            LOG_WARNING("Slot out of range %d", currentSlot);
+            write_user_ring_buffer_position(0);
             return NULL;
         }
 
-        if (currentSlot < 0) {
-            currentSlot = next_read_user_position;
-        }
-
-        if (currentSlot > NUM_SLOTS) {
-            LOG_WARNING("Forcing slot to zero (out of range) %d", currentSlot);
-            currentSlot = 0;
-        }
-
-        LOG_DEBUG_PACKET("Received user slot #{%d}", currentSlot);
+        LOG_DEBUG_PACKET("Received user slot #%d", currentSlot);
         RingBufferSlotHeader slot_header = read_user_ring_buffer_slot_header(currentSlot);
 
         if (slot_header.Id == 0) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1096,6 +1106,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1104,6 +1115,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1112,6 +1124,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1120,6 +1133,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1128,6 +1142,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1136,6 +1151,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1144,6 +1160,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
             next_read_user_position = currentSlot;
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             continue;
         }
 
@@ -1155,6 +1172,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         if(buffer == NULL){
             LOG_WARNING("Skipping slot (buffer null) %d", currentSlot);
             free_data_buffer_if_needed(buffer, bufferSet);
+            write_user_ring_buffer_position(0);
             return NULL;
         }
         else{
@@ -1179,40 +1197,47 @@ DataBuffer *ReadFromUserRingBuffer(void) {
             if(dataPullSuccess == -EINVAL){
                 LOG_WARNING("Skipping slot; Read data (user space) buffer is null) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
             else if(dataPullSuccess == -E2BIG){
                 LOG_WARNING("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
             else if(dataPullSuccess != 0){
                 LOG_WARNING("Skipping slot; Failed to read data %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
 
             if(buffer->size > MAX_PAYLOAD_SIZE){
                 LOG_ERROR("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
 
             if(buffer->size + currentOffset > MAX_PAYLOAD_SIZE){
                 LOG_ERROR("Skipping slot; Read data (user space) buffer size too large) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
 
             if(buffer == NULL){
                 LOG_ERROR("Skipping slot; Read data (user space) buffer is null) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
 
             if(buffer->data == NULL){
                 LOG_ERROR("Skipping slot; Read data (user space) buffer data is null) %d", currentSlot);
                 free_data_buffer_if_needed(buffer, bufferSet);
+                write_user_ring_buffer_position(0);
                 return NULL;
             }
 
@@ -1227,6 +1252,7 @@ DataBuffer *ReadFromUserRingBuffer(void) {
         // Move to next slot
         currentSlot = loop_around_increment(currentSlot, NUM_SLOTS);
         next_read_user_position = currentSlot;
+        break;
         // if (currentSlot == next_read_user_position || currentSlot > NUM_SLOTS || currentSlot < 0) {
         //     break; // Prevent infinite loop
         // }
@@ -1235,26 +1261,26 @@ DataBuffer *ReadFromUserRingBuffer(void) {
     next_read_user_position = endIndex;
     indexRange.End = next_read_user_position;
 
-    if(slotFound){
-        down(&userIndiciesToClearSemaphore);
-        if (indexRange.End < indexRange.End) {
-            IndexRange rangeToEndOfBuffer;
-            IndexRange rangeFromBeginningOfBuffer;
+    // if(slotFound){
+    //     down(&userIndiciesToClearSemaphore);
+    //     if (indexRange.End < indexRange.End) {
+    //         IndexRange rangeToEndOfBuffer;
+    //         IndexRange rangeFromBeginningOfBuffer;
 
-            rangeToEndOfBuffer.Start = indexRange.Start;
-            rangeToEndOfBuffer.End = NUM_SLOTS;
-            rangeFromBeginningOfBuffer.Start = 0;
-            rangeFromBeginningOfBuffer.End = indexRange.End;
+    //         rangeToEndOfBuffer.Start = indexRange.Start;
+    //         rangeToEndOfBuffer.End = NUM_SLOTS;
+    //         rangeFromBeginningOfBuffer.Start = 0;
+    //         rangeFromBeginningOfBuffer.End = indexRange.End;
 
-            kfifo_put(&userIndiciesToClear, rangeToEndOfBuffer);
-            kfifo_put(&userIndiciesToClear, rangeFromBeginningOfBuffer);
-        }
-        else {
-            kfifo_put(&userIndiciesToClear, indexRange);
-        }
+    //         kfifo_put(&userIndiciesToClear, rangeToEndOfBuffer);
+    //         kfifo_put(&userIndiciesToClear, rangeFromBeginningOfBuffer);
+    //     }
+    //     else {
+    //         kfifo_put(&userIndiciesToClear, indexRange);
+    //     }
 
-        up(&userIndiciesToClearSemaphore);
-    }
+    //     up(&userIndiciesToClearSemaphore);
+    // }
 
     write_user_ring_buffer_position(0);
     return buffer;

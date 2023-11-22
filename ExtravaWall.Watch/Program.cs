@@ -17,8 +17,8 @@ const int ushortSize = sizeof(ushort);
 const int ulongSize = sizeof(ulong);
 using ILoggerFactory factory = LoggerFactory.Create(builder =>
     builder.AddConsole()
-//.SetMinimumLevel(LogLevel.Information)
-.SetMinimumLevel(LogLevel.Trace)
+.SetMinimumLevel(LogLevel.Information)
+//.SetMinimumLevel(LogLevel.Trace)
 );
 ILogger logger = factory.CreateLogger("Program");
 
@@ -46,24 +46,56 @@ Task handlePacketsTask = Task.Run(async () => {
             continue;
         }
 
-        //logger.Log($"Checking for data ({reader.SlotWrittenTimes.Count})");
-        for (var slotIndex = 0; slotIndex < reader.SlotWrittenTimes.Count; slotIndex++) {
-            var slot = reader.SlotWrittenTimes.ElementAt(slotIndex);
-            if (DateTime.Now - slot.Value > TimeSpan.FromMilliseconds(1000)) {
-                sharedMemory.WriteUserRingBufferSlotStatus((uint)slot.Key, SlotStatus.EMPTY);
-                reader.SlotWrittenTimes.Remove(slot.Key);
-                //logger.LogWarning($"Removed stale response in slot {slot.Key} due to timeout");
-            }
-        }
 
         lastTime = DateTime.Now;
         processedPacketLastRound = ProcessNextPacket(intSize, ushortSize, ulongSize, logger, reader, ref dataProcessed, ref HandledPacketCounter, protocolCounter);
     }
 });
 
+
+DateTime lastResponseTime = DateTime.Now;
+bool processedPacketResponseLastRound = false;
+Task handlePacketsResponseTask = Task.Run(async () => {
+    logger.LogInformation("Packet response processing thread started");
+    while (true) {
+        // Thread.Sleep(1000);
+        // continue;
+
+        if (!processedPacketResponseLastRound && DateTime.Now - lastResponseTime < TimeSpan.FromMilliseconds(1)) {
+            processedPacketResponseLastRound = false;
+            await Task.Delay(1);
+            continue;
+        }
+
+        //logger.Log($"Checking for data ({reader.SlotWrittenTimes.Count})");
+        for (var slotIndex = 0; slotIndex < reader.SlotWrittenTimes.Count; slotIndex++) {
+            var slot = reader.SlotWrittenTimes.ElementAt(slotIndex);
+            if (DateTime.Now - slot.Value > TimeSpan.FromMilliseconds(1000)) {
+                sharedMemory.WriteUserRingBufferSlotStatus((uint)slot.Key, SlotStatus.EMPTY);
+                reader.SlotWrittenTimes.Remove(slot.Key);
+                reader.SlotHeadersQueue.Remove(slot.Key);
+
+                int userReadPosition = sharedMemory.ReadUserRingBufferPosition();
+                if (userReadPosition == slot.Key) {
+                    sharedMemory.WriteUserRingBufferPosition(0);
+                }
+
+                logger.LogWarning($"Removed stale response in slot {slot.Key} due to timeout");
+            }
+        }
+
+        lastResponseTime = DateTime.Now;
+        processedPacketResponseLastRound = reader.RespondQueueProcess();
+    }
+});
+
 List<Task> handlingTasks = new List<Task>{
     handlePacketsTask.ContinueWith((task) => {
         logger.LogError($"Task 1 failed: {task.Exception}");
+    }, TaskContinuationOptions.OnlyOnFaulted),
+
+    handlePacketsResponseTask.ContinueWith((task) => {
+        logger.LogError($"Task 2 failed: {task.Exception}");
     }, TaskContinuationOptions.OnlyOnFaulted),
 
     // handlePacketsTask.ContinueWith((task) => {
