@@ -1,0 +1,60 @@
+networks:
+  extravawall-network:
+    name: extravawall-network
+    driver: bridge
+
+services:
+  extravawall-service:
+    container_name: extravawall
+    image: localhost/extravawall:latest
+    build: .
+    restart: always
+    networks:
+      - extravawall-network
+    ports:
+      - 8080:5001
+    depends_on:
+      - extravawall-db-service
+  
+  extravawall-prometheus-service:
+    container_name: extravawall-prometheus
+    image: prom/prometheus:latest
+    networks:
+      - extravawall-network
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - extravawall-service
+  
+  
+  extravawall-grafana-service:
+    container_name: extravawall-grafana
+    image: grafana/grafana:latest
+    networks:
+      - extravawall-network
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana-provisioning:/etc/grafana/provisioning
+    depends_on: 
+      - extravawall-prometheus-service
+  
+  extravawall-db-service:
+    container_name: extravawall-db
+    image: postgres:latest
+    networks:
+      - extravawall-network
+    ports:
+      - 5432:5432
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: develop
+      POSTGRES_DB: extravawall
+    volumes:
+      - extravawall-db-data:/var/lib/postgres
+
+volumes:
+  extravawall-db-data:
